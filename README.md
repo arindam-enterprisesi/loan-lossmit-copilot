@@ -8,10 +8,19 @@ Read `CLAUDE.md` first. The functional source of truth is `docs/feature-design.m
 
 ```bash
 cp .env.example .env      # add your own keys
-docker compose up         # web, api, worker, postgres+pgvector, redis  (lands D1, Abhay)
+docker compose up         # web, api, worker, postgres+pgvector, redis
 ```
 
-Until `docker-compose.yml` lands, run the backend checks directly:
+API on :8000 (`/health`), web placeholder on :3000. Optional `make` shortcuts (on Windows, `make` is not installed by default: `winget install GnuWin32.Make`, or run the commands from the `Makefile` directly):
+
+| Command | Runs |
+| --- | --- |
+| `make up` / `make down` | `docker compose up -d --build` / `docker compose down` |
+| `make migrate` | `alembic upgrade head` inside the api container |
+| `make seed` | seed script (a stub until the synthetic data task lands) |
+| `make test` | `cd backend && uv run pytest` |
+
+Backend checks without Docker:
 
 ```bash
 cd backend

@@ -1,0 +1,80 @@
+# Local stack: postgres (pgvector), redis, api, worker, web placeholder. Files go to S3.
+# Start with `make up` (or `docker compose up -d --build`). Needs a .env (see .env.example).
+
+x-backend: &backend
+  build: ./backend
+  env_file:
+    - path: .env
+      required: false  # defaults in app/settings.py apply without it
+  environment:
+    # Inside the compose network the services are reached by name, not localhost.
+    DATABASE_URL: postgresql+asyncpg://copilot:copilot@postgres:5432/copilot
+    REDIS_URL: redis://redis:6379/0
+  volumes:
+    - ./backend:/app
+    # For AWS_PROFILE users, also mount your profile (path differs per OS):
+    # - ${USERPROFILE}/.aws:/root/.aws:ro
+  depends_on:
+    postgres:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: copilot
+      POSTGRES_PASSWORD: copilot
+      POSTGRES_DB: copilot
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      # -h localhost probes over TCP, which only the final server answers. The temporary
+      # init server (first start only) listens on a unix socket, so it can't pass this.
+      test: ["CMD-SHELL", "pg_isready -h localhost -U copilot -d copilot"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 30s  # first start runs the init scripts, which can take ~40s on Docker Desktop
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    <<: *backend
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request as u; u.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  worker:
+    <<: *backend
+    command: arq app.worker.WorkerSettings --watch app
+
+  # Placeholder until Amogh's Next.js app lands in frontend/.
+  web:
+    image: node:22-alpine
+    ports:
+      - "3000:3000"
+    command:
+      - node
+      - -e
+      - "require('http').createServer((q,r)=>r.end('web placeholder')).listen(3000)"
+
+volumes:
+  pgdata:
