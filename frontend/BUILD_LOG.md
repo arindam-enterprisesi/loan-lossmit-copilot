@@ -36,8 +36,14 @@ Goal: scaffold the app, PRD-based theme, app shell with left nav for both copilo
 - Port 3000 was already in use on my machine, so I ran the dev server on 3100.
 - I haven't looked at the screens in a browser with screenshots yet.
 
+### Tests (added after the first PR)
+`CLAUDE.md` says every change adds tests, so I added Vitest to the same branch.
+- Installed `vitest@3`, `jsdom`, `@testing-library/react` and `@testing-library/jest-dom`. Vitest 5 needs `@types/node` 26 but Next pins 20, and `@vitejs/plugin-react` 6 has heavy peer dependencies that clash with the shadcn CLI, so I used Vitest 3 and no React plugin instead of forcing the install.
+- `npm test` runs 29 tests in 5 files: nav config (slugs, menus stay in their own pillar, no decision wording), date and text formatting, flag chip tones, evidence box position as a percentage of the page, and the mock data (matches the case/document counts, keeps the pay-stub flag, no decision wording).
+- Checked the tests can fail: I broke the evidence box maths on purpose, the test caught it, then I restored it.
+- CI only runs eslint, tsc and build for `frontend/`. Asking Arindam to add `npm test`.
+
 ### Open items
-- Add tests (Vitest). `CLAUDE.md` requires them and there's no frontend test setup yet.
-- Ask Arindam whether `Case` in the contract should have a display reference like `LP-0001`. The PRD screens show one; for now it comes from a mock-only lookup.
-- Ask Arindam about the two `npm audit` warnings (dev-only `minimatch`, `postcss` bundled in Next 15). The only fix is a forced jump to Next 16, which I didn't take.
+- To raise with Arindam on the call: ask him to add `npm test` to the CI frontend job, and ask about the two `npm audit` warnings (dev-only `minimatch`, `postcss` bundled in Next 15). The only fix is a forced jump to Next 16, which I didn't take.
+- Staying on mocks until the backend sends real data: case references like `LP-0001`, the "Cases" menu item, and every screen whose endpoint isn't in the contract yet. Mocks are easy to edit and good for design review.
 - Sidebar is desktop-only for now.
