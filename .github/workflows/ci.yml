@@ -12,6 +12,24 @@ jobs:
     defaults:
       run:
         working-directory: backend
+    # tests/db builds a throwaway database with the real migration, so it needs Postgres
+    # with the pgvector extension (same image as docker-compose.yml).
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: copilot
+          POSTGRES_PASSWORD: copilot
+          POSTGRES_DB: copilot
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -h localhost -U copilot -d copilot"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      TEST_DATABASE_URL: postgresql+asyncpg://copilot:copilot@localhost:5432/copilot
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6

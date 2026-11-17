@@ -20,14 +20,17 @@ API on :8000 (`/health`), web placeholder on :3000. Optional `make` shortcuts (o
 | `make seed` | seed script (a stub until the synthetic data task lands) |
 | `make test` | `cd backend && uv run pytest` |
 
-Backend checks without Docker:
+Backend checks:
 
 ```bash
+docker compose up -d postgres      # tests/db builds a throwaway database with the real migration
 cd backend
 uv sync
-uv run pytest
+uv run pytest                      # tests/db skips (locally) if Postgres is not running
 uv run python -m app.llm.smoke     # one real Claude call; needs ANTHROPIC_API_KEY
 ```
+
+`TEST_DATABASE_URL` (default: the compose Postgres) must point at a server where the user can create databases.
 
 ## Layout
 
