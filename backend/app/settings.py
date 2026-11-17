@@ -37,6 +37,8 @@ class Settings(BaseSettings):
     redis_url: str = "redis://localhost:6379/0"
 
     jwt_secret: SecretStr = SecretStr("change-me")
+    # Password for the three seeded demo logins (synthetic demo only).
+    demo_password: SecretStr = SecretStr("demo")
 
     @field_validator("aws_profile", "aws_region", mode="before")
     @classmethod

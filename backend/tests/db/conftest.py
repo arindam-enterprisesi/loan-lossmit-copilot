@@ -16,6 +16,7 @@ import uuid
 from collections.abc import AsyncIterator, Callable, Iterator
 from pathlib import Path
 
+import httpx
 import pytest
 import pytest_asyncio
 import sqlalchemy as sa
@@ -27,6 +28,8 @@ from sqlalchemy.pool import NullPool
 
 from app.db.enums import Role
 from app.db.models import User
+from app.db.session import get_session
+from app.main import app
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 ADMIN_URL = os.environ.get(
@@ -117,6 +120,23 @@ async def conn(migrated_db_url: str) -> AsyncIterator[AsyncConnection]:
 async def session(conn: AsyncConnection) -> AsyncIterator[AsyncSession]:
     async with AsyncSession(bind=conn, join_transaction_mode="create_savepoint") as s:
         yield s
+
+
+@pytest_asyncio.fixture
+async def client(session: AsyncSession) -> AsyncIterator[httpx.AsyncClient]:
+    """The real app, talking to the test transaction (nothing is committed)."""
+
+    async def use_test_session() -> AsyncIterator[AsyncSession]:
+        yield session
+
+    app.dependency_overrides[get_session] = use_test_session
+    try:
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app), base_url="http://test"
+        ) as c:
+            yield c
+    finally:
+        app.dependency_overrides.clear()
 
 
 async def expect_db_error(conn: AsyncConnection, sql: str, **params: object) -> sa.exc.DBAPIError:

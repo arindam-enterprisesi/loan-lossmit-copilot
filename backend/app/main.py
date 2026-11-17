@@ -1,13 +1,20 @@
-"""FastAPI entry point. Feature routers mount under /api/v1 from ``app.api``."""
+"""FastAPI entry point. Feature routers mount under /api/v1 (the contract's server URL)."""
 
 from __future__ import annotations
 
 from fastapi import FastAPI
 
+from app.api.errors import register_error_handlers
+from app.api.routers import auth
+
+API_PREFIX = "/api/v1"
+
 app = FastAPI(
     title="Loan Processing and Mortgage Loss Mitigation Copilot API",
     version="0.1.0",
 )
+register_error_handlers(app)
+app.include_router(auth.router, prefix=API_PREFIX)
 
 
 @app.get("/health", tags=["infra"])
