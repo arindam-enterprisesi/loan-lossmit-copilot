@@ -38,6 +38,15 @@ class Settings(BaseSettings):
 
     jwt_secret: SecretStr = SecretStr("change-me")
 
+    @field_validator("aws_profile", "aws_region", mode="before")
+    @classmethod
+    def _blank_is_unset(cls, value: object) -> object:
+        # `AWS_PROFILE=` copied from .env.example arrives as "", which boto3 would treat as a
+        # profile named "". A blank value means "not set".
+        if isinstance(value, str) and not value.strip():
+            return None
+        return value
+
     @field_validator("s3_prefix")
     @classmethod
     def _normalise_prefix(cls, value: str) -> str:

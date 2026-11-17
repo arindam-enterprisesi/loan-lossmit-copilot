@@ -65,6 +65,19 @@ def test_keys_cannot_escape_prefix(storage: Storage, bad: str) -> None:
         storage.presigned_get(bad)
 
 
+def test_client_builds_with_blank_profile_from_env_example(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # `cp .env.example .env` leaves AWS_PROFILE= and AWS_REGION= blank.
+    monkeypatch.setenv("AWS_PROFILE", "")
+    monkeypatch.setenv("AWS_REGION", "")
+    monkeypatch.setenv("AWS_ACCESS_KEY_ID", "testing")
+    monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "testing")
+    monkeypatch.setenv("AWS_DEFAULT_REGION", "us-east-1")
+    store = Storage(Settings(_env_file=None, s3_bucket=BUCKET))
+    assert store._get_client() is not None
+
+
 def test_missing_bucket_is_an_error() -> None:
     with pytest.raises(StorageError, match="S3_BUCKET"):
         Storage(Settings(_env_file=None, s3_bucket="")).put("a", b"x")

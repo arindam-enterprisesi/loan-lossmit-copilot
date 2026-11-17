@@ -7,6 +7,7 @@ client is used here; model providers stay inside ``app.llm``.
 
 from __future__ import annotations
 
+import os
 from typing import TYPE_CHECKING, Any
 
 import boto3
@@ -46,6 +47,7 @@ class Storage:
 
     def _get_client(self) -> S3Client:
         if self._client is None:
+            _drop_blank_aws_env()
             s = self._settings
             session = boto3.Session(
                 profile_name=s.aws_profile,
@@ -107,6 +109,17 @@ class Storage:
             Params={"Bucket": self.bucket, "Key": full},
             ExpiresIn=expires,
         )
+
+
+def _drop_blank_aws_env() -> None:
+    """Remove blank ``AWS_*`` variables from the process environment.
+
+    boto3 reads ``AWS_PROFILE`` itself, so a blank ``AWS_PROFILE=`` (what
+    ``cp .env.example .env`` and docker compose's ``env_file`` produce) would be
+    treated as a profile named "". A blank value means "not set".
+    """
+    for name in [n for n, v in os.environ.items() if n.startswith("AWS_") and not v.strip()]:
+        del os.environ[name]
 
 
 def _code(exc: ClientError) -> str:
