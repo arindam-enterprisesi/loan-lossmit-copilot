@@ -118,7 +118,10 @@ async def conn(migrated_db_url: str) -> AsyncIterator[AsyncConnection]:
 
 @pytest_asyncio.fixture
 async def session(conn: AsyncConnection) -> AsyncIterator[AsyncSession]:
-    async with AsyncSession(bind=conn, join_transaction_mode="create_savepoint") as s:
+    # expire_on_commit=False matches app.db.session.get_sessionmaker.
+    async with AsyncSession(
+        bind=conn, join_transaction_mode="create_savepoint", expire_on_commit=False
+    ) as s:
         yield s
 
 

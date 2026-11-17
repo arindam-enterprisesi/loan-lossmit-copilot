@@ -20,6 +20,16 @@ API on :8000 (`/health`), web placeholder on :3000. Optional `make` shortcuts (o
 | `make seed` | seed script (a stub until the synthetic data task lands) |
 | `make test` | `cd backend && uv run pytest` |
 
+First run: `docker compose exec api alembic upgrade head` then `docker compose exec api python -m app.db.seed` (`make migrate`, `make seed`). The seed creates three demo users, all with the password from `DEMO_PASSWORD` (default `demo`), and two empty cases:
+
+| Username | Role | Sees |
+| --- | --- | --- |
+| `underwriter` | underwriter | Pillar 1 (`underwriting`) cases, e.g. Daniel Reyes |
+| `lm_specialist` | lm_specialist | Pillar 2 (`loss_mitigation`) cases, e.g. Angela Whitfield |
+| `admin` | admin | both |
+
+Log in with `POST /api/v1/auth/login` (`{"username", "password"}`) and send the token as `Authorization: Bearer <token>`. Interactive docs: http://localhost:8000/docs.
+
 Backend checks:
 
 ```bash

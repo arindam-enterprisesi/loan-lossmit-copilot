@@ -5,7 +5,7 @@ from __future__ import annotations
 from fastapi import FastAPI
 
 from app.api.errors import register_error_handlers
-from app.api.routers import auth
+from app.api.routers import auth, cases
 
 API_PREFIX = "/api/v1"
 
@@ -15,6 +15,7 @@ app = FastAPI(
 )
 register_error_handlers(app)
 app.include_router(auth.router, prefix=API_PREFIX)
+app.include_router(cases.router, prefix=API_PREFIX)
 
 
 @app.get("/health", tags=["infra"])
