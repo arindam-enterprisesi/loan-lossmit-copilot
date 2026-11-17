@@ -17,7 +17,7 @@ from typing import Any, Generic, TypeVar
 
 from pydantic import BaseModel, ValidationError
 
-from app.llm.config import LLMConfig, TaskConfig, load_llm_config
+from app.llm.config import ConfigError, LLMConfig, TaskConfig, load_llm_config
 from app.llm.prompts import PromptError, load_prompt
 from app.llm.types import (
     AdapterRequest,
@@ -83,9 +83,9 @@ class Gateway:
         self._config = config
         self._prompts_dir = prompts_dir
 
-    def _task_config(self, task: str) -> TaskConfig:
+    def _task_config(self, task: str, provider: str | None) -> TaskConfig:
         config = self._config() if callable(self._config) else self._config
-        return config.for_task(task)
+        return config.for_task(task, provider)
 
     def _log(self, **fields: Any) -> None:
         call_log.info(json.dumps(fields, sort_keys=True), extra={"llm_call": fields})
@@ -96,13 +96,19 @@ class Gateway:
         prompt_id: str,
         variables: dict[str, Any],
         output_model: type[T],
+        *,
+        provider: str | None = None,
     ) -> GatewayResult[T]:
+        """Run one call. ``provider`` overrides the configured provider (smoke, evaluation)."""
         try:
             rendered = load_prompt(prompt_id, self._prompts_dir).render(variables)
         except PromptError as exc:
             raise GatewayError(task, prompt_id, str(exc)) from exc
 
-        settings = self._task_config(task)
+        try:
+            settings = self._task_config(task, provider)
+        except ConfigError as exc:
+            raise GatewayError(task, prompt_id, str(exc)) from exc
         adapter = self._adapters.get(settings.provider)
         if adapter is None:
             raise GatewayError(task, prompt_id, f"no adapter for provider '{settings.provider}'")
@@ -191,9 +197,17 @@ _default_gateway: Gateway | None = None
 
 
 def default_adapters() -> dict[str, ProviderAdapter]:
-    from app.llm.adapters.anthropic import AnthropicAdapter
+    # Adapters create their clients on first use, so a missing key for one
+    # provider never blocks the others.
+    from app.llm.adapters.anthropic import AnthropicAdapter, BedrockClaudeAdapter
+    from app.llm.adapters.langchain import gemini_adapter, openai_adapter
 
-    return {"anthropic": AnthropicAdapter()}
+    return {
+        "anthropic": AnthropicAdapter(),
+        "bedrock": BedrockClaudeAdapter(),
+        "gemini": gemini_adapter(),
+        "openai": openai_adapter(),
+    }
 
 
 def get_gateway() -> Gateway:
@@ -208,6 +222,8 @@ async def run(
     prompt_id: str,
     variables: dict[str, Any],
     output_model: type[T],
+    *,
+    provider: str | None = None,
 ) -> GatewayResult[T]:
     """Run one structured-output call through the default gateway."""
-    return await get_gateway().run(task, prompt_id, variables, output_model)
+    return await get_gateway().run(task, prompt_id, variables, output_model, provider=provider)

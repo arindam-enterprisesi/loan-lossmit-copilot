@@ -17,7 +17,7 @@ Until `docker-compose.yml` lands, run the backend checks directly:
 cd backend
 uv sync
 uv run pytest
-uv run python -m app.llm.smoke     # one real Claude call; needs ANTHROPIC_API_KEY
+uv run python -m app.llm.smoke --provider all   # real calls on each provider with a key in .env
 ```
 
 ## Layout
