@@ -1,0 +1,5 @@
+extends:
+  - recommended
+rules:
+  # The contract's only server is the local docker compose stack.
+  no-server-example.com: off

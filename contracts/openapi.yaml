@@ -1,0 +1,931 @@
+openapi: 3.1.0
+info:
+  title: Loan Processing and Mortgage Loss Mitigation Copilot API
+  version: 0.1.0
+  description: |
+    Contract for Feature 1 (Document Intelligence), cases and jobs.
+    Source of truth: docs/feature-design.md section 1.7 and shared pages B and D.
+    Only Arindam merges changes to this file; each change goes in its own PR.
+
+    Rules that hold across every endpoint:
+    - Every case-scoped path starts with /cases/{case_id}. No endpoint takes a tenant or user ID;
+      both come from the bearer token.
+    - Long work (OCR, classification, extraction, analysis) runs as a background job. The
+      endpoint returns 202 with a Job; the client polls GET /jobs/{job_id}.
+    - Corrections never overwrite: a field keeps original_value, and every change is audited.
+    - No response presents a decision. There is no approve, deny or offer anywhere in this API.
+  license:
+    name: Proprietary
+    identifier: LicenseRef-Proprietary
+servers:
+  - url: http://localhost:8000/api/v1
+    description: Local docker compose
+security:
+  - bearerAuth: []
+tags:
+  - name: auth
+    description: Seeded demo login (three roles); Cognito later with the same claims.
+  - name: cases
+    description: A case groups one borrower scenario's documents and results.
+  - name: documents
+    description: Feature 1 Document Intelligence — upload, classify, extract, review.
+  - name: completeness
+    description: Feature 1 completeness checklist run against the case.
+  - name: jobs
+    description: Background job status for long-running work.
+
+paths:
+  /auth/login:
+    post:
+      tags: [auth]
+      operationId: login
+      summary: Log in as a seeded demo user
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Signed token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /cases:
+    post:
+      tags: [cases]
+      operationId: createCase
+      summary: Create a case
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CaseCreate"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Case"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+    get:
+      tags: [cases]
+      operationId: listCases
+      summary: List cases visible to the caller
+      parameters:
+        - name: pillar
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/Pillar"
+      responses:
+        "200":
+          description: Cases
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Case"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /cases/{case_id}:
+    parameters:
+      - $ref: "#/components/parameters/CaseId"
+    get:
+      tags: [cases]
+      operationId: getCase
+      summary: Get one case
+      responses:
+        "200":
+          description: Case
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Case"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /cases/{case_id}/profile:
+    parameters:
+      - $ref: "#/components/parameters/CaseId"
+    put:
+      tags: [cases]
+      operationId: putCaseProfile
+      summary: Set borrower names, employment type and reference date
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CaseProfile"
+      responses:
+        "200":
+          description: Updated profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CaseProfile"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+
+  /cases/{case_id}/overview:
+    parameters:
+      - $ref: "#/components/parameters/CaseId"
+    get:
+      tags: [cases]
+      operationId: getCaseOverview
+      summary: Every document with its type, owner, period, flags and summary
+      responses:
+        "200":
+          description: Case overview
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CaseOverview"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /cases/{case_id}/documents:
+    parameters:
+      - $ref: "#/components/parameters/CaseId"
+    post:
+      tags: [documents]
+      operationId: uploadDocuments
+      summary: Upload files; queues classification and extraction
+      description: |
+        Accepts PDF, PNG or JPEG. declared_type is "auto" (Auto-detect) or a document type the
+        user picked. File names are stored but never sent to a model.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [files]
+              properties:
+                files:
+                  type: array
+                  items:
+                    type: string
+                    contentMediaType: application/octet-stream
+                declared_type:
+                  oneOf:
+                    - type: string
+                      const: auto
+                    - $ref: "#/components/schemas/DocumentType"
+                  default: auto
+      responses:
+        "202":
+          description: Documents created and a processing job queued
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [documents, job]
+                properties:
+                  documents:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/DocumentSummary"
+                  job:
+                    $ref: "#/components/schemas/Job"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "413":
+          $ref: "#/components/responses/TooLarge"
+        "415":
+          $ref: "#/components/responses/UnsupportedMedia"
+    get:
+      tags: [documents]
+      operationId: listDocuments
+      summary: List documents with type, status and flags
+      parameters:
+        - name: needs_review
+          in: query
+          required: false
+          description: Only documents that have flagged fields
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: Documents
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/DocumentSummary"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /cases/{case_id}/documents/{document_id}/extraction:
+    parameters:
+      - $ref: "#/components/parameters/CaseId"
+      - $ref: "#/components/parameters/DocumentId"
+    get:
+      tags: [documents]
+      operationId: getExtraction
+      summary: Fields, flags and summary of the active run
+      responses:
+        "200":
+          description: Extraction
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Extraction"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /cases/{case_id}/documents/{document_id}/fields/{field_name}:
+    parameters:
+      - $ref: "#/components/parameters/CaseId"
+      - $ref: "#/components/parameters/DocumentId"
+      - name: field_name
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z][a-z0-9_]*$"
+    patch:
+      tags: [documents]
+      operationId: reviewField
+      summary: Confirm or correct a value; the original is always kept
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FieldReview"
+      responses:
+        "200":
+          description: Updated field
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Field"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/EditConflict"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+
+  /cases/{case_id}/documents/{document_id}/type:
+    parameters:
+      - $ref: "#/components/parameters/CaseId"
+      - $ref: "#/components/parameters/DocumentId"
+    put:
+      tags: [documents]
+      operationId: setDocumentType
+      summary: Confirm or change the document type; re-queues extraction when it changes
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [doc_type]
+              properties:
+                doc_type:
+                  $ref: "#/components/schemas/DocumentType"
+                reason:
+                  type: string
+                  maxLength: 500
+      responses:
+        "200":
+          description: Type confirmed; no new extraction needed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DocumentSummary"
+        "202":
+          description: Type changed; extraction job queued
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [document, job]
+                properties:
+                  document:
+                    $ref: "#/components/schemas/DocumentSummary"
+                  job:
+                    $ref: "#/components/schemas/Job"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+
+  # TODO(D3+): GET /cases/{case_id}/documents/{document_id}/pages/{page}  short-lived page image link
+  # TODO(D3+): POST /cases/{case_id}/documents/{document_id}/runs          re-run a document or one stage
+
+  /cases/{case_id}/completeness:
+    parameters:
+      - $ref: "#/components/parameters/CaseId"
+    post:
+      tags: [completeness]
+      operationId: runCompleteness
+      summary: Run the configured checklist against the case
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [checklist_id]
+              properties:
+                checklist_id:
+                  type: string
+                  examples: ["pillar1-wage-earner@1"]
+      responses:
+        "200":
+          description: Completeness result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CompletenessResult"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+
+  /cases/{case_id}/completeness/latest:
+    parameters:
+      - $ref: "#/components/parameters/CaseId"
+    get:
+      tags: [completeness]
+      operationId: getLatestCompleteness
+      summary: The most recent completeness result
+      responses:
+        "200":
+          description: Completeness result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CompletenessResult"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /jobs/{job_id}:
+    parameters:
+      - name: job_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      tags: [jobs]
+      operationId: getJob
+      summary: Status of a background job
+      responses:
+        "200":
+          description: Job
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Job"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  # TODO(F2 Income, D4):       POST /cases/{case_id}/income/analysis, GET .../latest, PATCH components
+  # TODO(F7 Hardship, D4-D6):  GET /cases/{case_id}/hardship/profile, budget
+  # TODO(F3 Assets, D6):       POST /cases/{case_id}/assets-liabilities/analysis
+  # TODO(F5 Guidelines, D6):   POST /guidelines/ask, GET /guidelines/passages/{id}, GET|POST /guidelines/sources
+  # TODO(F6 Underwriting, D7): agent runs, report, conditions, sign-off
+  # TODO(F8 Loss mitigation, D8): waterfall, lender view, agent runs, sign-off
+  # TODO(HITL/Audit, D8):      GET /cases/{case_id}/audit
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    CaseId:
+      name: case_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    DocumentId:
+      name: document_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+  responses:
+    Unauthorized:
+      description: Missing or invalid token
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    NotFound:
+      description: Not found, or not visible to the caller
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    EditConflict:
+      description: Someone else changed this field first; reload and retry
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    ValidationFailed:
+      description: The request body failed validation
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    TooLarge:
+      description: File too large
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    UnsupportedMedia:
+      description: Not a PDF, PNG or JPEG
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+
+  schemas:
+    # ---------- Reusable core shapes ----------
+    Evidence:
+      type: object
+      description: Where a value came from on the page.
+      required: [document_id, page, line_ids]
+      properties:
+        document_id:
+          type: string
+          format: uuid
+        page:
+          type: integer
+          minimum: 1
+        line_ids:
+          type: array
+          description: Numbered line IDs such as "p1-L31".
+          items:
+            type: string
+            pattern: "^p[0-9]+-L[0-9]+$"
+        bbox:
+          $ref: "#/components/schemas/BoundingBox"
+
+    BoundingBox:
+      type: object
+      description: Box on the page image, as fractions of page width and height (0 to 1).
+      required: [x0, y0, x1, y1]
+      properties:
+        x0: { type: number, minimum: 0, maximum: 1 }
+        y0: { type: number, minimum: 0, maximum: 1 }
+        x1: { type: number, minimum: 0, maximum: 1 }
+        y1: { type: number, minimum: 0, maximum: 1 }
+
+    Certainty:
+      type: string
+      enum: [high, medium, low]
+
+    Severity:
+      type: string
+      enum: [error, warning, info]
+
+    Flag:
+      type: object
+      required: [code, severity, message]
+      properties:
+        code:
+          type: string
+          description: Stable code, e.g. DI-CHK-03 or unverified_quote.
+          examples: ["DI-CHK-03"]
+        severity:
+          $ref: "#/components/schemas/Severity"
+        message:
+          type: string
+          examples: ["Gross 3,070.50 minus deductions 1,036.89 is 2,033.61, not 2,083.61"]
+        evidence:
+          $ref: "#/components/schemas/Evidence"
+
+    ReviewStatus:
+      type: string
+      enum: [unreviewed, confirmed, corrected, rejected]
+
+    Field:
+      type: object
+      description: |
+        One extracted value. Values are strings exactly as normalised by code (amounts as
+        "2033.61", dates as "2026-07-31"); arithmetic happens in code with Decimal, never here.
+      required: [name, value, original_value, certainty, flags, review_status]
+      properties:
+        name:
+          type: string
+          examples: ["net_pay_current"]
+        value:
+          type: [string, "null"]
+        original_value:
+          type: [string, "null"]
+          description: The value as first extracted. Never changed by a correction.
+        certainty:
+          $ref: "#/components/schemas/Certainty"
+        flags:
+          type: array
+          items:
+            $ref: "#/components/schemas/Flag"
+        evidence:
+          oneOf:
+            - $ref: "#/components/schemas/Evidence"
+            - type: "null"
+        review_status:
+          $ref: "#/components/schemas/ReviewStatus"
+        reviewed_by:
+          type: [string, "null"]
+        reviewed_at:
+          type: [string, "null"]
+          format: date-time
+        review_reason:
+          type: [string, "null"]
+        version:
+          type: integer
+          description: Incremented on every change; send it back on PATCH to detect edit conflicts.
+
+    FieldReview:
+      type: object
+      required: [action, expected_version]
+      properties:
+        action:
+          type: string
+          enum: [confirm, correct, reject]
+        value:
+          type: string
+          description: Required when action is correct.
+        reason:
+          type: string
+          maxLength: 1000
+          description: Required when action is correct or reject.
+        expected_version:
+          type: integer
+      allOf:
+        - if:
+            properties:
+              action:
+                const: correct
+          then:
+            required: [value, reason]
+        - if:
+            properties:
+              action:
+                const: reject
+          then:
+            required: [reason]
+
+    Job:
+      type: object
+      required: [id, status, progress]
+      properties:
+        id:
+          type: string
+          format: uuid
+        kind:
+          type: string
+          examples: ["document_processing"]
+        status:
+          type: string
+          enum: [queued, running, succeeded, failed]
+        progress:
+          type: number
+          minimum: 0
+          maximum: 1
+        stage:
+          type: [string, "null"]
+          examples: ["extract"]
+        error:
+          type: [string, "null"]
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        details:
+          type: object
+          additionalProperties: true
+
+    # ---------- Auth ----------
+    Role:
+      type: string
+      enum: [underwriter, lm_specialist, admin]
+      description: underwriter covers the loan processor or underwriter role.
+
+    LoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+          format: password
+
+    LoginResponse:
+      type: object
+      required: [access_token, token_type, user]
+      properties:
+        access_token:
+          type: string
+        token_type:
+          type: string
+          const: bearer
+        expires_in:
+          type: integer
+        user:
+          type: object
+          required: [id, name, role]
+          properties:
+            id:
+              type: string
+            name:
+              type: string
+            role:
+              $ref: "#/components/schemas/Role"
+
+    # ---------- Cases ----------
+    Pillar:
+      type: string
+      enum: [underwriting, loss_mitigation]
+
+    CaseCreate:
+      type: object
+      required: [title, pillar]
+      properties:
+        title:
+          type: string
+          maxLength: 200
+          examples: ["Daniel Reyes — purchase"]
+        pillar:
+          $ref: "#/components/schemas/Pillar"
+
+    Case:
+      allOf:
+        - $ref: "#/components/schemas/CaseCreate"
+        - type: object
+          required: [id, created_at]
+          properties:
+            id:
+              type: string
+              format: uuid
+            profile:
+              oneOf:
+                - $ref: "#/components/schemas/CaseProfile"
+                - type: "null"
+            document_count:
+              type: integer
+            created_at:
+              type: string
+              format: date-time
+
+    CaseProfile:
+      type: object
+      required: [borrower_names, employment_type, reference_date]
+      properties:
+        borrower_names:
+          type: array
+          minItems: 1
+          items:
+            type: string
+        employment_type:
+          type: string
+          enum: [wage_earner, self_employed, retired, other]
+        reference_date:
+          type: string
+          format: date
+
+    # ---------- Documents ----------
+    DocumentType:
+      type: string
+      enum:
+        - pay_stub
+        - bank_statement
+        - tax_return_1040
+        - w2
+        - credit_report
+        - mortgage_assistance_application
+        - mortgage_statement
+        - benefits_letter
+        - expense_bill
+        - hardship_letter
+        - unrecognized
+
+    DocumentStatus:
+      type: string
+      enum: [uploaded, processing, type_needed, needs_review, reviewed, failed]
+
+    DocumentSummary:
+      type: object
+      required: [id, case_id, file_name, status, flags]
+      properties:
+        id:
+          type: string
+          format: uuid
+        case_id:
+          type: string
+          format: uuid
+        file_name:
+          type: string
+        declared_type:
+          oneOf:
+            - $ref: "#/components/schemas/DocumentType"
+            - type: "null"
+        doc_type:
+          oneOf:
+            - $ref: "#/components/schemas/DocumentType"
+            - type: "null"
+        type_certainty:
+          oneOf:
+            - $ref: "#/components/schemas/Certainty"
+            - type: "null"
+        status:
+          $ref: "#/components/schemas/DocumentStatus"
+        page_count:
+          type: [integer, "null"]
+        owner:
+          type: [string, "null"]
+          description: The borrower the document belongs to.
+        period_start:
+          type: [string, "null"]
+          format: date
+        period_end:
+          type: [string, "null"]
+          format: date
+        flags:
+          type: array
+          items:
+            $ref: "#/components/schemas/Flag"
+        summary:
+          type: [string, "null"]
+        uploaded_at:
+          type: string
+          format: date-time
+
+    Extraction:
+      type: object
+      required: [document_id, doc_type, fields, flags]
+      properties:
+        document_id:
+          type: string
+          format: uuid
+        run_id:
+          type: string
+          format: uuid
+        doc_type:
+          $ref: "#/components/schemas/DocumentType"
+        fields:
+          type: array
+          description: Flagged fields first.
+          items:
+            $ref: "#/components/schemas/Field"
+        flags:
+          type: array
+          description: Document-level flags, e.g. printed page count does not match pages uploaded.
+          items:
+            $ref: "#/components/schemas/Flag"
+        summary:
+          type: [string, "null"]
+        prompt_id:
+          type: string
+          examples: ["extract@1"]
+        provider:
+          type: string
+        model:
+          type: string
+
+    CaseOverview:
+      type: object
+      required: [case_id, documents]
+      properties:
+        case_id:
+          type: string
+          format: uuid
+        documents:
+          type: array
+          items:
+            $ref: "#/components/schemas/DocumentSummary"
+
+    # ---------- Completeness ----------
+    CompletenessItemStatus:
+      type: string
+      enum: [satisfied, partial, missing, overridden]
+
+    CompletenessItem:
+      type: object
+      required: [item_id, label, status, reason]
+      properties:
+        item_id:
+          type: string
+          examples: ["pay_stubs_30_days"]
+        label:
+          type: string
+        status:
+          $ref: "#/components/schemas/CompletenessItemStatus"
+        reason:
+          type: string
+          examples: ["14 of 30 days of pay stubs found"]
+        document_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+        override_reason:
+          type: [string, "null"]
+
+    CompletenessResult:
+      type: object
+      required: [case_id, checklist_id, checklist_version, checklist_label, overall_status, items, outstanding]
+      properties:
+        id:
+          type: string
+          format: uuid
+        case_id:
+          type: string
+          format: uuid
+        checklist_id:
+          type: string
+        checklist_version:
+          type: string
+        checklist_label:
+          type: string
+          enum: [illustrative, authoritative]
+        overall_status:
+          type: string
+          enum: [complete, incomplete]
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/CompletenessItem"
+        outstanding:
+          type: array
+          description: Plain-text list of outstanding items the user can copy.
+          items:
+            type: string
+        run_at:
+          type: string
+          format: date-time

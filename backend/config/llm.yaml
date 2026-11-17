@@ -1,0 +1,25 @@
+# LLM provider and model per task. Change a task's provider here; no code change needed.
+# Read by app/llm/config.py. Every result records the provider and model it used.
+version: "2026-11-16.1"
+label: illustrative
+
+defaults:
+  provider: anthropic
+  model: claude-opus-5-5
+  temperature: 0          # sent to providers that accept it; current Claude models do not
+  max_tokens: 16000
+  options:
+    effort: medium
+
+tasks:
+  smoke:
+    max_tokens: 1024
+    options:
+      effort: low
+  classify:
+    max_tokens: 2048
+    options:
+      effort: low
+  extract:
+    options:
+      effort: medium
