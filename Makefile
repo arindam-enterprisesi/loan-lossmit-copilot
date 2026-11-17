@@ -1,4 +1,4 @@
-.PHONY: up down migrate seed test
+.PHONY: up down migrate seed test data
 
 up:
 	docker compose up -d --build
@@ -14,3 +14,6 @@ seed:
 
 test:
 	cd backend && uv run pytest
+
+data:
+	cd backend && uv run python ../data/synthetic/generate.py

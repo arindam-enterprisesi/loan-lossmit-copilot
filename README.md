@@ -42,6 +42,16 @@ uv run python -m app.llm.smoke     # one real Claude call; needs ANTHROPIC_API_K
 
 `TEST_DATABASE_URL` (default: the compose Postgres) must point at a server where the user can create databases.
 
+## Synthetic data
+
+`data/synthetic/scenarios/daniel_reyes.json` and `angela_whitfield.json` hold every figure for the two demo borrowers (the Feature Design worked examples), and `data/synthetic/generate.py` renders their documents from those files only, so a number is the same everywhere it appears:
+
+```bash
+make data        # or: cd backend && uv run python ../data/synthetic/generate.py
+```
+
+It writes `data/synthetic/rendered/` (git-ignored): `daniel_reyes/` (7 documents), `daniel_reyes/withheld/` (the 2024 W-2 and return the case is meant to be missing), `angela_whitfield/` (8 documents), `broken/` (a password-protected PDF, a corrupt PDF, an unsupported CSV, a duplicate and two degraded scans) and `manifest.json` (type, role, pages, SHA-256, expected behaviour for each file). Known defects are built in: Daniel's stub prints net pay 2,083.61 (true 2,033.61) and his August statement says "Page 1 of 3" with two pages. Each scenario file separates `documented`, `derived` and `invented` values in its `provenance` block. All people and accounts are invented.
+
 ## Layout
 
 | Path | What | Owner |
