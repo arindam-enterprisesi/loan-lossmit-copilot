@@ -8,17 +8,49 @@ Read `CLAUDE.md` first. The functional source of truth is `docs/feature-design.m
 
 ```bash
 cp .env.example .env      # add your own keys
-docker compose up         # web, api, worker, postgres+pgvector, redis  (lands D1, Abhay)
+docker compose up         # web, api, worker, postgres+pgvector, redis
 ```
 
-Until `docker-compose.yml` lands, run the backend checks directly:
+API on :8000 (`/health`), web placeholder on :3000. Optional `make` shortcuts (on Windows, `make` is not installed by default: `winget install GnuWin32.Make`, or run the commands from the `Makefile` directly):
+
+| Command | Runs |
+| --- | --- |
+| `make up` / `make down` | `docker compose up -d --build` / `docker compose down` |
+| `make migrate` | `alembic upgrade head` inside the api container |
+| `make seed` | seed script (a stub until the synthetic data task lands) |
+| `make test` | `cd backend && uv run pytest` |
+
+First run: `docker compose exec api alembic upgrade head` then `docker compose exec api python -m app.db.seed` (`make migrate`, `make seed`). The seed creates three demo users, all with the password from `DEMO_PASSWORD` (default `demo`), and two empty cases:
+
+| Username | Role | Sees |
+| --- | --- | --- |
+| `underwriter` | underwriter | Pillar 1 (`underwriting`) cases, e.g. Daniel Reyes |
+| `lm_specialist` | lm_specialist | Pillar 2 (`loss_mitigation`) cases, e.g. Angela Whitfield |
+| `admin` | admin | both |
+
+Log in with `POST /api/v1/auth/login` (`{"username", "password"}`) and send the token as `Authorization: Bearer <token>`. Interactive docs: http://localhost:8000/docs.
+
+Backend checks:
 
 ```bash
+docker compose up -d postgres      # tests/db builds a throwaway database with the real migration
 cd backend
 uv sync
-uv run pytest
+uv run pytest                      # tests/db skips (locally) if Postgres is not running
 uv run python -m app.llm.smoke --provider all   # real calls on each provider with a key in .env
 ```
+
+`TEST_DATABASE_URL` (default: the compose Postgres) must point at a server where the user can create databases.
+
+## Synthetic data
+
+`data/synthetic/scenarios/daniel_reyes.json` and `angela_whitfield.json` hold every figure for the two demo borrowers (the Feature Design worked examples), and `data/synthetic/generate.py` renders their documents from those files only, so a number is the same everywhere it appears:
+
+```bash
+make data        # or: cd backend && uv run python ../data/synthetic/generate.py
+```
+
+It writes `data/synthetic/rendered/` (git-ignored): `daniel_reyes/` (7 documents), `daniel_reyes/withheld/` (the 2024 W-2 and return the case is meant to be missing), `angela_whitfield/` (8 documents), `broken/` (a password-protected PDF, a corrupt PDF, an unsupported CSV, a duplicate and two degraded scans) and `manifest.json` (type, role, pages, SHA-256, expected behaviour for each file). Known defects are built in: Daniel's stub prints net pay 2,083.61 (true 2,033.61) and his August statement says "Page 1 of 3" with two pages. Each scenario file separates `documented`, `derived` and `invented` values in its `provenance` block. All people and accounts are invented.
 
 ## Layout
 
