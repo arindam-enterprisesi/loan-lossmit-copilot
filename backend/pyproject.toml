@@ -6,7 +6,12 @@ requires-python = ">=3.12"
 dependencies = [
     "pydantic>=2.9",
     "pyyaml>=6.0",
-    "anthropic>=0.70",
+    "anthropic[bedrock]>=0.70",
+    "langchain-core>=1.8.1",
+    "langchain-openai>=1.8.0",
+    "langchain-google-genai>=4.5.0",
+    "langchain-aws>=1.9.3",
+    "python-dotenv>=1.2.4",
     "fastapi>=0.115",
     "uvicorn[standard]>=0.32",
     "pydantic-settings>=2.6",

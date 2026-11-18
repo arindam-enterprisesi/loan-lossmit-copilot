@@ -37,7 +37,7 @@ docker compose up -d postgres      # tests/db builds a throwaway database with t
 cd backend
 uv sync
 uv run pytest                      # tests/db skips (locally) if Postgres is not running
-uv run python -m app.llm.smoke     # one real Claude call; needs ANTHROPIC_API_KEY
+uv run python -m app.llm.smoke --provider all   # real calls on each provider with a key in .env
 ```
 
 `TEST_DATABASE_URL` (default: the compose Postgres) must point at a server where the user can create databases.
