@@ -6,14 +6,13 @@ decided in ``app.services.cases``; a case the caller cannot see is a 404.
 
 from __future__ import annotations
 
-import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_user, require_roles
-from app.api.errors import ApiError, forbidden
+from app.api.deps import CaseIdPath, case_not_found, get_current_user, require_roles
+from app.api.errors import forbidden
 from app.api.schemas.cases import CaseCreate, CaseList, CaseOut, CaseProfile
 from app.db.enums import Pillar, Role
 from app.db.session import get_session
@@ -28,21 +27,6 @@ router = APIRouter(
 
 User = Annotated[CurrentUser, Depends(get_current_user)]
 Session = Annotated[AsyncSession, Depends(get_session)]
-
-
-def _not_found() -> ApiError:
-    return ApiError(404, "not_found", "Case not found")
-
-
-def _case_id(case_id: str) -> uuid.UUID:
-    """A malformed ID is a 404, like an unknown one (the contract lists no 422 here)."""
-    try:
-        return uuid.UUID(case_id)
-    except ValueError:
-        raise _not_found() from None
-
-
-CaseIdPath = Annotated[uuid.UUID, Depends(_case_id)]
 
 
 @router.post("", status_code=201, response_model=CaseOut, operation_id="createCase")
@@ -64,7 +48,7 @@ async def list_cases(user: User, session: Session, pillar: Pillar | None = None)
 async def get_case(case_id: CaseIdPath, user: User, session: Session) -> CaseOut:
     view = await case_service.get_case(session, user.role, case_id)
     if view is None:
-        raise _not_found()
+        raise case_not_found()
     return CaseOut.from_view(view)
 
 
@@ -81,6 +65,6 @@ async def put_case_profile(
         reference_date=body.reference_date,
     )
     if view is None:
-        raise _not_found()
+        raise case_not_found()
     await session.commit()
     return body

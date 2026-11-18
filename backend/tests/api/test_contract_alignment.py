@@ -16,7 +16,14 @@ from typing import Any
 import pytest
 import yaml
 
-from app.api.schemas.documents import DocumentSummaryOut, EvidenceOut, FlagOut
+from app.api.schemas.documents import (
+    DocumentList,
+    DocumentSummaryOut,
+    EvidenceOut,
+    FlagOut,
+    UploadResult,
+)
+from app.api.schemas.jobs import JobOut
 from app.db import enums
 from app.db.models import Document
 
@@ -24,8 +31,13 @@ CONTRACT = Path(__file__).resolve().parents[3] / "contracts" / "openapi.yaml"
 
 
 @pytest.fixture(scope="module")
-def schemas() -> dict[str, Any]:
-    return yaml.safe_load(CONTRACT.read_text(encoding="utf-8"))["components"]["schemas"]
+def spec() -> dict[str, Any]:
+    return yaml.safe_load(CONTRACT.read_text(encoding="utf-8"))
+
+
+@pytest.fixture(scope="module")
+def schemas(spec: dict[str, Any]) -> dict[str, Any]:
+    return spec["components"]["schemas"]
 
 
 @pytest.mark.parametrize(
@@ -124,3 +136,30 @@ def test_evidence_rejects_a_malformed_line_ref(bad: str) -> None:
 def test_evidence_page_starts_at_one() -> None:
     with pytest.raises(ValueError, match="page"):
         EvidenceOut.from_refs(document_id=uuid.uuid4(), page_no=0, line_refs=["p1-L1"])
+
+
+def _body(spec: dict[str, Any], method: str, status: str) -> dict[str, Any]:
+    operation = spec["paths"]["/cases/{case_id}/documents"][method]
+    return operation["responses"][status]["content"]["application/json"]["schema"]
+
+
+def test_job_uses_the_contracts_names(schemas: dict[str, Any]) -> None:
+    assert set(JobOut.model_fields) == _properties(schemas["Job"])
+
+
+def test_the_upload_response_is_the_contracts_202_body(spec: dict[str, Any]) -> None:
+    body = _body(spec, "post", "202")
+    assert set(UploadResult.model_fields) == set(body["properties"]) == set(body["required"])
+
+
+def test_the_list_response_is_the_contracts_200_body(spec: dict[str, Any]) -> None:
+    body = _body(spec, "get", "200")
+    assert set(DocumentList.model_fields) == set(body["properties"]) == set(body["required"])
+
+
+def test_the_upload_form_fields_are_the_contracts(spec: dict[str, Any]) -> None:
+    form = spec["paths"]["/cases/{case_id}/documents"]["post"]["requestBody"]["content"][
+        "multipart/form-data"
+    ]["schema"]
+    assert set(form["properties"]) == {"files", "declared_type"}
+    assert form["required"] == ["files"]
