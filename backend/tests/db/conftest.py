@@ -167,12 +167,34 @@ async def user_id(conn: AsyncConnection) -> uuid.UUID:
 
 @pytest_asyncio.fixture
 async def case_id(conn: AsyncConnection, user_id: uuid.UUID) -> uuid.UUID:
+    return await insert_case(conn, user_id)
+
+
+async def insert_case(
+    conn: AsyncConnection,
+    user_id: uuid.UUID,
+    *,
+    pillar: str = "underwriting",
+    case_ref: str | None = None,
+) -> uuid.UUID:
+    """A case with a unique ref (taken from the pillar's sequence unless one is given)."""
+    prefix, sequence = (
+        ("LP", "case_ref_lp_seq")
+        if pillar == "underwriting"
+        else (
+            "LM",
+            "case_ref_lm_seq",
+        )
+    )
+    if case_ref is None:
+        number = (await conn.execute(sa.text(f"SELECT nextval('{sequence}')"))).scalar_one()
+        case_ref = f"{prefix}-{number:04d}"
     result = await conn.execute(
         sa.text(
-            "INSERT INTO cases (pillar, title, created_by) "
-            "VALUES ('underwriting', 'Test case', :u) RETURNING id"
+            "INSERT INTO cases (case_ref, pillar, title, created_by) "
+            "VALUES (:r, :p, 'Test case', :u) RETURNING id"
         ),
-        {"u": user_id},
+        {"r": case_ref, "p": pillar, "u": user_id},
     )
     return result.scalar_one()
 
@@ -182,8 +204,8 @@ async def insert_document(
 ) -> uuid.UUID:
     result = await conn.execute(
         sa.text(
-            "INSERT INTO documents (case_id, file_name, file_key, sha256, mime) "
-            "VALUES (:c, 'a.pdf', :k, :h, 'application/pdf') RETURNING id"
+            "INSERT INTO documents (case_id, file_name, s3_key, sha256, mime, size_bytes) "
+            "VALUES (:c, 'a.pdf', :k, :h, 'application/pdf', 1024) RETURNING id"
         ),
         {"c": case_id, "k": f"k/{uuid.uuid4().hex}.pdf", "h": sha256 or uuid.uuid4().hex * 2},
     )

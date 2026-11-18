@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import uuid
 from typing import Any
 
@@ -48,8 +49,8 @@ async def seeded(session: AsyncSession) -> None:
 async def audit_rows(session: AsyncSession, case: uuid.UUID) -> list[Any]:
     result = await session.execute(
         sa.text(
-            "SELECT actor, action, entity, before, after FROM audit_events "
-            "WHERE case_id = :c ORDER BY id"
+            "SELECT actor_id, role, action, entity_type, entity_id, before, after "
+            "FROM audit_events WHERE case_id = :c ORDER BY id"
         ),
         {"c": case},
     )
@@ -75,6 +76,33 @@ async def test_create_case(client: httpx.AsyncClient, session: AsyncSession) -> 
         sa.text("SELECT created_by FROM cases WHERE id = :c"), {"c": body["id"]}
     )
     assert created_by == user_id("underwriter")
+
+
+async def test_new_cases_get_a_ref_from_their_pillars_sequence(
+    client: httpx.AsyncClient, session: AsyncSession
+) -> None:
+    # case_ref is not in the contract's Case, so it is stored but never sent.
+    refs = []
+    for role, pillar in [
+        (Role.UNDERWRITER, "underwriting"),
+        (Role.UNDERWRITER, "underwriting"),
+        (Role.LM_SPECIALIST, "loss_mitigation"),
+    ]:
+        response = await client.post(
+            "/api/v1/cases", json={"title": "T", "pillar": pillar}, headers=auth(role)
+        )
+        assert "case_ref" not in response.json()
+        refs.append(
+            await session.scalar(
+                sa.text("SELECT case_ref FROM cases WHERE id = :c"), {"c": response.json()["id"]}
+            )
+        )
+
+    assert all(re.fullmatch(r"(LP|LM)-\d{4,}", ref) for ref in refs)
+    assert [ref[:2] for ref in refs] == ["LP", "LP", "LM"]
+    # Never the seeded refs, and never repeated (the seed moved the sequences past them).
+    assert len(set(refs)) == 3
+    assert not {"LP-0001", "LM-0001"} & set(refs)
 
 
 @pytest.mark.parametrize(
@@ -139,9 +167,12 @@ async def test_create_writes_an_audit_event(
     new_id = uuid.UUID(response.json()["id"])
 
     [event] = await audit_rows(session, new_id)
-    assert event.actor == str(user_id("lm_specialist"))
-    assert (event.action, event.entity) == ("case.created", f"case:{new_id}")
-    assert event.after == {"title": "Audited", "pillar": "loss_mitigation", "status": "open"}
+    assert event.actor_id == user_id("lm_specialist")
+    assert event.role == "lm_specialist"
+    assert (event.action, event.entity_type, event.entity_id) == ("case.created", "case", new_id)
+    after = dict(event.after)
+    assert re.fullmatch(r"LM-\d{4,}", after.pop("case_ref"))
+    assert after == {"title": "Audited", "pillar": "loss_mitigation", "status": "open"}
 
 
 # --- list --------------------------------------------------------------------------------
@@ -246,7 +277,8 @@ async def test_profile_update_is_audited_with_before_and_after(
 
     first, second = await audit_rows(session, DANIEL)
     assert first.action == second.action == "case.profile_updated"
-    assert first.actor == str(user_id("underwriter"))
+    assert first.actor_id == user_id("underwriter")
+    assert (first.role, first.entity_type, first.entity_id) == ("underwriter", "case", DANIEL)
     assert first.before == {"borrower_names": None, "employment_type": None, "reference_date": None}
     assert first.after["employment_type"] == "wage_earner"
     # The earlier value is not overwritten away: it lives on in the next event's "before".
@@ -295,7 +327,9 @@ async def test_a_partly_filled_profile_reads_back_as_null(
     client: httpx.AsyncClient, session: AsyncSession
 ) -> None:
     await session.execute(
-        sa.text("UPDATE cases SET borrower_names = ARRAY['Daniel Reyes'] WHERE id = :c"),
+        sa.text(
+            "UPDATE cases SET borrower_names = CAST('[\"Daniel Reyes\"]' AS jsonb) WHERE id = :c"
+        ),
         {"c": DANIEL},
     )
     got = await client.get(f"/api/v1/cases/{DANIEL}", headers=auth(Role.UNDERWRITER))

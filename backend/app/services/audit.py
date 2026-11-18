@@ -17,19 +17,27 @@ from app.db.models import AuditEvent
 async def record(
     session: AsyncSession,
     *,
-    actor: str,
+    actor_id: uuid.UUID | None,
+    role: str,
     action: str,
-    entity: str,
+    entity_type: str,
+    entity_id: uuid.UUID | None = None,
     case_id: uuid.UUID | None = None,
     before: dict[str, Any] | None = None,
     after: dict[str, Any] | None = None,
     reason: str | None = None,
 ) -> AuditEvent:
-    """Add one event to the session. ``actor`` is a user ID, or ``system`` / ``worker``."""
+    """Add one event to the session.
+
+    ``actor_id`` is the user who acted; ``None`` means the system or a worker, and then ``role``
+    says which (``system`` or ``worker``). For a user, ``role`` is their role.
+    """
     event = AuditEvent(
-        actor=actor,
+        actor_id=actor_id,
+        role=role,
         action=action,
-        entity=entity,
+        entity_type=entity_type,
+        entity_id=entity_id,
         case_id=case_id,
         before=before,
         after=after,

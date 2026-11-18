@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import httpx
 import pytest
+import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.enums import Role
@@ -42,6 +43,18 @@ async def test_response_never_contains_the_password_or_its_hash(client: httpx.As
     assert PASSWORD not in response.text
     assert "scrypt" not in response.text
     assert "password" not in response.text
+
+
+async def test_email_is_stored_but_never_returned(
+    client: httpx.AsyncClient, session: AsyncSession
+) -> None:
+    # users.email exists (schema doc) but the contract's login user is only id, name and role.
+    await session.execute(
+        sa.text("UPDATE users SET email = 'admin@example.test' WHERE username = 'admin'")
+    )
+    response = await client.post(LOGIN, json={"username": "admin", "password": PASSWORD})
+    assert set(response.json()["user"]) == {"id", "name", "role"}
+    assert "email" not in response.text and "example.test" not in response.text
 
 
 async def test_wrong_password_and_unknown_user_look_identical(client: httpx.AsyncClient) -> None:
