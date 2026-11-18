@@ -1,0 +1,739 @@
+{
+  "scenario_id": "angela_whitfield",
+  "schema_version": 1,
+  "version": "2026-11-17.1",
+  "label": "illustrative",
+  "borrower": {
+    "name": "Angela Whitfield",
+    "address": "2210 Larkspur Court, Dayton, OH 45420",
+    "ssn_last4": "7719",
+    "case_title": "Angela Whitfield — hardship",
+    "pillar": "loss_mitigation",
+    "reference_date": "2026-10-16"
+  },
+  "loan_record": {
+    "loan_id": "8800412271",
+    "investor": "Sample Investor A",
+    "servicer": "Pinebrook Mortgage Servicing",
+    "borrower": "Angela Whitfield",
+    "property_address": "2210 Larkspur Court, Dayton, OH 45420",
+    "unpaid_principal_balance": "212400.00",
+    "interest_rate_pct": "6.250",
+    "principal_and_interest": "1298.40",
+    "escrow": "421.60",
+    "monthly_payment": "1720.00",
+    "next_due_date": "2026-11-01",
+    "missed_payment_due_dates": [
+      "2026-08-01",
+      "2026-09-01",
+      "2026-10-01"
+    ],
+    "past_due_amount": "5160.00",
+    "total_due": "5160.00",
+    "delinquency_status": "3 payments past due",
+    "months_delinquent": 3
+  },
+  "documents": [
+    {
+      "id": "mortgage_assistance_application",
+      "type": "mortgage_assistance_application",
+      "file_name": "mortgage_assistance_application.pdf",
+      "role": "case",
+      "declared_type": null,
+      "facts": {
+        "title": "Mortgage Assistance Application",
+        "borrower": "Angela Whitfield",
+        "address": "2210 Larkspur Court, Dayton, OH 45420",
+        "phone": "(937) 555-0147",
+        "loan_number": "8800412271",
+        "servicer": "Pinebrook Mortgage Servicing",
+        "property_address": "2210 Larkspur Court, Dayton, OH 45420",
+        "occupancy": "Owner-occupied primary residence",
+        "hardship_reasons": [
+          {
+            "reason": "Reduction in income",
+            "checked": true
+          },
+          {
+            "reason": "Unemployment",
+            "checked": false
+          },
+          {
+            "reason": "Increase in housing expense",
+            "checked": false
+          },
+          {
+            "reason": "Medical or disability",
+            "checked": false
+          },
+          {
+            "reason": "Divorce or separation",
+            "checked": false
+          },
+          {
+            "reason": "Other",
+            "checked": false
+          }
+        ],
+        "intent": "Keep the home",
+        "monthly_gross_income": "4200.00",
+        "other_income": "0.00",
+        "expenses": [
+          {
+            "category": "Housing (mortgage)",
+            "amount": "1720.00"
+          },
+          {
+            "category": "Utilities",
+            "amount": "310.00"
+          },
+          {
+            "category": "Food and everyday",
+            "amount": "780.00"
+          },
+          {
+            "category": "Loan payments",
+            "amount": "410.00"
+          },
+          {
+            "category": "Other",
+            "amount": "200.00"
+          }
+        ],
+        "total_expenses": "3420.00",
+        "assets": [
+          {
+            "description": "Checking account",
+            "amount": "640.25"
+          }
+        ],
+        "enclosed": [
+          "Hardship letter",
+          "Pay stubs",
+          "Bank statements"
+        ],
+        "signature": "Angela Whitfield",
+        "signed_date": "2026-10-14"
+      }
+    },
+    {
+      "id": "hardship_letter",
+      "type": "hardship_letter",
+      "file_name": "hardship_letter.pdf",
+      "role": "case",
+      "declared_type": null,
+      "facts": {
+        "lines": [
+          "Angela Whitfield",
+          "2210 Larkspur Court, Dayton, OH 45420",
+          "Date: 2026-10-14",
+          "Re: Loan 8800412271 - request for help with my mortgage",
+          "Dear Loss Mitigation Team,",
+          "Because my employer cut my hours from 40 to 30 a week in July, my pay fell by a quarter.",
+          "I fell behind in August and I now owe 5,160.00 in missed payments.",
+          "My take-home pay no longer covers my bills and the mortgage together.",
+          "I do not know whether my hours will return to 40 a week.",
+          "I have cut my spending where I can and I have used up my savings.",
+          "I am enclosing my application, my recent pay stubs and my recent bank statements.",
+          "I am asking for help to lower my payment so I can stay current.",
+          "I have lived in this house for nine years and my family is here.",
+          "I want to keep my home and I will do everything I can to make that work.",
+          "Sincerely,",
+          "Angela Whitfield"
+        ],
+        "quotes": {
+          "primary_reason": {
+            "line": 6,
+            "quote": "cut my hours from 40 to 30 a week in July"
+          },
+          "intent": {
+            "line": 14,
+            "quote": "I want to keep my home"
+          }
+        }
+      }
+    },
+    {
+      "id": "mortgage_statement_2026-10",
+      "type": "mortgage_statement",
+      "file_name": "mortgage_statement_2026-10.pdf",
+      "role": "case",
+      "declared_type": null,
+      "facts": {
+        "servicer": "Pinebrook Mortgage Servicing",
+        "servicer_address": "PO Box 7120, Cincinnati, OH 45202",
+        "statement_date": "2026-10-16",
+        "loan_number": "8800412271",
+        "borrower": "Angela Whitfield",
+        "property_address": "2210 Larkspur Court, Dayton, OH 45420",
+        "unpaid_principal_balance": "212400.00",
+        "interest_rate_pct": "6.250",
+        "payment_due_date": "2026-10-01",
+        "principal_and_interest": "1298.40",
+        "escrow": "421.60",
+        "monthly_payment": "1720.00",
+        "past_due_amount": "5160.00",
+        "late_fees": "0.00",
+        "total_due": "5160.00",
+        "payments_past_due": [
+          "2026-08-01",
+          "2026-09-01",
+          "2026-10-01"
+        ],
+        "delinquency_notice": "Your loan is 3 payments past due. Contact us to discuss options to avoid foreclosure."
+      }
+    },
+    {
+      "id": "pay_stub_2026-06-30",
+      "type": "pay_stub",
+      "file_name": "pay_stub_2026-06-30.pdf",
+      "role": "case",
+      "declared_type": null,
+      "facts": {
+        "employer": {
+          "name": "Brightwater Health Supply, LLC",
+          "address": "77 Commerce Drive, Dayton, OH 45402",
+          "ein": "34-2210987"
+        },
+        "employee": "Angela Whitfield",
+        "employee_id": "B-7731",
+        "address": "2210 Larkspur Court, Dayton, OH 45420",
+        "pay_frequency": "Semi-monthly",
+        "period_start": "2026-06-16",
+        "period_end": "2026-06-30",
+        "pay_date": "2026-06-30",
+        "period_number": 12,
+        "periods_per_year": 24,
+        "earnings": [
+          {
+            "description": "Regular",
+            "hours": "80.00",
+            "rate": "35.00",
+            "current": "2800.00",
+            "ytd": "33600.00"
+          }
+        ],
+        "deductions": [
+          {
+            "description": "Federal income tax",
+            "current": "304.50",
+            "ytd": "3654.00"
+          },
+          {
+            "description": "State income tax",
+            "current": "106.30",
+            "ytd": "1275.60"
+          },
+          {
+            "description": "Social Security",
+            "current": "173.60",
+            "ytd": "2083.20"
+          },
+          {
+            "description": "Medicare",
+            "current": "40.60",
+            "ytd": "487.20"
+          }
+        ],
+        "gross_current": "2800.00",
+        "gross_ytd": "33600.00",
+        "deductions_current": "625.00",
+        "deductions_ytd": "7500.00",
+        "net_current": "2175.00",
+        "net_ytd": "26100.00",
+        "printed_net_current": null,
+        "direct_deposit_last4": "3358",
+        "pages": 1
+      }
+    },
+    {
+      "id": "pay_stub_2026-09-30",
+      "type": "pay_stub",
+      "file_name": "pay_stub_2026-09-30.pdf",
+      "role": "case",
+      "declared_type": null,
+      "facts": {
+        "employer": {
+          "name": "Brightwater Health Supply, LLC",
+          "address": "77 Commerce Drive, Dayton, OH 45402",
+          "ein": "34-2210987"
+        },
+        "employee": "Angela Whitfield",
+        "employee_id": "B-7731",
+        "address": "2210 Larkspur Court, Dayton, OH 45420",
+        "pay_frequency": "Semi-monthly",
+        "period_start": "2026-09-16",
+        "period_end": "2026-09-30",
+        "pay_date": "2026-09-30",
+        "period_number": 18,
+        "periods_per_year": 24,
+        "earnings": [
+          {
+            "description": "Regular",
+            "hours": "60.00",
+            "rate": "35.00",
+            "current": "2100.00",
+            "ytd": "46200.00"
+          }
+        ],
+        "deductions": [
+          {
+            "description": "Federal income tax",
+            "current": "189.40",
+            "ytd": "4790.40"
+          },
+          {
+            "description": "State income tax",
+            "current": "74.95",
+            "ytd": "1725.30"
+          },
+          {
+            "description": "Social Security",
+            "current": "130.20",
+            "ytd": "2864.40"
+          },
+          {
+            "description": "Medicare",
+            "current": "30.45",
+            "ytd": "669.90"
+          }
+        ],
+        "gross_current": "2100.00",
+        "gross_ytd": "46200.00",
+        "deductions_current": "425.00",
+        "deductions_ytd": "10050.00",
+        "net_current": "1675.00",
+        "net_ytd": "36150.00",
+        "printed_net_current": null,
+        "direct_deposit_last4": "3358",
+        "pages": 1
+      }
+    },
+    {
+      "id": "bank_statement_2026-07",
+      "type": "bank_statement",
+      "file_name": "bank_statement_2026-07.pdf",
+      "role": "case",
+      "declared_type": null,
+      "facts": {
+        "bank": "Lakeside Credit Union",
+        "bank_address": "900 Riverview Avenue, Dayton, OH 45402",
+        "account_holder": "Angela Whitfield",
+        "account_type": "Share Draft Checking",
+        "account_last4": "3358",
+        "period_start": "2026-07-01",
+        "period_end": "2026-07-31",
+        "opening_balance": "1382.50",
+        "closing_balance": "1102.50",
+        "total_pages_printed": 2,
+        "pages_rendered": 2,
+        "first_page_rows": 16,
+        "other_page_rows": 16,
+        "transactions": [
+          {
+            "date": "2026-07-01",
+            "description": "PINEBROOK MORTGAGE SERVICING",
+            "amount": "-1720.00",
+            "category": "housing payment",
+            "counterparty": "Pinebrook Mortgage Servicing"
+          },
+          {
+            "date": "2026-07-06",
+            "description": "ALDI 55021",
+            "amount": "-98.93",
+            "category": "everyday spending",
+            "counterparty": "Aldi"
+          },
+          {
+            "date": "2026-07-06",
+            "description": "TARGET T-1124",
+            "amount": "-124.96",
+            "category": "other",
+            "counterparty": "Target"
+          },
+          {
+            "date": "2026-07-07",
+            "description": "MEIJER #118",
+            "amount": "-126.61",
+            "category": "everyday spending",
+            "counterparty": "Meijer"
+          },
+          {
+            "date": "2026-07-08",
+            "description": "REDHAWK AUTO CREDIT",
+            "amount": "-410.00",
+            "category": "loan payment",
+            "counterparty": "Redhawk Auto Credit"
+          },
+          {
+            "date": "2026-07-09",
+            "description": "MIAMI VALLEY ELECTRIC",
+            "amount": "-142.60",
+            "category": "utility",
+            "counterparty": "Miami Valley Electric"
+          },
+          {
+            "date": "2026-07-09",
+            "description": "ATM CASH WITHDRAWAL",
+            "amount": "-90.31",
+            "category": "other",
+            "counterparty": "ATM"
+          },
+          {
+            "date": "2026-07-14",
+            "description": "DAYTON WATER DEPT",
+            "amount": "-61.40",
+            "category": "utility",
+            "counterparty": "Dayton Water Department"
+          },
+          {
+            "date": "2026-07-14",
+            "description": "ALDI 55021",
+            "amount": "-71.24",
+            "category": "everyday spending",
+            "counterparty": "Aldi"
+          },
+          {
+            "date": "2026-07-15",
+            "description": "BRIGHTWATER HEALTH SUPPLY PAYROLL",
+            "amount": "1675.00",
+            "category": "payroll deposit",
+            "counterparty": "Brightwater Health Supply"
+          },
+          {
+            "date": "2026-07-16",
+            "description": "SKYLINE FIBER INTERNET",
+            "amount": "-106.00",
+            "category": "utility",
+            "counterparty": "Skyline Fiber"
+          },
+          {
+            "date": "2026-07-16",
+            "description": "SPEEDWAY 08821",
+            "amount": "-64.72",
+            "category": "everyday spending",
+            "counterparty": "Speedway"
+          },
+          {
+            "date": "2026-07-18",
+            "description": "NETFLIX.COM",
+            "amount": "-63.36",
+            "category": "other",
+            "counterparty": "Netflix"
+          },
+          {
+            "date": "2026-07-22",
+            "description": "ALDI 55021",
+            "amount": "-59.83",
+            "category": "everyday spending",
+            "counterparty": "Aldi"
+          },
+          {
+            "date": "2026-07-23",
+            "description": "CVS PHARMACY 03355",
+            "amount": "-102.18",
+            "category": "everyday spending",
+            "counterparty": "CVS"
+          },
+          {
+            "date": "2026-07-23",
+            "description": "ALDI 55021",
+            "amount": "-134.76",
+            "category": "everyday spending",
+            "counterparty": "Aldi"
+          },
+          {
+            "date": "2026-07-27",
+            "description": "ATM CASH WITHDRAWAL",
+            "amount": "-131.37",
+            "category": "other",
+            "counterparty": "ATM"
+          },
+          {
+            "date": "2026-07-28",
+            "description": "GIANT EAGLE 6640",
+            "amount": "-121.73",
+            "category": "everyday spending",
+            "counterparty": "Giant Eagle"
+          },
+          {
+            "date": "2026-07-31",
+            "description": "BRIGHTWATER HEALTH SUPPLY PAYROLL",
+            "amount": "1675.00",
+            "category": "payroll deposit",
+            "counterparty": "Brightwater Health Supply"
+          }
+        ]
+      }
+    },
+    {
+      "id": "bank_statement_2026-09",
+      "type": "bank_statement",
+      "file_name": "bank_statement_2026-09.pdf",
+      "role": "case",
+      "declared_type": null,
+      "facts": {
+        "bank": "Lakeside Credit Union",
+        "bank_address": "900 Riverview Avenue, Dayton, OH 45402",
+        "account_holder": "Angela Whitfield",
+        "account_type": "Share Draft Checking",
+        "account_last4": "3358",
+        "period_start": "2026-09-01",
+        "period_end": "2026-09-30",
+        "opening_balance": "200.25",
+        "closing_balance": "640.25",
+        "total_pages_printed": 2,
+        "pages_rendered": 2,
+        "first_page_rows": 16,
+        "other_page_rows": 16,
+        "transactions": [
+          {
+            "date": "2026-09-04",
+            "description": "MEIJER #118",
+            "amount": "-85.72",
+            "category": "everyday spending",
+            "counterparty": "Meijer"
+          },
+          {
+            "date": "2026-09-08",
+            "description": "REDHAWK AUTO CREDIT",
+            "amount": "-410.00",
+            "category": "loan payment",
+            "counterparty": "Redhawk Auto Credit"
+          },
+          {
+            "date": "2026-09-09",
+            "description": "MIAMI VALLEY ELECTRIC",
+            "amount": "-142.60",
+            "category": "utility",
+            "counterparty": "Miami Valley Electric"
+          },
+          {
+            "date": "2026-09-09",
+            "description": "TARGET T-1124",
+            "amount": "-82.55",
+            "category": "other",
+            "counterparty": "Target"
+          },
+          {
+            "date": "2026-09-11",
+            "description": "CVS PHARMACY 03355",
+            "amount": "-92.22",
+            "category": "everyday spending",
+            "counterparty": "CVS"
+          },
+          {
+            "date": "2026-09-14",
+            "description": "DAYTON WATER DEPT",
+            "amount": "-61.40",
+            "category": "utility",
+            "counterparty": "Dayton Water Department"
+          },
+          {
+            "date": "2026-09-15",
+            "description": "BRIGHTWATER HEALTH SUPPLY PAYROLL",
+            "amount": "1675.00",
+            "category": "payroll deposit",
+            "counterparty": "Brightwater Health Supply"
+          },
+          {
+            "date": "2026-09-16",
+            "description": "SKYLINE FIBER INTERNET",
+            "amount": "-106.00",
+            "category": "utility",
+            "counterparty": "Skyline Fiber"
+          },
+          {
+            "date": "2026-09-16",
+            "description": "NETFLIX.COM",
+            "amount": "-154.56",
+            "category": "other",
+            "counterparty": "Netflix"
+          },
+          {
+            "date": "2026-09-18",
+            "description": "AMAZON MKTPLACE",
+            "amount": "-78.66",
+            "category": "other",
+            "counterparty": "Amazon"
+          },
+          {
+            "date": "2026-09-21",
+            "description": "ALDI 55021",
+            "amount": "-127.96",
+            "category": "everyday spending",
+            "counterparty": "Aldi"
+          },
+          {
+            "date": "2026-09-21",
+            "description": "FAMILY DOLLAR 2210",
+            "amount": "-94.23",
+            "category": "other",
+            "counterparty": "Family Dollar"
+          },
+          {
+            "date": "2026-09-22",
+            "description": "ALDI 55021",
+            "amount": "-127.96",
+            "category": "everyday spending",
+            "counterparty": "Aldi"
+          },
+          {
+            "date": "2026-09-23",
+            "description": "CVS PHARMACY 03355",
+            "amount": "-97.64",
+            "category": "everyday spending",
+            "counterparty": "CVS"
+          },
+          {
+            "date": "2026-09-24",
+            "description": "CVS PHARMACY 03355",
+            "amount": "-66.23",
+            "category": "everyday spending",
+            "counterparty": "CVS"
+          },
+          {
+            "date": "2026-09-24",
+            "description": "ZELLE TO R WHITFIELD",
+            "amount": "-1000.00",
+            "category": "transfer out",
+            "counterparty": "R Whitfield"
+          },
+          {
+            "date": "2026-09-25",
+            "description": "SPEEDWAY 08821",
+            "amount": "-99.80",
+            "category": "everyday spending",
+            "counterparty": "Speedway"
+          },
+          {
+            "date": "2026-09-26",
+            "description": "ALDI 55021",
+            "amount": "-82.47",
+            "category": "everyday spending",
+            "counterparty": "Aldi"
+          },
+          {
+            "date": "2026-09-30",
+            "description": "BRIGHTWATER HEALTH SUPPLY PAYROLL",
+            "amount": "1675.00",
+            "category": "payroll deposit",
+            "counterparty": "Brightwater Health Supply"
+          }
+        ]
+      }
+    },
+    {
+      "id": "utility_bill_2026-09",
+      "type": "expense_bill",
+      "file_name": "utility_bill_2026-09.pdf",
+      "role": "case",
+      "declared_type": null,
+      "facts": {
+        "provider": "Miami Valley Electric",
+        "provider_address": "PO Box 5100, Dayton, OH 45401",
+        "customer": "Angela Whitfield",
+        "service_address": "2210 Larkspur Court, Dayton, OH 45420",
+        "account_number_last4": "5518",
+        "period_start": "2026-08-10",
+        "period_end": "2026-09-08",
+        "statement_date": "2026-09-09",
+        "due_date": "2026-09-30",
+        "amount_due": "142.60"
+      }
+    }
+  ],
+  "expected": {
+    "hardship_profile": {
+      "primary_reason": "reduction_in_income",
+      "onset": "July 2026",
+      "duration": "unknown",
+      "intent": "keep",
+      "hours_before": 40,
+      "hours_after": 30
+    },
+    "income": {
+      "stub_semi_monthly_before": "2800.00",
+      "stub_semi_monthly_after": "2100.00",
+      "stub_drop_pct": "25.00",
+      "gross_monthly": "4200.00",
+      "net_monthly": "3350.00",
+      "net_semi_monthly_after": "1675.00"
+    },
+    "budget": {
+      "stated": {
+        "Housing (mortgage)": "1720.00",
+        "Utilities": "310.00",
+        "Food and everyday": "780.00",
+        "Loan payments": "410.00",
+        "Other": "200.00"
+      },
+      "observed": {
+        "Housing (mortgage)": "1720.00",
+        "Utilities": "310.00",
+        "Food and everyday": "780.00",
+        "Loan payments": "410.00",
+        "Other": "410.00"
+      },
+      "stated_total": "3420.00",
+      "observed_total": "3630.00",
+      "other_stated": "200.00",
+      "other_observed": "410.00",
+      "deficit_stated": "70.00",
+      "deficit_observed": "280.00",
+      "observed_basis": "July 2026 statement (mortgage still being paid) and the mortgage statement; September carries the same non-housing totals",
+      "housing_ratio_pct": "40.95",
+      "housing_ratio_before_cut_pct": "30.71",
+      "arrears": "5160.00",
+      "liquid_assets": "640.25",
+      "liquid_assets_pct_of_arrears": "12.41"
+    },
+    "lender_view": {
+      "settings": {
+        "property_value": "265000.00",
+        "liquidation_discount_pct": "15",
+        "foreclosure_and_carrying_costs": "24000.00",
+        "horizon_months": 36,
+        "redefault_chance_pct": "30"
+      },
+      "foreclosure": {
+        "claim": "217560.00",
+        "net_recovery": "201250.00",
+        "loss": "16310.00"
+      },
+      "modification": {
+        "payment_reduction_monthly": "250.00",
+        "reduction_over_horizon": "9000.00",
+        "expected_redefault_loss": "4893.00",
+        "expected_cost": "13893.00"
+      },
+      "modification_advantage": "2417.00",
+      "target_payment": "1470.00"
+    },
+    "waterfall": {
+      "loan_modification": "met"
+    },
+    "completeness": {
+      "missing": [
+        "bank_statement_2026-08"
+      ],
+      "request_item": "August 2026 bank statement"
+    }
+  },
+  "defects": [],
+  "provenance": {
+    "documented": [
+      "hours cut 40 to 30 in July 2026, behind from August, duration unknown, keep home; quotes on p1-L6 and p1-L14 (FD 7.5, 7.8)",
+      "stubs 2,800.00 to 2,100.00 per half-month, monthly 4,200.00 gross and 3,350.00 net, expenses 3,420.00 stated and 3,630.00 observed, deficits 70.00 and 280.00, 40.95% and 30.71%, arrears 5,160.00, liquid assets 640.25 (FD 7.8)",
+      "unpaid balance 212,400.00, lender view settings and the loss 16,310.00, 13,893.00 and 2,417.00 (FD 8.3, 8.8)",
+      "August 2026 bank statement missing; signed application; October mortgage statement (FSD 7, 11; FD 9.8)"
+    ],
+    "derived": [
+      "hourly 35.00 x 80 hours = 2,800.00; x 60 = 2,100.00",
+      "payment 1,720.00 satisfies both 40.95% (of 4,200.00) and 30.71% (of 5,600.00); arrears = 3 x 1,720.00",
+      "modification target 35% of 4,200.00 = 1,470.00, so the reduction is 250.00",
+      "July statement spends 3,630.00 (3,350.00 in, 280.00 down); September has the same non-housing spending plus a 1,000.00 transfer out so opening and closing (640.25) stay positive"
+    ],
+    "invented": "names, addresses, employer, servicer, bank, ID last-4s, deduction split, principal/interest/escrow split, interest rate, merchants and individual transaction amounts, the 1,000.00 transfer out"
+  }
+}

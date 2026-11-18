@@ -1,0 +1,7 @@
+# Settings for the seeded demo login. Read by app/services/auth_config.py.
+# Every setting is versioned and labelled; change the version when you change a value.
+version: "2026-11-17.1"
+label: illustrative
+
+# How long a login token stays valid. A demo convenience, not a policy.
+access_token_minutes: 480

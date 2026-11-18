@@ -1,0 +1,949 @@
+{
+  "scenario_id": "daniel_reyes",
+  "schema_version": 1,
+  "version": "2026-11-17.1",
+  "label": "illustrative",
+  "borrower": {
+    "name": "Daniel Reyes",
+    "address": "418 Alder Street, Apt 3B, Columbus, OH 43215",
+    "ssn_last4": "4821",
+    "case_title": "Daniel Reyes — purchase",
+    "pillar": "underwriting",
+    "reference_date": "2026-10-12"
+  },
+  "loan_scenario": {
+    "purpose": "purchase",
+    "occupancy": "primary residence",
+    "property_value": "400000.00",
+    "loan_amount": "360000.00",
+    "proposed_housing_payment": "1980.00",
+    "funds_needed_to_close": "36500.00"
+  },
+  "documents": [
+    {
+      "id": "pay_stub_2026-09-27",
+      "type": "pay_stub",
+      "file_name": "pay_stub_2026-09-27.pdf",
+      "role": "case",
+      "declared_type": null,
+      "facts": {
+        "employer": {
+          "name": "Cedar Valley Manufacturing, Inc.",
+          "address": "1200 Industrial Parkway, Columbus, OH 43228",
+          "ein": "31-4408172"
+        },
+        "employee": "Daniel Reyes",
+        "employee_id": "E-20417",
+        "address": "418 Alder Street, Apt 3B, Columbus, OH 43215",
+        "pay_frequency": "Biweekly",
+        "period_start": "2026-09-14",
+        "period_end": "2026-09-27",
+        "pay_date": "2026-10-02",
+        "period_number": 19,
+        "periods_per_year": 26,
+        "earnings": [
+          {
+            "description": "Regular",
+            "hours": "80.00",
+            "rate": "34.50",
+            "current": "2760.00",
+            "ytd": "52440.00"
+          },
+          {
+            "description": "Overtime 1.5x",
+            "hours": "3.96",
+            "rate": "51.75",
+            "current": "204.93",
+            "ytd": "3897.10"
+          },
+          {
+            "description": "Bonus",
+            "hours": null,
+            "rate": null,
+            "current": "105.57",
+            "ytd": "2002.40"
+          }
+        ],
+        "deductions": [
+          {
+            "description": "Federal income tax",
+            "current": "428.30",
+            "ytd": "8137.70"
+          },
+          {
+            "description": "State income tax",
+            "current": "131.84",
+            "ytd": "2504.96"
+          },
+          {
+            "description": "Social Security",
+            "current": "186.50",
+            "ytd": "3543.50"
+          },
+          {
+            "description": "Medicare",
+            "current": "43.62",
+            "ytd": "828.78"
+          },
+          {
+            "description": "401(k) deferral",
+            "current": "184.23",
+            "ytd": "3500.37"
+          },
+          {
+            "description": "Health insurance (pre-tax)",
+            "current": "62.40",
+            "ytd": "1185.60"
+          }
+        ],
+        "gross_current": "3070.50",
+        "gross_ytd": "58339.50",
+        "deductions_current": "1036.89",
+        "deductions_ytd": "19700.91",
+        "net_current": "2033.61",
+        "net_ytd": "38638.59",
+        "printed_net_current": "2083.61",
+        "direct_deposit_last4": "6032",
+        "pages": 2
+      }
+    },
+    {
+      "id": "bank_statement_2026-08",
+      "type": "bank_statement",
+      "file_name": "bank_statement_2026-08.pdf",
+      "role": "case",
+      "declared_type": null,
+      "facts": {
+        "bank": "Fairhaven Community Bank",
+        "bank_address": "410 Main Street, Columbus, OH 43215",
+        "account_holder": "Daniel Reyes",
+        "account_type": "Everyday Checking",
+        "account_last4": "6032",
+        "period_start": "2026-08-01",
+        "period_end": "2026-08-31",
+        "opening_balance": "5845.26",
+        "closing_balance": "6455.13",
+        "total_pages_printed": 3,
+        "pages_rendered": 2,
+        "first_page_rows": 12,
+        "other_page_rows": 12,
+        "transactions": [
+          {
+            "date": "2026-08-01",
+            "description": "OAKMONT APARTMENTS RENT",
+            "amount": "-1425.00",
+            "category": "housing payment",
+            "counterparty": "Oakmont Apartments"
+          },
+          {
+            "date": "2026-08-01",
+            "description": "TARGET T-1124",
+            "amount": "-20.81",
+            "category": "other",
+            "counterparty": "Target"
+          },
+          {
+            "date": "2026-08-02",
+            "description": "GIANT EAGLE 6640",
+            "amount": "-85.39",
+            "category": "everyday spending",
+            "counterparty": "Giant Eagle"
+          },
+          {
+            "date": "2026-08-03",
+            "description": "PANERA BREAD 4471",
+            "amount": "-72.16",
+            "category": "everyday spending",
+            "counterparty": "Panera"
+          },
+          {
+            "date": "2026-08-05",
+            "description": "LAKESHORE AUTO FINANCE",
+            "amount": "-420.00",
+            "category": "loan payment",
+            "counterparty": "Lakeshore Auto Finance"
+          },
+          {
+            "date": "2026-08-06",
+            "description": "SPEEDWAY 08821",
+            "amount": "-83.41",
+            "category": "everyday spending",
+            "counterparty": "Speedway"
+          },
+          {
+            "date": "2026-08-07",
+            "description": "CEDAR VALLEY MFG PAYROLL",
+            "amount": "2033.61",
+            "category": "payroll deposit",
+            "counterparty": "Cedar Valley Manufacturing"
+          },
+          {
+            "date": "2026-08-07",
+            "description": "CVS PHARMACY 03355",
+            "amount": "-87.65",
+            "category": "everyday spending",
+            "counterparty": "CVS"
+          },
+          {
+            "date": "2026-08-09",
+            "description": "BUCKEYE POWER & GAS",
+            "amount": "-96.40",
+            "category": "utility",
+            "counterparty": "Buckeye Power & Gas"
+          },
+          {
+            "date": "2026-08-10",
+            "description": "BRIGHTPATH STUDENT LOAN",
+            "amount": "-110.00",
+            "category": "loan payment",
+            "counterparty": "Brightpath Student Loan Servicing"
+          },
+          {
+            "date": "2026-08-10",
+            "description": "CVS PHARMACY 03355",
+            "amount": "-14.48",
+            "category": "everyday spending",
+            "counterparty": "CVS"
+          },
+          {
+            "date": "2026-08-10",
+            "description": "SHELL OIL 574412",
+            "amount": "-52.37",
+            "category": "everyday spending",
+            "counterparty": "Shell"
+          },
+          {
+            "date": "2026-08-11",
+            "description": "GIANT EAGLE 6640",
+            "amount": "-60.15",
+            "category": "everyday spending",
+            "counterparty": "Giant Eagle"
+          },
+          {
+            "date": "2026-08-11",
+            "description": "DOMINOS 7701",
+            "amount": "-56.38",
+            "category": "everyday spending",
+            "counterparty": "Dominos"
+          },
+          {
+            "date": "2026-08-12",
+            "description": "NORTHGATE CARD PAYMENT",
+            "amount": "-88.00",
+            "category": "credit card payment",
+            "counterparty": "Northgate Card"
+          },
+          {
+            "date": "2026-08-12",
+            "description": "CVS PHARMACY 03355",
+            "amount": "-43.32",
+            "category": "everyday spending",
+            "counterparty": "CVS"
+          },
+          {
+            "date": "2026-08-14",
+            "description": "CARDINAL REWARDS VISA PMT",
+            "amount": "-40.00",
+            "category": "credit card payment",
+            "counterparty": "Cardinal Rewards Visa"
+          },
+          {
+            "date": "2026-08-16",
+            "description": "SKYLINE FIBER INTERNET",
+            "amount": "-79.99",
+            "category": "utility",
+            "counterparty": "Skyline Fiber"
+          },
+          {
+            "date": "2026-08-16",
+            "description": "CHIPOTLE 2216",
+            "amount": "-97.19",
+            "category": "everyday spending",
+            "counterparty": "Chipotle"
+          },
+          {
+            "date": "2026-08-18",
+            "description": "STATELINE WIRELESS",
+            "amount": "-65.00",
+            "category": "utility",
+            "counterparty": "Stateline Wireless"
+          },
+          {
+            "date": "2026-08-20",
+            "description": "TRILLIUM AUTO INSURANCE",
+            "amount": "-112.50",
+            "category": "insurance",
+            "counterparty": "Trillium Insurance"
+          },
+          {
+            "date": "2026-08-21",
+            "description": "CEDAR VALLEY MFG PAYROLL",
+            "amount": "2033.61",
+            "category": "payroll deposit",
+            "counterparty": "Cedar Valley Manufacturing"
+          },
+          {
+            "date": "2026-08-24",
+            "description": "SPEEDWAY 08821",
+            "amount": "-42.16",
+            "category": "everyday spending",
+            "counterparty": "Speedway"
+          },
+          {
+            "date": "2026-08-24",
+            "description": "CVS PHARMACY 03355",
+            "amount": "-33.86",
+            "category": "everyday spending",
+            "counterparty": "CVS"
+          },
+          {
+            "date": "2026-08-25",
+            "description": "ALDI 55021",
+            "amount": "-97.22",
+            "category": "everyday spending",
+            "counterparty": "Aldi"
+          },
+          {
+            "date": "2026-08-26",
+            "description": "KROGER #0412",
+            "amount": "-56.27",
+            "category": "everyday spending",
+            "counterparty": "Kroger"
+          },
+          {
+            "date": "2026-08-26",
+            "description": "ATM CASH WITHDRAWAL",
+            "amount": "-34.46",
+            "category": "other",
+            "counterparty": "ATM"
+          },
+          {
+            "date": "2026-08-28",
+            "description": "TARGET T-1124",
+            "amount": "-46.95",
+            "category": "other",
+            "counterparty": "Target"
+          },
+          {
+            "date": "2026-08-28",
+            "description": "TARGET T-1124",
+            "amount": "-36.23",
+            "category": "other",
+            "counterparty": "Target"
+          }
+        ]
+      }
+    },
+    {
+      "id": "bank_statement_2026-09",
+      "type": "bank_statement",
+      "file_name": "bank_statement_2026-09.pdf",
+      "role": "case",
+      "declared_type": "tax_return_1040",
+      "facts": {
+        "bank": "Fairhaven Community Bank",
+        "bank_address": "410 Main Street, Columbus, OH 43215",
+        "account_holder": "Daniel Reyes",
+        "account_type": "Everyday Checking",
+        "account_last4": "6032",
+        "period_start": "2026-09-01",
+        "period_end": "2026-09-30",
+        "opening_balance": "6455.13",
+        "closing_balance": "9226.32",
+        "total_pages_printed": 3,
+        "pages_rendered": 3,
+        "first_page_rows": 12,
+        "other_page_rows": 12,
+        "transactions": [
+          {
+            "date": "2026-09-01",
+            "description": "OAKMONT APARTMENTS RENT",
+            "amount": "-1425.00",
+            "category": "housing payment",
+            "counterparty": "Oakmont Apartments"
+          },
+          {
+            "date": "2026-09-04",
+            "description": "CEDAR VALLEY MFG PAYROLL",
+            "amount": "2033.61",
+            "category": "payroll deposit",
+            "counterparty": "Cedar Valley Manufacturing"
+          },
+          {
+            "date": "2026-09-04",
+            "description": "MARATHON PETRO 4410",
+            "amount": "-37.86",
+            "category": "everyday spending",
+            "counterparty": "Marathon"
+          },
+          {
+            "date": "2026-09-05",
+            "description": "LAKESHORE AUTO FINANCE",
+            "amount": "-420.00",
+            "category": "loan payment",
+            "counterparty": "Lakeshore Auto Finance"
+          },
+          {
+            "date": "2026-09-05",
+            "description": "MARATHON PETRO 4410",
+            "amount": "-17.99",
+            "category": "everyday spending",
+            "counterparty": "Marathon"
+          },
+          {
+            "date": "2026-09-06",
+            "description": "MARATHON PETRO 4410",
+            "amount": "-52.38",
+            "category": "everyday spending",
+            "counterparty": "Marathon"
+          },
+          {
+            "date": "2026-09-06",
+            "description": "TARGET T-1124",
+            "amount": "-29.67",
+            "category": "other",
+            "counterparty": "Target"
+          },
+          {
+            "date": "2026-09-09",
+            "description": "BUCKEYE POWER & GAS",
+            "amount": "-96.40",
+            "category": "utility",
+            "counterparty": "Buckeye Power & Gas"
+          },
+          {
+            "date": "2026-09-10",
+            "description": "BRIGHTPATH STUDENT LOAN",
+            "amount": "-110.00",
+            "category": "loan payment",
+            "counterparty": "Brightpath Student Loan Servicing"
+          },
+          {
+            "date": "2026-09-10",
+            "description": "MARATHON PETRO 4410",
+            "amount": "-47.14",
+            "category": "everyday spending",
+            "counterparty": "Marathon"
+          },
+          {
+            "date": "2026-09-10",
+            "description": "ALDI 55021",
+            "amount": "-49.22",
+            "category": "everyday spending",
+            "counterparty": "Aldi"
+          },
+          {
+            "date": "2026-09-12",
+            "description": "NORTHGATE CARD PAYMENT",
+            "amount": "-88.00",
+            "category": "credit card payment",
+            "counterparty": "Northgate Card"
+          },
+          {
+            "date": "2026-09-13",
+            "description": "KROGER #0412",
+            "amount": "-70.26",
+            "category": "everyday spending",
+            "counterparty": "Kroger"
+          },
+          {
+            "date": "2026-09-13",
+            "description": "HOME DEPOT 3871",
+            "amount": "-48.86",
+            "category": "other",
+            "counterparty": "Home Depot"
+          },
+          {
+            "date": "2026-09-14",
+            "description": "CARDINAL REWARDS VISA PMT",
+            "amount": "-40.00",
+            "category": "credit card payment",
+            "counterparty": "Cardinal Rewards Visa"
+          },
+          {
+            "date": "2026-09-16",
+            "description": "SKYLINE FIBER INTERNET",
+            "amount": "-79.99",
+            "category": "utility",
+            "counterparty": "Skyline Fiber"
+          },
+          {
+            "date": "2026-09-16",
+            "description": "KROGER #0412",
+            "amount": "-63.27",
+            "category": "everyday spending",
+            "counterparty": "Kroger"
+          },
+          {
+            "date": "2026-09-16",
+            "description": "MARATHON PETRO 4410",
+            "amount": "-49.47",
+            "category": "everyday spending",
+            "counterparty": "Marathon"
+          },
+          {
+            "date": "2026-09-17",
+            "description": "SHELL OIL 574412",
+            "amount": "-70.47",
+            "category": "everyday spending",
+            "counterparty": "Shell"
+          },
+          {
+            "date": "2026-09-18",
+            "description": "CEDAR VALLEY MFG PAYROLL",
+            "amount": "2033.61",
+            "category": "payroll deposit",
+            "counterparty": "Cedar Valley Manufacturing"
+          },
+          {
+            "date": "2026-09-18",
+            "description": "STATELINE WIRELESS",
+            "amount": "-65.00",
+            "category": "utility",
+            "counterparty": "Stateline Wireless"
+          },
+          {
+            "date": "2026-09-18",
+            "description": "PANERA BREAD 4471",
+            "amount": "-90.19",
+            "category": "everyday spending",
+            "counterparty": "Panera"
+          },
+          {
+            "date": "2026-09-20",
+            "description": "TRILLIUM AUTO INSURANCE",
+            "amount": "-112.50",
+            "category": "insurance",
+            "counterparty": "Trillium Insurance"
+          },
+          {
+            "date": "2026-09-20",
+            "description": "TARGET T-1124",
+            "amount": "-40.36",
+            "category": "other",
+            "counterparty": "Target"
+          },
+          {
+            "date": "2026-09-22",
+            "description": "ZELLE FROM PATRICIA OWENS REF 8841",
+            "amount": "2000.00",
+            "category": "transfer in",
+            "counterparty": "Patricia Owens"
+          },
+          {
+            "date": "2026-09-22",
+            "description": "LOCAL TAP HOUSE",
+            "amount": "-23.95",
+            "category": "everyday spending",
+            "counterparty": "Local Tap House"
+          },
+          {
+            "date": "2026-09-22",
+            "description": "KROGER #0412",
+            "amount": "-15.77",
+            "category": "everyday spending",
+            "counterparty": "Kroger"
+          },
+          {
+            "date": "2026-09-23",
+            "description": "SPEEDWAY 08821",
+            "amount": "-71.93",
+            "category": "everyday spending",
+            "counterparty": "Speedway"
+          },
+          {
+            "date": "2026-09-24",
+            "description": "PANERA BREAD 4471",
+            "amount": "-62.05",
+            "category": "everyday spending",
+            "counterparty": "Panera"
+          },
+          {
+            "date": "2026-09-24",
+            "description": "AMAZON MKTPLACE",
+            "amount": "-18.30",
+            "category": "other",
+            "counterparty": "Amazon"
+          }
+        ]
+      }
+    },
+    {
+      "id": "w2_2025",
+      "type": "w2",
+      "file_name": "w2_2025.pdf",
+      "role": "case",
+      "declared_type": null,
+      "facts": {
+        "tax_year": 2025,
+        "employer": {
+          "name": "Cedar Valley Manufacturing, Inc.",
+          "ein": "31-4408172",
+          "address": "1200 Industrial Parkway, Columbus, OH 43228"
+        },
+        "employee": "Daniel Reyes",
+        "ssn_last4": "4821",
+        "address": "418 Alder Street, Apt 3B, Columbus, OH 43215",
+        "box1": "69840.68",
+        "box2": "8112.40",
+        "box3": "74298.60",
+        "box4": "4606.51",
+        "box5": "74298.60",
+        "box6": "1077.33",
+        "box12": [
+          {
+            "code": "D",
+            "amount": "4457.92"
+          }
+        ]
+      }
+    },
+    {
+      "id": "form_1040_2025",
+      "type": "tax_return_1040",
+      "file_name": "form_1040_2025.pdf",
+      "role": "case",
+      "declared_type": null,
+      "facts": {
+        "tax_year": 2025,
+        "filing_status": "Single",
+        "taxpayer": "Daniel Reyes",
+        "ssn_last4": "4821",
+        "address": "418 Alder Street, Apt 3B, Columbus, OH 43215",
+        "wages": "69840.68",
+        "taxable_interest": "41.17",
+        "total_income": "69881.85",
+        "adjustments": "1120.00",
+        "adjusted_gross_income": "68761.85"
+      }
+    },
+    {
+      "id": "credit_report_2026-10-12",
+      "type": "credit_report",
+      "file_name": "credit_report_2026-10-12.pdf",
+      "role": "case",
+      "declared_type": null,
+      "facts": {
+        "report_date": "2026-10-12",
+        "consumer": "Daniel Reyes",
+        "address": "418 Alder Street, Apt 3B, Columbus, OH 43215",
+        "ssn_last4": "4821",
+        "report_type": "Sample merged credit report (simulated)",
+        "scores": [
+          {
+            "bureau": "Bureau A",
+            "score": 712
+          },
+          {
+            "bureau": "Bureau B",
+            "score": 698
+          },
+          {
+            "bureau": "Bureau C",
+            "score": 705
+          }
+        ],
+        "tradelines": [
+          {
+            "creditor": "Northgate Card",
+            "account_type": "revolving",
+            "ownership": "individual",
+            "open_date": "2019-06-14",
+            "status": "open",
+            "balance": "2940.00",
+            "credit_limit": "8000.00",
+            "monthly_payment": "88.00",
+            "past_due": "0.00",
+            "late_30": 1,
+            "late_60": 0,
+            "late_90": 0,
+            "most_recent_late": "2025-03-05",
+            "remarks": ""
+          },
+          {
+            "creditor": "Cardinal Rewards Visa",
+            "account_type": "revolving",
+            "ownership": "individual",
+            "open_date": "2021-02-02",
+            "status": "open",
+            "balance": "1240.00",
+            "credit_limit": "6000.00",
+            "monthly_payment": "40.00",
+            "past_due": "0.00",
+            "late_30": 0,
+            "late_60": 0,
+            "late_90": 0,
+            "most_recent_late": null,
+            "remarks": ""
+          },
+          {
+            "creditor": "Harbor Retail Card",
+            "account_type": "revolving",
+            "ownership": "individual",
+            "open_date": "2026-09-08",
+            "status": "open",
+            "balance": "300.00",
+            "credit_limit": "2000.00",
+            "monthly_payment": "35.00",
+            "past_due": "0.00",
+            "late_30": 0,
+            "late_60": 0,
+            "late_90": 0,
+            "most_recent_late": null,
+            "remarks": "new account"
+          },
+          {
+            "creditor": "Lakeshore Auto Finance",
+            "account_type": "installment",
+            "ownership": "individual",
+            "open_date": "2023-04-11",
+            "status": "open",
+            "balance": "14860.00",
+            "credit_limit": null,
+            "monthly_payment": "420.00",
+            "past_due": "0.00",
+            "late_30": 0,
+            "late_60": 0,
+            "late_90": 0,
+            "most_recent_late": null,
+            "remarks": "auto loan"
+          },
+          {
+            "creditor": "Brightpath Student Loan Servicing",
+            "account_type": "installment",
+            "ownership": "individual",
+            "open_date": "2017-09-01",
+            "status": "open",
+            "balance": "18430.00",
+            "credit_limit": null,
+            "monthly_payment": "110.00",
+            "past_due": "0.00",
+            "late_30": 0,
+            "late_60": 0,
+            "late_90": 0,
+            "most_recent_late": null,
+            "remarks": "student loan"
+          }
+        ],
+        "inquiries": [
+          {
+            "creditor": "Harbor Retail",
+            "date": "2026-09-08"
+          },
+          {
+            "creditor": "Orion Mortgage",
+            "date": "2026-07-08"
+          }
+        ],
+        "collections": [],
+        "public_records": [],
+        "alerts": []
+      }
+    },
+    {
+      "id": "utility_bill_2026-09",
+      "type": "expense_bill",
+      "file_name": "utility_bill_2026-09.pdf",
+      "role": "case",
+      "declared_type": null,
+      "notes": "Out of scope for an underwriting file; it stays out of the case results.",
+      "facts": {
+        "provider": "Buckeye Power & Gas",
+        "provider_address": "PO Box 4400, Columbus, OH 43216",
+        "customer": "Daniel Reyes",
+        "service_address": "418 Alder Street, Apt 3B, Columbus, OH 43215",
+        "account_number_last4": "2290",
+        "period_start": "2026-08-10",
+        "period_end": "2026-09-08",
+        "statement_date": "2026-09-09",
+        "due_date": "2026-09-30",
+        "amount_due": "96.40"
+      }
+    },
+    {
+      "id": "w2_2024",
+      "type": "w2",
+      "file_name": "w2_2024.pdf",
+      "role": "withheld",
+      "declared_type": null,
+      "notes": "Missing from the case on purpose (completeness shows Incomplete).",
+      "facts": {
+        "tax_year": 2024,
+        "employer": {
+          "name": "Cedar Valley Manufacturing, Inc.",
+          "ein": "31-4408172",
+          "address": "1200 Industrial Parkway, Columbus, OH 43228"
+        },
+        "employee": "Daniel Reyes",
+        "ssn_last4": "4821",
+        "address": "418 Alder Street, Apt 3B, Columbus, OH 43215",
+        "box1": "66205.89",
+        "box2": "7630.15",
+        "box3": "70431.80",
+        "box4": "4366.77",
+        "box5": "70431.80",
+        "box6": "1021.26",
+        "box12": [
+          {
+            "code": "D",
+            "amount": "4225.91"
+          }
+        ]
+      }
+    },
+    {
+      "id": "form_1040_2024",
+      "type": "tax_return_1040",
+      "file_name": "form_1040_2024.pdf",
+      "role": "withheld",
+      "declared_type": null,
+      "notes": "Missing from the case on purpose (completeness shows Incomplete).",
+      "facts": {
+        "tax_year": 2024,
+        "filing_status": "Single",
+        "taxpayer": "Daniel Reyes",
+        "ssn_last4": "4821",
+        "address": "418 Alder Street, Apt 3B, Columbus, OH 43215",
+        "wages": "66205.89",
+        "taxable_interest": "33.80",
+        "total_income": "66239.69",
+        "adjustments": "1050.00",
+        "adjusted_gross_income": "65189.69"
+      }
+    }
+  ],
+  "expected": {
+    "income": {
+      "base_monthly": "5980.00",
+      "overtime_monthly": "444.41",
+      "bonus_monthly": "228.34",
+      "candidate_monthly": "5980.00",
+      "candidate_monthly_with_overtime": "6424.41",
+      "overtime_and_bonus_excluded_reason": "documented history covers 2026 only",
+      "w2_box5": {
+        "2024": "70431.80",
+        "2025": "74298.60"
+      },
+      "w2_box5_growth_pct": "5.49",
+      "annualized_2026": "79833.00",
+      "annualized_2026_growth_pct": "7.45"
+    },
+    "assets_liabilities": {
+      "documented_assets": "9226.32",
+      "funds_needed_to_close": "36500.00",
+      "shortfall": "27273.68",
+      "obligations_monthly": "693.00",
+      "front_end_ratio_pct": "33.11",
+      "dti_pct": "44.70",
+      "dti_with_overtime_pct": "41.61",
+      "ltv_pct": "90.00",
+      "dti_review_level_pct": "43",
+      "large_deposit": {
+        "date": "2026-09-22",
+        "amount": "2000.00",
+        "counterparty": "Patricia Owens"
+      },
+      "payroll_matches": [
+        {
+          "date": "2026-09-04",
+          "amount": "2033.61"
+        },
+        {
+          "date": "2026-09-18",
+          "amount": "2033.61"
+        }
+      ]
+    },
+    "credit": {
+      "scores": [
+        712,
+        698,
+        705
+      ],
+      "representative_score": 705,
+      "northgate_utilization_pct": "36.75",
+      "total_revolving_utilization_pct": "28.00",
+      "late_payments": [
+        {
+          "creditor": "Northgate Card",
+          "severity": "30-day",
+          "most_recent": "2025-03-05",
+          "months_before_report": 19
+        }
+      ],
+      "monthly_payments_total": "693.00",
+      "inquiries": [
+        {
+          "creditor": "Harbor Retail",
+          "date": "2026-09-08",
+          "matched_account": "Harbor Retail Card"
+        },
+        {
+          "creditor": "Orion Mortgage",
+          "date": "2026-07-08",
+          "matched_account": null
+        }
+      ]
+    },
+    "completeness": {
+      "pay_stub_days_covered": 14,
+      "pay_stub_days_required": 30,
+      "pay_stub_days_short": 16,
+      "missing": [
+        "w2_2024",
+        "form_1040_2024"
+      ],
+      "incomplete_documents": [
+        {
+          "id": "bank_statement_2026-08",
+          "reason": "footer says Page 1 of 3 but only 2 pages were uploaded"
+        }
+      ],
+      "overall": "incomplete"
+    }
+  },
+  "defects": [
+    {
+      "id": "net_pay_misprint",
+      "document": "pay_stub_2026-09-27",
+      "field": "net_pay_current",
+      "printed": "2083.61",
+      "true": "2033.61",
+      "caught_by": "gross minus deductions arithmetic check",
+      "line": "p1-L31"
+    },
+    {
+      "id": "missing_page",
+      "document": "bank_statement_2026-08",
+      "printed_pages": 3,
+      "uploaded_pages": 2,
+      "caught_by": "printed page count against pages uploaded"
+    },
+    {
+      "id": "mislabelled_upload",
+      "document": "bank_statement_2026-09",
+      "declared_type": "tax_return_1040",
+      "true_type": "bank_statement",
+      "caught_by": "classification from content"
+    }
+  ],
+  "provenance": {
+    "documented": [
+      "pay stub period, gross 3,070.50, deductions 1,036.89, net 2,033.61 (FD 1.8); printed net 2,083.61 (FD 1.8, FSD 11)",
+      "base 5,980.00, overtime 444.41, bonus 228.34, candidate 6,424.41, W-2 Box 5 2024/2025, 5.49%, 79,833.00, 7.45% (FD 2.8)",
+      "September paychecks 2,033.61, 2,000.00 transfer on 2026-09-22, assets 9,226.32, 36,500.00 needed, shortfall 27,273.68, obligations 693.00, 33.11%, 44.70%, 41.61%, 90.00% (FD 3.5, 3.8)",
+      "credit report date, scores, utilization 36.75% and 28.00%, one 30-day late 19 months ago, inquiries, monthly payments 693.00 (FD 4.8)",
+      "14 of 30 days of pay stubs, August statement Page 1 of 3 with two pages, 2024 W-2 and return missing (FSD 7, 11; FD 6.8)"
+    ],
+    "derived": [
+      "rate 34.50 x 80 hours x 26 / 12 = 5,980.00",
+      "YTD gross 58,339.50 = 3,070.50 x 19 periods; x 26 = 79,833.00",
+      "YTD overtime 3,897.10 and bonus 2,002.40 chosen so monthly figures round to 444.41 and 228.34 with no half-cent tie",
+      "401(k) 6.00% of gross; W-2 Box 12 D = 6% of Box 5; Box 1 = Box 5 - D",
+      "proposed housing payment 1,980.00 = 33.11% of 5,980.00; property 400,000.00 and loan 360,000.00 give LTV 90.00%",
+      "obligations 693.00 = 88.00 + 40.00 + 35.00 + 420.00 + 110.00",
+      "opening balances backed out so each statement reconciles; September closing is 9,226.32"
+    ],
+    "invented": "names, addresses, employer and bank, ID last-4s, deduction split, W-2 Box 2/3/4/6, 1040 interest and adjustments, creditor details beyond the documented names, transaction merchants and amounts other than the documented ones"
+  }
+}
