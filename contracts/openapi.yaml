@@ -222,6 +222,10 @@ paths:
           $ref: "#/components/responses/TooLarge"
         "415":
           $ref: "#/components/responses/UnsupportedMedia"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
     get:
       tags: [documents]
       operationId: listDocuments
@@ -500,6 +504,14 @@ components:
         application/json:
           schema:
             $ref: "#/components/schemas/Error"
+    ServiceUnavailable:
+      description: |
+        A dependency is down; try again. code is storage_unavailable (nothing was saved) or
+        queue_unavailable (the upload was saved but could not be queued for processing).
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
 
   schemas:
     # ---------- Reusable core shapes ----------
@@ -733,6 +745,11 @@ components:
             id:
               type: string
               format: uuid
+            case_ref:
+              type: string
+              pattern: "^(LP|LM)-[0-9]{4,}$"
+              description: Human case reference; LP for underwriting, LM for loss mitigation.
+              examples: ["LP-0001"]
             profile:
               oneOf:
                 - $ref: "#/components/schemas/CaseProfile"
