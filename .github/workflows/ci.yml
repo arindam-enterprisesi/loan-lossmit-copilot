@@ -77,6 +77,9 @@ jobs:
       - name: tsc
         if: steps.app.outputs.present == 'true'
         run: npx tsc --noEmit
+      - name: test
+        if: steps.app.outputs.present == 'true'
+        run: npm test
       - name: build
         if: steps.app.outputs.present == 'true'
         run: npm run build

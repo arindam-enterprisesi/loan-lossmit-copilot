@@ -1,22 +1,24 @@
-"""Claude API adapter (official ``anthropic`` SDK, structured outputs).
+"""Claude adapters: Claude API and Claude on Amazon Bedrock (official ``anthropic`` SDK).
 
 Why not LangChain here: current Claude models reject sampling parameters
 (``temperature``) and forced ``tool_choice``, which LangChain's default
-``with_structured_output`` relies on. The SDK's ``output_config.format``
-JSON-schema mode constrains the reply to the schema directly, and the gateway
-still validates it with Pydantic.
+structured output relies on. The SDK's ``output_config.format`` JSON-schema
+mode constrains the reply to the schema directly, and the gateway still
+validates it with Pydantic. Bedrock uses the same Messages API through the
+SDK's Mantle client, so both providers share one request builder.
 
 Task options read from config (all optional):
   effort:    low | medium | high | xhigh | max
-  fallbacks: "default" to enable server-side refusal fallback (beta)
+  fallbacks: "default" to enable server-side refusal fallback (Claude API only, beta)
 """
 
 from __future__ import annotations
 
+import os
 from typing import Any
 
 import anthropic
-from anthropic import AsyncAnthropic, transform_schema
+from anthropic import AsyncAnthropic, AsyncAnthropicBedrockMantle, transform_schema
 
 from app.llm.types import AdapterRequest, AdapterResponse, ProviderCallError
 
@@ -25,14 +27,18 @@ FALLBACK_BETA = "server-side-fallback-2026-07-01"
 
 class AnthropicAdapter:
     name = "anthropic"
+    supports_server_fallbacks = True
 
-    def __init__(self, client: AsyncAnthropic | None = None) -> None:
+    def __init__(self, client: Any | None = None) -> None:
         self._client = client
 
-    def _get_client(self) -> AsyncAnthropic:
+    def _create_client(self) -> Any:
+        # Reads ANTHROPIC_API_KEY (or an `ant auth login` profile).
+        return AsyncAnthropic()
+
+    def _get_client(self) -> Any:
         if self._client is None:
-            # Reads ANTHROPIC_API_KEY (or an `ant auth login` profile).
-            self._client = AsyncAnthropic()
+            self._client = self._create_client()
         return self._client
 
     def build_params(self, request: AdapterRequest) -> dict[str, Any]:
@@ -57,10 +63,10 @@ class AnthropicAdapter:
         return params
 
     async def complete(self, request: AdapterRequest) -> AdapterResponse:
-        client = self._get_client()
         params = self.build_params(request)
-        fallbacks = request.options.get("fallbacks")
+        fallbacks = request.options.get("fallbacks") if self.supports_server_fallbacks else None
         try:
+            client = self._get_client()
             if fallbacks:
                 response: Any = await client.beta.messages.create(
                     **params, betas=[FALLBACK_BETA], fallbacks=fallbacks
@@ -75,6 +81,15 @@ class AnthropicAdapter:
             ) from exc
         except anthropic.APIConnectionError as exc:
             raise ProviderCallError(self.name, "connection error", retryable=True) from exc
+        except anthropic.CredentialsError as exc:
+            raise ProviderCallError(self.name, "no credentials configured") from exc
+        except anthropic.AnthropicError as exc:
+            raise ProviderCallError(self.name, type(exc).__name__) from exc
+        except TypeError as exc:
+            # The SDK raises TypeError at request time when no credentials resolve.
+            if "authentication" not in str(exc):
+                raise
+            raise ProviderCallError(self.name, "no credentials configured") from exc
 
         text = "".join(block.text for block in response.content if block.type == "text")
         usage = response.usage
@@ -85,3 +100,21 @@ class AnthropicAdapter:
             refused=response.stop_reason == "refusal",
             truncated=response.stop_reason == "max_tokens",
         )
+
+
+class BedrockClaudeAdapter(AnthropicAdapter):
+    """Claude on Amazon Bedrock via the Mantle (Messages API) endpoint.
+
+    Credentials come from the standard AWS chain (env keys, AWS_PROFILE, SSO);
+    the region from AWS_REGION. Model IDs take the ``anthropic.`` prefix or are
+    inference-profile IDs supplied by the AWS admin.
+    """
+
+    name = "bedrock"
+    supports_server_fallbacks = False  # server-side fallbacks are a Claude API feature
+
+    def _create_client(self) -> Any:
+        region = os.environ.get("AWS_REGION") or os.environ.get("AWS_DEFAULT_REGION")
+        if not region:
+            raise ProviderCallError(self.name, "AWS_REGION is not set")
+        return AsyncAnthropicBedrockMantle(aws_region=region)
