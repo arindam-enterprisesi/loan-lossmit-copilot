@@ -10,7 +10,9 @@ import pytest
 
 from app.llm.config import load_llm_config
 from app.llm.gateway import Gateway, default_adapters
-from app.llm.samples import sample_transactions
+from app.llm.hardship import read_hardship_letter
+from app.llm.income import explain_income_flags
+from app.llm.samples import daniel_income_inputs, load_lines, sample_transactions
 from app.llm.smoke import (
     EXPECTED_PAY_STUB,
     SAMPLE_PAY_STUB,
@@ -111,3 +113,34 @@ async def test_label_daniel_august_transactions(gateway: Gateway, provider: str)
     by_line = {lab.line_id: lab.category for lab in outcome.labels}
     assert by_line["p1-L20"] is TransactionCategory.PAYROLL_DEPOSIT
     assert by_line["p1-L14"] is TransactionCategory.HOUSING_PAYMENT
+
+
+@pytest.mark.live
+@pytest.mark.parametrize("provider", PROVIDERS)
+async def test_hardship_angela_letter(gateway: Gateway, provider: str) -> None:
+    """D4 done-when: Angela's profile passes verify_quotes."""
+    outcome = await read_hardship_letter(
+        load_lines("angela_hardship_letter"),
+        application_reasons=["Reduction in income"],
+        provider=provider,
+        gateway=gateway,
+    )
+    p = outcome.profile
+    assert p.primary_reason.category == "reduction_in_income"
+    assert p.onset.month == "2026-07"
+    assert p.duration.category == "unknown"
+    assert p.intent.category == "keep"
+    assert outcome.all_quotes_verified, outcome.flagged
+    assert outcome.unknown_line_ids == []
+
+
+@pytest.mark.live
+@pytest.mark.parametrize("provider", PROVIDERS)
+async def test_explain_daniel_deferrals(gateway: Gateway, provider: str) -> None:
+    """D4 done-when: Daniel's 401(k) explanation cites Box 12."""
+    flags, evidence = daniel_income_inputs()
+    outcome = await explain_income_flags(flags, evidence, provider=provider, gateway=gateway)
+    assert outcome.explanations
+    assert any("w2_2025.box12" in e.explanation.evidence_refs for e in outcome.explanations)
+    assert all(not e.flags for e in outcome.explanations), [e.flags for e in outcome.explanations]
+    assert outcome.unknown_flag_codes == []

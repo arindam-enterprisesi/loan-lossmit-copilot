@@ -5,8 +5,9 @@
     uv run python -m app.llm.smoke --provider gemini --check classify
     uv run python -m app.llm.smoke --provider anthropic --check extract
 
-Checks: smoke (echo), classify, extract (Daniel Reyes's pay stub) and label
-(his August bank statement's transactions). The samples are synthetic.
+Checks: smoke (echo), classify, extract (Daniel Reyes's pay stub), label (his
+August bank statement's transactions), hardship (Angela Whitfield's letter) and
+explain (Daniel's W-2 deferral flag). The samples are synthetic.
 
 Prints each result with tokens and latency. Exits 1 if any call fails.
 Reads keys from the repo-root .env if present.
@@ -23,7 +24,9 @@ from pydantic import BaseModel
 
 from app.llm.config import load_llm_config
 from app.llm.gateway import GatewayError, run
-from app.llm.samples import load_lines, sample_transactions
+from app.llm.hardship import read_hardship_letter
+from app.llm.income import explain_income_flags
+from app.llm.samples import daniel_income_inputs, load_lines, sample_transactions
 from app.llm.tasks import classify, extract, label_transactions
 from app.prompts.schemas.registry import DocumentType
 from app.prompts.schemas.transactions import TransactionCategory
@@ -39,6 +42,7 @@ class SmokeResult(BaseModel):
 # Synthetic samples (invented people), with the line IDs ingestion produces.
 SAMPLE_PAY_STUB = load_lines("daniel_pay_stub")
 SAMPLE_STATEMENT = "daniel_bank_statement_2026-08"
+SAMPLE_LETTER = load_lines("angela_hardship_letter")
 
 # What the pay stub check expects: values exactly as printed, on these lines.
 # Net pay is the deliberate misprint (true net is 2,033.61); the arithmetic check in
@@ -120,12 +124,46 @@ async def check_label(provider: str) -> str:
     )
 
 
+async def check_hardship(provider: str) -> str:
+    outcome = await read_hardship_letter(
+        SAMPLE_LETTER, application_reasons=["Reduction in income"], provider=provider
+    )
+    p, call = outcome.profile, outcome.call
+    got = (p.primary_reason.category, p.onset.month, p.duration.category, p.intent.category)
+    expected = ("reduction_in_income", "2026-07", "unknown", "keep")
+    ok = got == expected and outcome.all_quotes_verified and not outcome.unknown_line_ids
+    flagged = [c.path for c in outcome.flagged]
+    return (
+        f"hardship {'ok' if ok else 'UNEXPECTED':10} {'/'.join(str(g) for g in got)} "
+        f"quotes={len(outcome.quote_checks)} flagged={flagged} model={call.model} "
+        f"attempts={call.attempts} in={call.input_tokens} out={call.output_tokens} "
+        f"{call.latency_ms}ms"
+    )
+
+
+async def check_explain(provider: str) -> str:
+    flags, evidence = daniel_income_inputs()
+    outcome = await explain_income_flags(flags, evidence, provider=provider)
+    call = outcome.call
+    cites_box12 = any("w2_2025.box12" in e.explanation.evidence_refs for e in outcome.explanations)
+    flagged = sorted({f for e in outcome.explanations for f in e.flags})
+    ok = cites_box12 and not flagged and not outcome.unknown_flag_codes
+    return (
+        f"explain  {'ok' if ok else 'UNEXPECTED':10} {len(outcome.explanations)} explanation(s), "
+        f"cites Box 12={cites_box12}, flags={flagged} model={call.model} "
+        f"attempts={call.attempts} in={call.input_tokens} out={call.output_tokens} "
+        f"{call.latency_ms}ms"
+    )
+
+
 async def main(argv: list[str] | None = None) -> int:
     providers = sorted(load_llm_config().providers)
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--provider", choices=[*providers, "all"], default="all")
     parser.add_argument(
-        "--check", choices=["smoke", "classify", "extract", "label", "all"], default="all"
+        "--check",
+        choices=["smoke", "classify", "extract", "label", "hardship", "explain", "all"],
+        default="all",
     )
     args = parser.parse_args(argv)
 
@@ -142,6 +180,8 @@ async def main(argv: list[str] | None = None) -> int:
         "classify": check_classify,
         "extract": check_extract,
         "label": check_label,
+        "hardship": check_hardship,
+        "explain": check_explain,
     }
     names = list(checks) if args.check == "all" else [args.check]
 
