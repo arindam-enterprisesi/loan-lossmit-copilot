@@ -30,6 +30,7 @@ from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
 from app.api.schemas.jobs import JobOut
 from app.db.enums import Certainty, DocumentStatus, DocumentType
+from app.db.models import Flag
 from app.services.documents import DocumentView
 from app.services.documents import UploadResult as UploadOutcome
 
@@ -98,9 +99,31 @@ DUPLICATE_FLAG = FlagOut(
 )
 
 
+def flag_from_row(flag: Flag) -> FlagOut:
+    """A stored flag as the contract's Flag. Only the contract's evidence keys are sent."""
+    evidence = flag.evidence or {}
+    shown = (
+        EvidenceOut(
+            document_id=uuid.UUID(evidence["document_id"]),
+            page=evidence["page"],
+            line_ids=evidence["line_ids"],
+            bbox=BoundingBox(**evidence["bbox"]) if evidence.get("bbox") else None,
+        )
+        if {"document_id", "page", "line_ids"} <= set(evidence)
+        else None
+    )
+    return FlagOut(
+        code=flag.code, severity=flag.severity.value, message=flag.message, evidence=shown
+    )
+
+
 def summary_from_view(view: DocumentView) -> DocumentSummaryOut:
+    """The contract's DocumentSummary: stored open flags, plus DI-W206 if it duplicates a file."""
     summary = DocumentSummaryOut.model_validate(view.document)
-    return summary.model_copy(update={"flags": [DUPLICATE_FLAG]}) if view.duplicate else summary
+    flags = [flag_from_row(f) for f in view.flags]
+    if view.duplicate:
+        flags.append(DUPLICATE_FLAG)
+    return summary.model_copy(update={"flags": flags})
 
 
 class DocumentList(BaseModel):

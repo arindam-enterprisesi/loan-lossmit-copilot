@@ -4,7 +4,7 @@ Every line gets an ID such as ``p1-L31`` (page 1, line 31, counted top to bottom
 the page, as fractions of the page width and height. Other features cite these IDs as evidence.
 
 The parsers (``parse_pdf``, ``parse_image``) are pure: bytes in, pages and lines out, nothing
-stored. ``ingest_document`` and ``run_ingest_job`` put the result in S3 and Postgres.
+stored. ``ingest_document`` puts the result in S3 and Postgres; ``app.services.pipeline`` runs it.
 
 Document text is data. It is never logged here, and never leaves this module except into the
 ``lines`` table.
@@ -25,11 +25,13 @@ import pypdfium2 as pdfium
 import pypdfium2.raw as pdfium_raw
 from PIL import Image, UnidentifiedImageError
 from sqlalchemy import delete
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.enums import DocumentStatus, JobStatus, ReadBy
-from app.db.models import Document, Job, Line, Page
-from app.services import audit
+from app.db.enums import DocumentStatus, FlagStatus, ReadBy
+from app.db.models import Document, Line, Page
+from app.services import audit, flags
+from app.services.doc_lines import printed_page_label
+from app.services.document_config import get_validation_config
 from app.services.storage_keys import page_image_key
 from app.storage import ObjectNotFoundError, Storage
 
@@ -230,6 +232,17 @@ class IngestResult:
     line_count: int = 0
 
 
+# Which flag explains each way ingestion can fail (FSD error codes): the file itself, or reading it.
+FAILURE_FLAG = {
+    "password_protected": "DI-E201",
+    "unreadable": "DI-E201",
+    "original_missing": "DI-E201",
+    "ocr_unavailable": "DI-E301",
+    "no_text": "DI-E301",
+}
+INGEST_FLAGS = ("DI-E201", "DI-E301")
+
+
 def _pages_phrase(pages: Sequence[int]) -> str:
     if len(pages) == 1:
         return f"page {pages[0]} has"
@@ -241,6 +254,18 @@ async def _fail(
 ) -> IngestResult:
     document.status = DocumentStatus.FAILED
     await session.flush()
+    # The reason is also a document flag, so the case overview can show why a file failed.
+    flag_code = FAILURE_FLAG.get(code, "DI-E201")
+    severity, message = get_validation_config().flag(flag_code, reason=reason)
+    await flags.raise_flag(
+        session,
+        case_id=document.case_id,
+        entity_type="document",
+        entity_id=document.id,
+        code=flag_code,
+        severity=severity,
+        message=message,
+    )
     await audit.record(
         session,
         actor_id=None,
@@ -315,6 +340,7 @@ async def ingest_document(
             width=page.width,
             height=page.height,
             read_by=page.read_by,
+            printed_page_label=printed_page_label(line.text for line in page.lines),
         )
         session.add(page_row)
         await session.flush()
@@ -345,7 +371,15 @@ async def ingest_document(
             len(parsed.pages),
         )
 
-    # Classification and extraction (later features) set the next status.
+    # An earlier failure is over: close its flag. The next stage (classify) sets the next status.
+    await flags.close_flags(
+        session,
+        entity_type="document",
+        entity_ids=[document.id],
+        codes=INGEST_FLAGS,
+        status=FlagStatus.RESOLVED,
+        reason="read successfully",
+    )
     await audit.record(
         session,
         actor_id=None,
@@ -362,72 +396,3 @@ async def ingest_document(
     return IngestResult(
         document.id, document.file_name, True, page_count=len(parsed.pages), line_count=line_count
     )
-
-
-# --- the background job ---------------------------------------------------------------------
-
-
-async def _finish_job(
-    session_factory: async_sessionmaker[AsyncSession],
-    job_id: uuid.UUID,
-    status: JobStatus,
-    error: str | None,
-) -> None:
-    async with session_factory() as session:
-        job = await session.get(Job, job_id)
-        if job is not None:
-            job.status = status
-            job.error = error
-            if status is JobStatus.SUCCEEDED:
-                job.progress = 1.0
-            await session.commit()
-
-
-async def run_ingest_job(
-    session_factory: async_sessionmaker[AsyncSession],
-    storage: Storage,
-    ocr: OcrAdapter,
-    job_id: uuid.UUID,
-    document_ids: Sequence[uuid.UUID],
-    *,
-    dpi: int,
-) -> None:
-    """Ingest each document, keeping the job's progress current.
-
-    The job ends ``succeeded`` if every document was read, and ``failed`` (with a message per
-    unreadable file) if any was not; the others keep what was read from them.
-    """
-    async with session_factory() as session:
-        job = await session.get(Job, job_id)
-        if job is None:
-            raise LookupError(f"job {job_id} does not exist")
-        job.status = JobStatus.RUNNING
-        job.stage = "ingest"
-        job.progress = 0.0
-        job.error = None
-        job.attempts += 1
-        await session.commit()
-
-    failures: list[str] = []
-    total = len(document_ids)
-    for done, document_id in enumerate(document_ids, start=1):
-        try:
-            async with session_factory() as session:
-                result = await ingest_document(session, storage, ocr, document_id, dpi=dpi)
-                job = await session.get(Job, job_id)
-                if job is not None:
-                    job.progress = done / total
-                await session.commit()
-        except Exception:
-            logger.exception("ingest crashed job=%s document=%s", job_id, document_id)
-            await _finish_job(
-                session_factory, job_id, JobStatus.FAILED, "Reading the files stopped unexpectedly."
-            )
-            raise
-        if not result.ok:
-            failures.append(f"We couldn't use {result.file_name}: {result.reason}.")
-
-    if failures:
-        await _finish_job(session_factory, job_id, JobStatus.FAILED, " ".join(failures))
-    else:
-        await _finish_job(session_factory, job_id, JobStatus.SUCCEEDED, None)

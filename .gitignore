@@ -33,3 +33,6 @@ Thumbs.db
 # Local data
 *.log
 data/synthetic/rendered/
+
+# Local-only config overrides (for example a personal LLM_CONFIG_PATH file)
+backend/config/*.local.yaml

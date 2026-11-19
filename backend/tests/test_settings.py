@@ -28,3 +28,28 @@ def test_blank_aws_values_are_unset(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_secrets_are_not_echoed(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("JWT_SECRET", "hunter2")
     assert "hunter2" not in repr(Settings(_env_file=None))
+
+
+def test_the_worker_limits_allow_for_slow_model_calls(monkeypatch: pytest.MonkeyPatch) -> None:
+    # arq's own default is 300 s, which a job of several real model calls overruns.
+    defaults = Settings(_env_file=None)
+    assert (defaults.worker_job_timeout, defaults.worker_max_jobs) == (1800, 4)
+    monkeypatch.setenv("WORKER_JOB_TIMEOUT", "600")
+    monkeypatch.setenv("WORKER_MAX_JOBS", "2")
+    changed = Settings(_env_file=None)
+    assert (changed.worker_job_timeout, changed.worker_max_jobs) == (600, 2)
+
+
+@pytest.mark.parametrize("name", ["WORKER_JOB_TIMEOUT", "WORKER_MAX_JOBS"])
+def test_a_zero_worker_limit_is_rejected(monkeypatch: pytest.MonkeyPatch, name: str) -> None:
+    monkeypatch.setenv(name, "0")
+    with pytest.raises(ValueError):
+        Settings(_env_file=None)
+
+
+def test_the_worker_uses_the_settings() -> None:
+    from app.settings import get_settings
+    from app.worker import WorkerSettings
+
+    assert WorkerSettings.job_timeout == get_settings().worker_job_timeout
+    assert WorkerSettings.max_jobs == get_settings().worker_max_jobs

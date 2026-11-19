@@ -1,0 +1,25 @@
+# Thresholds for the analyses (Feature Design 2.3). Read by app/services/analysis_config.py.
+#
+# Every setting carries its value, its label (illustrative or authoritative) and its source
+# (CLAUDE.md rule 4). Illustrative samples: real values must come from the lender or program.
+# Change `version` when a value changes. Amounts are strings so they stay exact (Decimal).
+version: "2026-11-19.1"
+label: illustrative
+source: "Feature Design 2.3, illustrative sample settings"
+
+# Cross-document comparisons agree when they differ by no more than 1.00 or 0.5% of the larger
+# figure, whichever is larger.
+tolerance_absolute:
+  value: "1.00"
+  label: illustrative
+  source: "Feature Design 2.3: cross-document comparisons within 1.00 or 0.5%, whichever is larger"
+tolerance_relative:
+  value: "0.005"
+  label: illustrative
+  source: "Feature Design 2.3: cross-document comparisons within 1.00 or 0.5%, whichever is larger"
+
+# A year-over-year drop above this share is flagged as declining income.
+decline_threshold:
+  value: "0.05"
+  label: illustrative
+  source: "Feature Design 2.3: a year-over-year drop above 5% is flagged"
