@@ -10,8 +10,16 @@ import pytest
 
 from app.llm.config import load_llm_config
 from app.llm.gateway import Gateway, default_adapters
-from app.llm.smoke import SAMPLE_PAY_STUB, SmokeResult
-from app.llm.tasks import classify
+from app.llm.samples import sample_transactions
+from app.llm.smoke import (
+    EXPECTED_PAY_STUB,
+    SAMPLE_PAY_STUB,
+    SAMPLE_STATEMENT,
+    SmokeResult,
+)
+from app.llm.tasks import classify, extract, iter_extracted, label_transactions
+from app.prompts.schemas.registry import DocumentType
+from app.prompts.schemas.transactions import TransactionCategory
 
 try:
     from dotenv import load_dotenv
@@ -63,3 +71,43 @@ async def test_classify_pay_stub(gateway: Gateway, provider: str) -> None:
     assert outcome.result.doc_type == "pay_stub"
     assert outcome.result.justification_line_ids
     assert outcome.unknown_line_ids == []
+
+
+@pytest.mark.live
+@pytest.mark.parametrize("provider", PROVIDERS)
+async def test_extract_daniel_pay_stub(gateway: Gateway, provider: str) -> None:
+    """D3 done-when: every field of Daniel's pay stub, with line IDs."""
+    outcome = await extract(
+        SAMPLE_PAY_STUB, DocumentType.PAY_STUB, provider=provider, gateway=gateway
+    )
+    fields = outcome.result.fields
+    for name, (value, line) in EXPECTED_PAY_STUB.items():
+        got = getattr(fields, name)
+        assert got.value == value, name
+        assert line in got.lines, name
+    assert len(fields.earnings) == 3
+    assert len(fields.deductions) == 6
+    assert outcome.unknown_line_ids == []
+    # Every value found carries the lines it came from. (Hours and rate on the bonus row
+    # are not printed, so some fields are rightly null.)
+    found = [(path, f) for path, f in iter_extracted(fields) if f.value is not None]
+    assert len(found) >= 40
+    assert all(f.lines for _, f in found)
+
+
+@pytest.mark.live
+@pytest.mark.parametrize("provider", PROVIDERS)
+async def test_label_daniel_august_transactions(gateway: Gateway, provider: str) -> None:
+    transactions = sample_transactions(SAMPLE_STATEMENT)
+    outcome = await label_transactions(
+        transactions,
+        borrower_names=["Daniel Reyes"],
+        employer_names=["Cedar Valley Manufacturing, Inc."],
+        provider=provider,
+        gateway=gateway,
+    )
+    assert outcome.unknown_line_ids == []
+    assert not [lab.line_id for lab in outcome.labels if lab.needs_review]
+    by_line = {lab.line_id: lab.category for lab in outcome.labels}
+    assert by_line["p1-L20"] is TransactionCategory.PAYROLL_DEPOSIT
+    assert by_line["p1-L14"] is TransactionCategory.HOUSING_PAYMENT

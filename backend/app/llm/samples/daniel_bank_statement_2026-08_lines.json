@@ -1,0 +1,230 @@
+{
+ "source": "data/synthetic/scenarios/daniel_reyes.json -> bank_statement_2026-08.pdf (rendered by data/synthetic/generate.py, read by app.services.ingestion.parse_pdf)",
+ "lines": [
+  {
+   "page": 1,
+   "line": 1,
+   "text": "Fairhaven Community Bank"
+  },
+  {
+   "page": 1,
+   "line": 2,
+   "text": "410 Main Street, Columbus, OH 43215"
+  },
+  {
+   "page": 1,
+   "line": 3,
+   "text": "STATEMENT OF ACCOUNT"
+  },
+  {
+   "page": 1,
+   "line": 4,
+   "text": "Account holder: Daniel Reyes"
+  },
+  {
+   "page": 1,
+   "line": 5,
+   "text": "Everyday Checking ending 6032"
+  },
+  {
+   "page": 1,
+   "line": 6,
+   "text": "Statement period: 2026-08-01 to 2026-08-31"
+  },
+  {
+   "page": 1,
+   "line": 7,
+   "text": "ACCOUNT SUMMARY"
+  },
+  {
+   "page": 1,
+   "line": 8,
+   "text": "Opening balance 5,845.26"
+  },
+  {
+   "page": 1,
+   "line": 9,
+   "text": "Total deposits and credits 4,067.22"
+  },
+  {
+   "page": 1,
+   "line": 10,
+   "text": "Total withdrawals and debits 3,457.35"
+  },
+  {
+   "page": 1,
+   "line": 11,
+   "text": "Closing balance 6,455.13"
+  },
+  {
+   "page": 1,
+   "line": 12,
+   "text": "TRANSACTIONS"
+  },
+  {
+   "page": 1,
+   "line": 13,
+   "text": "Date Description Amount Balance"
+  },
+  {
+   "page": 1,
+   "line": 14,
+   "text": "2026-08-01 OAKMONT APARTMENTS RENT -1,425.00 4,420.26"
+  },
+  {
+   "page": 1,
+   "line": 15,
+   "text": "2026-08-01 TARGET T-1124 -20.81 4,399.45"
+  },
+  {
+   "page": 1,
+   "line": 16,
+   "text": "2026-08-02 GIANT EAGLE 6640 -85.39 4,314.06"
+  },
+  {
+   "page": 1,
+   "line": 17,
+   "text": "2026-08-03 PANERA BREAD 4471 -72.16 4,241.90"
+  },
+  {
+   "page": 1,
+   "line": 18,
+   "text": "2026-08-05 LAKESHORE AUTO FINANCE -420.00 3,821.90"
+  },
+  {
+   "page": 1,
+   "line": 19,
+   "text": "2026-08-06 SPEEDWAY 08821 -83.41 3,738.49"
+  },
+  {
+   "page": 1,
+   "line": 20,
+   "text": "2026-08-07 CEDAR VALLEY MFG PAYROLL 2,033.61 5,772.10"
+  },
+  {
+   "page": 1,
+   "line": 21,
+   "text": "2026-08-07 CVS PHARMACY 03355 -87.65 5,684.45"
+  },
+  {
+   "page": 1,
+   "line": 22,
+   "text": "2026-08-09 BUCKEYE POWER & GAS -96.40 5,588.05"
+  },
+  {
+   "page": 1,
+   "line": 23,
+   "text": "2026-08-10 BRIGHTPATH STUDENT LOAN -110.00 5,478.05"
+  },
+  {
+   "page": 1,
+   "line": 24,
+   "text": "2026-08-10 CVS PHARMACY 03355 -14.48 5,463.57"
+  },
+  {
+   "page": 1,
+   "line": 25,
+   "text": "2026-08-10 SHELL OIL 574412 -52.37 5,411.20"
+  },
+  {
+   "page": 1,
+   "line": 26,
+   "text": "Page 1 of 3"
+  },
+  {
+   "page": 1,
+   "line": 27,
+   "text": "SYNTHETIC SAMPLE - invented data, not a real document"
+  },
+  {
+   "page": 2,
+   "line": 1,
+   "text": "Fairhaven Community Bank"
+  },
+  {
+   "page": 2,
+   "line": 2,
+   "text": "STATEMENT OF ACCOUNT (continued)"
+  },
+  {
+   "page": 2,
+   "line": 3,
+   "text": "Everyday Checking ending 6032, 2026-08-01 to 2026-08-31"
+  },
+  {
+   "page": 2,
+   "line": 4,
+   "text": "Date Description Amount Balance"
+  },
+  {
+   "page": 2,
+   "line": 5,
+   "text": "2026-08-11 GIANT EAGLE 6640 -60.15 5,351.05"
+  },
+  {
+   "page": 2,
+   "line": 6,
+   "text": "2026-08-11 DOMINOS 7701 -56.38 5,294.67"
+  },
+  {
+   "page": 2,
+   "line": 7,
+   "text": "2026-08-12 NORTHGATE CARD PAYMENT -88.00 5,206.67"
+  },
+  {
+   "page": 2,
+   "line": 8,
+   "text": "2026-08-12 CVS PHARMACY 03355 -43.32 5,163.35"
+  },
+  {
+   "page": 2,
+   "line": 9,
+   "text": "2026-08-14 CARDINAL REWARDS VISA PMT -40.00 5,123.35"
+  },
+  {
+   "page": 2,
+   "line": 10,
+   "text": "2026-08-16 SKYLINE FIBER INTERNET -79.99 5,043.36"
+  },
+  {
+   "page": 2,
+   "line": 11,
+   "text": "2026-08-16 CHIPOTLE 2216 -97.19 4,946.17"
+  },
+  {
+   "page": 2,
+   "line": 12,
+   "text": "2026-08-18 STATELINE WIRELESS -65.00 4,881.17"
+  },
+  {
+   "page": 2,
+   "line": 13,
+   "text": "2026-08-20 TRILLIUM AUTO INSURANCE -112.50 4,768.67"
+  },
+  {
+   "page": 2,
+   "line": 14,
+   "text": "2026-08-21 CEDAR VALLEY MFG PAYROLL 2,033.61 6,802.28"
+  },
+  {
+   "page": 2,
+   "line": 15,
+   "text": "2026-08-24 SPEEDWAY 08821 -42.16 6,760.12"
+  },
+  {
+   "page": 2,
+   "line": 16,
+   "text": "2026-08-24 CVS PHARMACY 03355 -33.86 6,726.26"
+  },
+  {
+   "page": 2,
+   "line": 17,
+   "text": "Page 2 of 3"
+  },
+  {
+   "page": 2,
+   "line": 18,
+   "text": "SYNTHETIC SAMPLE - invented data, not a real document"
+  }
+ ]
+}
