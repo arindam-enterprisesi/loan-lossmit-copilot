@@ -1,7 +1,8 @@
 """The background job that reads uploaded files into pages and numbered lines.
 
 Each test uploads through the API (so the rows, S3 objects and job are the real ones) and then
-runs the real ``ingest_documents`` worker function against Postgres and a moto S3.
+runs the real ``process_documents`` worker function, stopped after the ingest stage (the
+pipeline tests cover the later stages), against Postgres and a moto S3.
 """
 
 from __future__ import annotations
@@ -17,10 +18,13 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.db.enums import ReadBy
 from app.db.seed import case_id, seed
-from app.services.ingestion import BBox, NotImplementedOcr, OcrLine, run_ingest_job
+from app.services.document_config import get_document_fields, get_validation_config
+from app.services.fake_reader import FakeClassifier, FakeExtractor
+from app.services.ingestion import BBox, NotImplementedOcr, OcrLine
 from app.services.ingestion_config import IngestionConfig
+from app.services.pipeline import Readers, run_pipeline_job
 from app.storage import Storage, StorageError
-from app.worker import ingest_documents
+from app.worker import process_documents
 from tests.conftest import Rendered
 from tests.data.helpers import read_pages
 from tests.db.conftest import S3_PREFIX, s3_object
@@ -62,10 +66,11 @@ async def run_job(
     config: IngestionConfig = DPI_50,
     **ctx: Any,
 ) -> None:
-    await ingest_documents(
+    await process_documents(
         {"storage": storage, "session_factory": factory, "ingestion_config": config, **ctx},
         body["job"]["id"],
         [d["id"] for d in body["documents"]],
+        ["ingest"],  # these tests are about ingestion; the pipeline tests run every stage
     )
 
 
@@ -321,16 +326,34 @@ async def test_an_unexpected_error_fails_the_job_and_is_raised(
 
     job = await job_row(session, body)
     assert (job.status, job.error) == ("failed", "Reading the files stopped unexpectedly.")
-    assert (await document_row(session, doc["id"])).status == "uploaded"  # nothing half-applied
+    # The crash is recorded where the user can see it, and they can re-run that stage (DI-E801).
+    assert (await document_row(session, doc["id"])).status == "failed"
+    [crash] = await rows(
+        session,
+        "SELECT code, severity, message FROM flags WHERE entity_id = :d",
+        d=doc["id"],
+    )
+    assert tuple(crash) == (
+        "DI-E801",
+        "error",
+        "Processing stopped at ingest. You can re-run this stage.",
+    )
 
 
 async def test_a_job_that_does_not_exist_is_an_error(
     s3_storage: Storage, session_factory: async_sessionmaker[AsyncSession]
 ) -> None:
+    readers = Readers(
+        storage=s3_storage,
+        ocr=NotImplementedOcr(),
+        classifier=FakeClassifier(),
+        extractor=FakeExtractor(),
+        dpi=50,
+        rules=get_validation_config(),
+        cfg=get_document_fields(),
+    )
     with pytest.raises(LookupError):
-        await run_ingest_job(
-            session_factory, s3_storage, NotImplementedOcr(), uuid.uuid4(), [uuid.uuid4()], dpi=50
-        )
+        await run_pipeline_job(session_factory, readers, uuid.uuid4(), [uuid.uuid4()])
 
 
 # --- the OCR seam ---------------------------------------------------------------------------

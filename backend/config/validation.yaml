@@ -1,0 +1,83 @@
+# Settings and flag messages for the checks that run in code on extracted documents
+# (FSD 4.3, 4.4). Read by app/services/document_config.py.
+# Every setting is versioned and labelled; change the version when you change a value.
+version: "2026-11-18.1"
+label: illustrative
+
+# The largest difference that still counts as "equal" in an arithmetic check, in currency units.
+arithmetic_tolerance: "0.01"
+
+# A cited line read by OCR below this confidence lowers a field's certainty (FSD 4.4).
+# Text-layer lines have no OCR confidence and always meet it.
+min_line_confidence: "0.80"
+
+# One entry per flag code. The message is a template filled in by code with the figures found;
+# severity is the contract's error / warning / info. A key "CODE:variant" is a second wording.
+flags:
+  DI-CHK-01:
+    severity: warning
+    message: "Earnings add up to {earnings_sum}, but gross pay is {gross}."
+  DI-CHK-02:
+    severity: warning
+    message: "Gross {gross} minus deductions {deductions} is {expected}, not {printed}."
+  DI-CHK-03:
+    severity: warning
+    message: "Pay period start {start} is after its end {end}."
+  DI-CHK-04:
+    severity: warning
+    message: "Year-to-date gross {ytd} is below the current period's {current}."
+  DI-CHK-05:
+    severity: warning
+    message: "Opening balance {opening} plus transactions {transactions} is {expected}, not the closing balance {closing}."
+  DI-CHK-06:
+    severity: warning
+    message: "The printed {what} {printed} does not match {listed} from the transactions listed."
+  DI-CHK-07:
+    severity: warning
+    message: "The running balance after {date} {description} is {printed}, but {expected} was expected."
+  DI-CHK-08:
+    severity: warning
+    message: "Transaction dated {date} is outside the statement period {start} to {end}."
+  "DI-CHK-08:period":
+    severity: warning
+    message: "Statement period start {start} is after its end {end}."
+  DI-W601:
+    severity: warning
+    message: "We couldn't find this value in the text it came from."
+  DI-W604:
+    severity: warning
+    message: "{label} wasn't found in this document."
+  "DI-W604:none":
+    severity: warning
+    message: "No fields were extracted from this document."
+  DI-W605:
+    severity: warning
+    message: "{label} could not be read as {kind}."
+  DI-W501:
+    severity: warning
+    message: "We couldn't tell what this document is. Choose its type."
+  DI-W502:
+    severity: warning
+    message: "This looks like a {predicted}, but you chose {selected}. Which is right?"
+  DI-W701:
+    severity: warning
+    message: "Incomplete: this document says it has {total} pages, but {uploaded} were uploaded; {missing}."
+  "DI-W701:signal":
+    severity: warning
+    message: "This document may be incomplete: {signal}."
+  DI-E201:
+    severity: error
+    message: "We couldn't use this file: {reason}."
+  DI-E301:
+    severity: error
+    message: "We couldn't read this document: {reason}."
+  DI-E401:
+    severity: error
+    message: "We couldn't read this document reliably. Re-run it or enter the values by hand."
+  DI-E801:
+    severity: error
+    message: "Processing stopped at {stage}. You can re-run this stage."
+  # A check that is missing an input says so (FSD 4.3). Used with the code of the check.
+  cannot_check:
+    severity: info
+    message: "Cannot check {rule}: {missing} not found."

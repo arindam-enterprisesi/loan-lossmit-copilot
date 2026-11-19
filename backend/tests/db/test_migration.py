@@ -21,12 +21,19 @@ D1_TABLES = {
     "fields",
     "jobs",
     "audit_events",
+    "flags",
+    # D4 (migration 0005).
+    "config_versions",
+    "analysis_runs",
+    "calculations",
+    "income_components",
+    "completeness_results",
 }
 SEQUENCES = {"case_ref_lp_seq", "case_ref_lm_seq"}
 
 
-async def test_only_the_d1_tables_exist(conn: AsyncConnection) -> None:
-    # Later tables (flags, config_versions, analysis_runs ...) arrive in their own migrations.
+async def test_only_the_expected_tables_exist(conn: AsyncConnection) -> None:
+    # Later tables (assets, credit, agents ...) arrive in their own migrations.
     result = await conn.execute(
         sa.text("SELECT tablename FROM pg_tables WHERE schemaname = 'public'")
     )

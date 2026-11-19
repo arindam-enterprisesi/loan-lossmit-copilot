@@ -1,0 +1,147 @@
+# The field list per document type, the roles the checks use, and each type's template summary.
+# Read by app/services/document_config.py. Versioned and labelled like every setting.
+#
+# Field names follow Arindam's extract schemas (app/prompts/schemas/documents.py). Where a name
+# here differs from his, `renames` maps his name to ours. The checks and the income analysis look
+# fields up by ROLE (the `roles` map), so a renamed field is a change here, not in the code.
+#
+# kind: amount (money, Decimal, two decimals), number (hours or a rate, up to four decimals), date,
+# text, id_last4 (an SSN or account number: only its last four digits are ever stored).
+#
+# `rows` flattens a repeating group of his schema (earnings lines, transactions, Box 12 entries)
+# into fields named <prefix><nnn>_<part>, numbered from 001 in document order.
+version: "2026-11-19.1"
+label: illustrative
+
+types:
+  pay_stub:
+    label: pay stub
+    summary: "Pay stub, {employee_name}, {pay_period_start} to {pay_period_end}: gross {gross_pay_current}, net {net_pay_current}."
+    borrower_field: employee_name
+    period_fields: [pay_period_start, pay_period_end]
+    roles:
+      gross: gross_pay_current
+      net: net_pay_current
+      deductions: total_deductions_current
+      period_start: pay_period_start
+      period_end: pay_period_end
+      ytd_gross: gross_pay_ytd
+      employer: employer_name
+      frequency: pay_frequency
+      pay_date: pay_date
+    # Every field named earnings_<...>_current is an earnings line that adds up to gross pay
+    # (the rule-based reader names them earnings_regular_current; the real reader earnings_001_current).
+    earnings: {prefix: earnings_, suffix: _current}
+    rows:
+      - source: earnings
+        prefix: earnings_
+        parts: {description: text, hours: number, rate: number, current: amount, ytd: amount}
+      - source: deductions
+        prefix: deduction_
+        parts: {description: text, current: amount, ytd: amount}
+    fields:
+      - {name: employer_name, label: Employer, kind: text, required: true}
+      - {name: employee_name, label: Employee, kind: text, required: true}
+      - {name: pay_frequency, label: Pay frequency, kind: text}
+      - {name: pay_period_start, label: Pay period start, kind: date, required: true}
+      - {name: pay_period_end, label: Pay period end, kind: date, required: true}
+      - {name: pay_date, label: Pay date, kind: date}
+      - {name: earnings_regular_current, label: Regular earnings, kind: amount}
+      - {name: earnings_overtime_current, label: Overtime earnings, kind: amount}
+      - {name: earnings_bonus_current, label: Bonus, kind: amount}
+      - {name: gross_pay_current, label: Gross pay, kind: amount, required: true}
+      - {name: total_deductions_current, label: Total deductions, kind: amount, required: true}
+      - {name: net_pay_current, label: Net pay, kind: amount, required: true}
+      - {name: gross_pay_ytd, label: Gross pay year to date, kind: amount}
+      - {name: total_deductions_ytd, label: Total deductions year to date, kind: amount}
+      - {name: net_pay_ytd, label: Net pay year to date, kind: amount}
+      - {name: account_last4, label: Deposit account (last four), kind: id_last4}
+
+  bank_statement:
+    label: bank statement
+    summary: "Bank statement, {account_holder}, {institution_name}, {statement_period_start} to {statement_period_end}: opening {opening_balance}, closing {closing_balance}."
+    borrower_field: account_holder
+    period_fields: [statement_period_start, statement_period_end]
+    roles:
+      opening: opening_balance
+      closing: closing_balance
+      period_start: statement_period_start
+      period_end: statement_period_end
+      total_deposits: total_deposits
+      total_withdrawals: total_withdrawals
+      account: account_last4
+    # His names -> ours.
+    renames: {institution: institution_name, account_number: account_last4}
+    # Each transaction is four fields: txn_001_date, txn_001_description, txn_001_amount (signed)
+    # and txn_001_balance (the running balance printed after it).
+    transactions: {prefix: txn_, date: date, description: description, amount: amount, balance: balance}
+    # A statement with separate deposit and withdrawal columns prints every amount unsigned; the
+    # column heading (txn_001_column) then decides the sign of the normalised value.
+    rows:
+      - source: transactions
+        prefix: txn_
+        parts: {date: date, description: text, amount: amount, balance: amount, column: text}
+        sign_column: column
+        amount_part: amount
+    column_signs:
+      negative: [withdrawal, debit, payment, check, charge, fee]
+      positive: [deposit, credit]
+    fields:
+      - {name: institution_name, label: Institution, kind: text, required: true}
+      - {name: account_holder, label: Account holder, kind: text, required: true}
+      - {name: account_last4, label: Account (last four), kind: id_last4, required: true}
+      - {name: statement_period_start, label: Statement period start, kind: date, required: true}
+      - {name: statement_period_end, label: Statement period end, kind: date, required: true}
+      - {name: opening_balance, label: Opening balance, kind: amount, required: true}
+      - {name: closing_balance, label: Closing balance, kind: amount, required: true}
+      - {name: total_deposits, label: Total deposits and credits, kind: amount}
+      - {name: total_withdrawals, label: Total withdrawals and debits, kind: amount}
+
+  w2:
+    label: W-2
+    summary: "W-2 for {tax_year}, {employee_name}, {employer_name}: Box 1 {box1_wages}, Box 5 {box5_medicare_wages}."
+    borrower_field: employee_name
+    roles:
+      year: tax_year
+      employer: employer_name
+      box1: box1_wages
+      box5: box5_medicare_wages
+    rows:
+      - source: box12
+        prefix: box12_
+        parts: {code: text, amount: amount}
+    fields:
+      - {name: tax_year, label: Tax year, kind: text, required: true}
+      - {name: employer_name, label: Employer, kind: text, required: true}
+      - {name: employee_name, label: Employee, kind: text, required: true}
+      - {name: box1_wages, label: "Box 1, wages", kind: amount, required: true}
+      - {name: box2_federal_tax_withheld, label: "Box 2, federal tax withheld", kind: amount}
+      - {name: box3_social_security_wages, label: "Box 3, social security wages", kind: amount}
+      - {name: box4_social_security_tax, label: "Box 4, social security tax", kind: amount}
+      - {name: box5_medicare_wages, label: "Box 5, Medicare wages", kind: amount, required: true}
+      - {name: box6_medicare_tax, label: "Box 6, Medicare tax", kind: amount}
+
+  tax_return_1040:
+    label: "tax return (Form 1040)"
+    summary: "Form 1040 for {tax_year}, {taxpayer_names}: wages {wages}, total income {total_income}."
+    borrower_field: taxpayer_names
+    roles:
+      year: tax_year
+      wages: wages
+      total_income: total_income
+    fields:
+      - {name: tax_year, label: Tax year, kind: text, required: true}
+      - {name: taxpayer_names, label: Taxpayer, kind: text, required: true}
+      - {name: filing_status, label: Filing status, kind: text}
+      - {name: wages, label: "Wages, salaries and tips", kind: amount, required: true}
+      - {name: total_income, label: Total income, kind: amount, required: true}
+      - {name: adjusted_gross_income, label: Adjusted gross income, kind: amount}
+
+  # Types that are classified here and read by later features: no field list yet.
+  credit_report: {label: credit report}
+  mortgage_assistance_application: {label: mortgage assistance application}
+  mortgage_statement: {label: mortgage statement}
+  benefits_letter: {label: benefits letter}
+  expense_bill: {label: expense bill}
+  hardship_letter: {label: hardship letter}
+  unrecognized: {label: unrecognized document}

@@ -1,0 +1,106 @@
+# The income method (Feature Design 2.3, 2.4 and 2.5), the pay frequencies, and the message of
+# every income flag. Read by app/services/analysis_config.py.
+#
+# Every setting carries its value, its label (illustrative or authoritative) and its source
+# (CLAUDE.md rule 4). These are illustrative samples: a real method depends on the program and the
+# lender and must come from their documented requirements. Change `version` when a value changes.
+version: "2026-11-19.1"
+label: illustrative
+source: "Feature Design 2.3, illustrative sample settings"
+
+# What the underwriter sees next to the candidate monthly income (Feature Design 2.8).
+candidate_label: "candidate — qualifying income is determined by the underwriter"
+
+# Earnings lines are grouped into components by the words in their description.
+components:
+  base:
+    keywords:
+      value: [regular, hourly, base, salary, straight]
+      label: illustrative
+      source: "Feature Design 2.3: groups earnings by type"
+  overtime:
+    keywords:
+      value: [overtime, ot]
+      label: illustrative
+      source: "Feature Design 2.3: groups earnings by type"
+  bonus:
+    keywords:
+      value: [bonus]
+      label: illustrative
+      source: "Feature Design 2.3: groups earnings by type"
+  commission:
+    keywords:
+      value: [commission]
+      label: illustrative
+      source: "Feature Design 2.3: groups earnings by type"
+
+# Overtime, bonus and commission count only with this much documented history; otherwise they are
+# excluded and flagged (the underwriter can include them, with a reason).
+variable_history_months:
+  value: 24
+  label: illustrative
+  source: "Feature Design 2.3: counted only if documented history is 24 months or more"
+
+# Base pay is rate x regular hours x periods per year / 12; the year-to-date average is year-to-date
+# x periods per year / (periods elapsed x 12). The pay frequency decides periods per year, and the
+# length of a pay period (inclusive days) must fit its frequency.
+pay_frequencies:
+  value:
+    weekly: {periods_per_year: 52, min_days: 7, max_days: 7, aliases: [weekly]}
+    biweekly: {periods_per_year: 26, min_days: 14, max_days: 14, aliases: [biweekly, bi-weekly, every two weeks]}
+    semi_monthly: {periods_per_year: 24, min_days: 13, max_days: 16, aliases: [semi-monthly, semimonthly, twice monthly]}
+    monthly: {periods_per_year: 12, min_days: 28, max_days: 31, aliases: [monthly]}
+  label: illustrative
+  source: "Feature Design 2.3: periods per year from the printed pay frequency"
+
+# Words dropped from the end of an employer's name before two names are compared, so
+# "Cedar Valley Manufacturing, Inc." and "Cedar Valley Manufacturing" are the same employer.
+employer_suffixes:
+  value: [inc, incorporated, llc, corp, corporation, co, company, ltd]
+  label: illustrative
+  source: "Employer names are compared in code (FSD section 7: names matched in code)"
+
+# Box 12 codes that are employee deferrals (Box 5 minus Box 1 is explained by them).
+deferral_codes:
+  value: ["D"]
+  label: illustrative
+  source: "Feature Design 2.5: Box 12 deferral codes (configured; sample: D)"
+
+# Flag messages: no decision words, and each says what was compared.
+flags:
+  INC-CHK-01:
+    severity: warning
+    message: "Form 1040 wages {tax_wages} for {year} differ from W-2 Box 1 {box1} by {difference} (tolerance {tolerance})."
+  INC-CHK-02:
+    severity: warning
+    message: "The latest pay stub names {stub_employer}, but the latest W-2 names {w2_employer}."
+  INC-CHK-03:
+    severity: warning
+    message: "W-2 Box 5 is {gap} above Box 1 for {year}, but the Box 12 deferral codes ({codes}) add up to {deferrals}."
+  "INC-CHK-03:explained":
+    severity: info
+    message: "W-2 Box 5 is {gap} above Box 1 for {year}, which the Box 12 deferral codes ({codes}) account for."
+  INC-CHK-04:
+    severity: warning
+    message: "{label} fell {drop} from {from_label} ({from_amount}) to {to_label} ({to_amount}), above the {threshold} review level."
+  "INC-CHK-04:trend":
+    severity: info
+    message: "{label} {direction} {change} from {from_label} ({from_amount}) to {to_label} ({to_amount})."
+  INC-W101:
+    severity: warning
+    message: "{component} is excluded: its documented history is {history}, and {required} months are needed."
+  INC-W102:
+    severity: warning
+    message: "Year-to-date {component} averages {average} per pay period, against {current} this period (difference {difference})."
+  INC-W103:
+    severity: warning
+    message: "The pay stub prints {printed} pay, but its pay period is {days} days long."
+  INC-W104:
+    severity: warning
+    message: "The pay date puts this stub in pay period {by_date}, but year-to-date regular pay divided by this period's regular pay is {by_ytd}."
+  INC-W105:
+    severity: warning
+    message: "The earnings line '{description}' could not be grouped as base pay, overtime, bonus or commission, so it is not in the figures."
+  cannot_check:
+    severity: info
+    message: "Could not check {rule}: {missing} not available."

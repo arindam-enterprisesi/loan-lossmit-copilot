@@ -8,7 +8,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from app.api.errors import register_error_handlers
-from app.api.routers import auth, cases, documents
+from app.api.routers import auth, cases, completeness, documents, income, jobs
 from app.services.queue import close_queue
 
 API_PREFIX = "/api/v1"
@@ -29,6 +29,9 @@ register_error_handlers(app)
 app.include_router(auth.router, prefix=API_PREFIX)
 app.include_router(cases.router, prefix=API_PREFIX)
 app.include_router(documents.router, prefix=API_PREFIX)
+app.include_router(jobs.router, prefix=API_PREFIX)
+app.include_router(income.router, prefix=API_PREFIX)
+app.include_router(completeness.router, prefix=API_PREFIX)
 
 
 @app.get("/health", tags=["infra"])

@@ -9,6 +9,7 @@ from typing import Any
 import httpx
 import pytest
 import sqlalchemy as sa
+from botocore.exceptions import EndpointConnectionError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.schemas.documents import DocumentSummaryOut
@@ -94,7 +95,7 @@ async def test_upload_one_pdf(
     ] == [None] * 5
     job = body["job"]
     assert (job["kind"], job["status"], job["progress"], job["stage"], job["error"]) == (
-        "document_ingest",
+        "document_processing",
         "queued",
         0,
         None,
@@ -127,8 +128,8 @@ async def test_upload_one_pdf(
     [job_row] = await rows(
         session, "SELECT kind, case_id, document_id, status FROM jobs WHERE id = :j", j=job["id"]
     )
-    assert tuple(job_row) == ("document_ingest", DANIEL, uuid.UUID(doc["id"]), "queued")
-    assert fake_queue.calls == [("ingest_documents", (job["id"], [doc["id"]]), job["id"])]
+    assert tuple(job_row) == ("document_processing", DANIEL, uuid.UUID(doc["id"]), "queued")
+    assert fake_queue.calls == [("process_documents", (job["id"], [doc["id"]]), job["id"])]
 
 
 async def test_every_upload_writes_an_audit_event(
@@ -173,7 +174,7 @@ async def test_several_files_make_several_documents_and_one_job(
     assert [d["file_name"] for d in body["documents"]] == [n for n, _ in names]  # upload order
     ids = [d["id"] for d in body["documents"]]
     assert len(set(ids)) == 3 and len(s3_keys()) == 3
-    assert fake_queue.calls == [("ingest_documents", (body["job"]["id"], ids), body["job"]["id"])]
+    assert fake_queue.calls == [("process_documents", (body["job"]["id"], ids), body["job"]["id"])]
     assert await counts(session) == {"documents": 3, "jobs": 1, "audit_events": 3}
     [job_row] = await rows(session, "SELECT document_id FROM jobs")
     assert job_row.document_id is None  # a batch job belongs to no single document
@@ -405,6 +406,41 @@ async def test_a_storage_failure_leaves_nothing_behind(
         "code": "storage_unavailable",
         "message": "The file could not be stored. Please try again.",
     }
+    assert s3_keys() == []  # the first file was removed again
+    assert fake_queue.calls == []
+    assert await counts(session) == {"documents": 0, "jobs": 0, "audit_events": 0}
+
+
+async def test_a_connection_error_to_s3_is_a_503_not_a_crash(
+    docs_client: httpx.AsyncClient,
+    session: AsyncSession,
+    s3_storage: Storage,
+    rendered: Rendered,
+    fake_queue: FakeQueue,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # botocore raises EndpointConnectionError (not ClientError) when S3 cannot be reached. It
+    # used to escape as a 500; it is the same "storage_unavailable" as any other storage failure.
+    client = s3_storage._get_client()
+    real_put_object, calls = client.put_object, []
+
+    def unreachable_on_second(**kwargs: Any) -> Any:
+        calls.append(kwargs["Key"])
+        if len(calls) == 2:
+            raise EndpointConnectionError(endpoint_url="https://s3.example.invalid/secret-key")
+        return real_put_object(**kwargs)
+
+    monkeypatch.setattr(client, "put_object", unreachable_on_second)
+
+    response = await upload(
+        docs_client,
+        DANIEL,
+        [("a.pdf", rendered.read(STUB)), ("b.pdf", rendered.read(AUGUST))],
+    )
+
+    assert response.status_code == 503
+    assert response.json()["code"] == "storage_unavailable"
+    assert "secret-key" not in response.text  # the failing URL is never echoed
     assert s3_keys() == []  # the first file was removed again
     assert fake_queue.calls == []
     assert await counts(session) == {"documents": 0, "jobs": 0, "audit_events": 0}

@@ -11,7 +11,7 @@ import uuid
 from datetime import datetime
 
 import sqlalchemy as sa
-from sqlalchemy.dialects.postgresql import ARRAY
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -42,6 +42,11 @@ class ExtractionRun(Base):
     prompt_id: Mapped[str | None] = mapped_column(sa.String(100), nullable=True)
     provider: Mapped[str | None] = mapped_column(sa.String(50), nullable=True)
     model: Mapped[str | None] = mapped_column(sa.String(100), nullable=True)
+    # The reader's signs that the document is incomplete ("a table is cut off", a "continued"
+    # notice), kept so the checks can be re-run later without calling a model again.
+    signals: Mapped[list[str]] = mapped_column(
+        JSONB, default=list, server_default=sa.text("'[]'::jsonb")
+    )
     created_at: Mapped[datetime] = created_at_column()
 
 
