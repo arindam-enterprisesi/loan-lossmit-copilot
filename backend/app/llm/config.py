@@ -61,6 +61,13 @@ class EmbeddingConfig(_Strict):
     dimensions: int | None = Field(default=None, gt=0)
 
 
+class ExtractionSettings(_Strict):
+    """How extract@1 splits long documents (Feature Design 1.5: split by pages, merged in code)."""
+
+    # A document with more pages than this is sent in page batches of this size.
+    max_pages_per_call: int = Field(gt=0)
+
+
 class LLMConfig(_Strict):
     version: str
     label: Literal["illustrative", "authoritative"]
@@ -69,6 +76,7 @@ class LLMConfig(_Strict):
     providers: dict[str, ProviderDefaults]
     tasks: dict[str, TaskOverride] = Field(default_factory=dict)
     embeddings: EmbeddingConfig | None = None
+    extraction: ExtractionSettings | None = None
 
     def for_task(self, task: str, provider: str | None = None) -> TaskConfig:
         override = self.tasks.get(task, TaskOverride())

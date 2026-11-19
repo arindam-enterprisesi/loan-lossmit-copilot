@@ -3,6 +3,10 @@
     uv run python -m app.llm.smoke --provider anthropic
     uv run python -m app.llm.smoke --provider all
     uv run python -m app.llm.smoke --provider gemini --check classify
+    uv run python -m app.llm.smoke --provider anthropic --check extract
+
+Checks: smoke (echo), classify, extract (Daniel Reyes's pay stub) and label
+(his August bank statement's transactions). The samples are synthetic.
 
 Prints each result with tokens and latency. Exits 1 if any call fails.
 Reads keys from the repo-root .env if present.
@@ -19,7 +23,10 @@ from pydantic import BaseModel
 
 from app.llm.config import load_llm_config
 from app.llm.gateway import GatewayError, run
-from app.llm.tasks import DocumentLine, classify
+from app.llm.samples import load_lines, sample_transactions
+from app.llm.tasks import classify, extract, label_transactions
+from app.prompts.schemas.registry import DocumentType
+from app.prompts.schemas.transactions import TransactionCategory
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 
@@ -29,19 +36,19 @@ class SmokeResult(BaseModel):
     length: int
 
 
-# Synthetic sample (not a real person): the first lines of a pay stub.
-SAMPLE_PAY_STUB = [
-    DocumentLine(1, 1, "NORTHWIND LOGISTICS INC."),
-    DocumentLine(1, 2, "Earnings Statement"),
-    DocumentLine(1, 3, "Employee: Daniel Reyes        Employee ID: 0042"),
-    DocumentLine(1, 4, "Pay Period: 07/16/2026 - 07/31/2026    Pay Date: 08/05/2026"),
-    DocumentLine(1, 5, "Earnings          Rate     Hours    Current     YTD"),
-    DocumentLine(1, 6, "Regular           34.50    80.00    2,760.00    41,400.00"),
-    DocumentLine(1, 7, "Overtime          51.75     6.00      310.50     3,105.00"),
-    DocumentLine(1, 8, "Gross Pay                           3,070.50    44,505.00"),
-    DocumentLine(1, 9, "Deductions                          1,036.89    15,031.45"),
-    DocumentLine(1, 10, "Net Pay                             2,033.61    29,473.55"),
-]
+# Synthetic samples (invented people), with the line IDs ingestion produces.
+SAMPLE_PAY_STUB = load_lines("daniel_pay_stub")
+SAMPLE_STATEMENT = "daniel_bank_statement_2026-08"
+
+# What the pay stub check expects: values exactly as printed, on these lines.
+# Net pay is the deliberate misprint (true net is 2,033.61); the arithmetic check in
+# code is what catches it, not the model.
+EXPECTED_PAY_STUB = {
+    "net_pay_current": ("2,083.61", "p1-L31"),
+    "gross_pay_current": ("3,070.50", "p1-L17"),
+    "total_deductions_current": ("1,036.89", "p1-L25"),
+    "pay_date": ("2026-10-02", "p1-L10"),
+}
 
 
 async def check_smoke(provider: str) -> str:
@@ -66,11 +73,60 @@ async def check_classify(provider: str) -> str:
     )
 
 
+async def check_extract(provider: str) -> str:
+    outcome = await extract(SAMPLE_PAY_STUB, DocumentType.PAY_STUB, provider=provider)
+    fields = outcome.result.fields
+    problems = []
+    for name, (value, line) in EXPECTED_PAY_STUB.items():
+        got = getattr(fields, name)
+        if got.value != value or line not in got.lines:
+            problems.append(f"{name}={got.value!r}@{got.lines}")
+    if len(fields.earnings) != 3 or len(fields.deductions) != 6:
+        problems.append(f"rows earnings={len(fields.earnings)} deductions={len(fields.deductions)}")
+    if outcome.unknown_line_ids:
+        problems.append(f"unknown lines {outcome.unknown_line_ids}")
+    status = "ok" if not problems else "UNEXPECTED"
+    calls = outcome.calls
+    return (
+        f"extract  {status:10} {'; '.join(problems) or 'net pay 2,083.61 @ p1-L31'} "
+        f"model={calls[0].model} calls={len(calls)} "
+        f"attempts={sum(c.attempts for c in calls)} in={sum(c.input_tokens for c in calls)} "
+        f"out={sum(c.output_tokens for c in calls)} {max(c.latency_ms for c in calls)}ms"
+    )
+
+
+async def check_label(provider: str) -> str:
+    transactions = sample_transactions(SAMPLE_STATEMENT)
+    outcome = await label_transactions(
+        transactions,
+        borrower_names=["Daniel Reyes"],
+        employer_names=["Cedar Valley Manufacturing, Inc."],
+        provider=provider,
+    )
+    by_line = {lab.line_id: lab for lab in outcome.labels}
+    payroll = [t.line_id for t in transactions if "PAYROLL" in t.description]
+    review = [lab.line_id for lab in outcome.labels if lab.needs_review]
+    ok = (
+        not review
+        and not outcome.unknown_line_ids
+        and all(by_line[lid].category is TransactionCategory.PAYROLL_DEPOSIT for lid in payroll)
+    )
+    calls = outcome.calls
+    return (
+        f"label    {'ok' if ok else 'UNEXPECTED':10} {len(outcome.labels)} labelled, "
+        f"needs review={review}, unknown={outcome.unknown_line_ids} "
+        f"model={calls[0].model} calls={len(calls)} in={sum(c.input_tokens for c in calls)} "
+        f"out={sum(c.output_tokens for c in calls)} {sum(c.latency_ms for c in calls)}ms"
+    )
+
+
 async def main(argv: list[str] | None = None) -> int:
     providers = sorted(load_llm_config().providers)
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--provider", choices=[*providers, "all"], default="all")
-    parser.add_argument("--check", choices=["smoke", "classify", "all"], default="all")
+    parser.add_argument(
+        "--check", choices=["smoke", "classify", "extract", "label", "all"], default="all"
+    )
     args = parser.parse_args(argv)
 
     try:
@@ -81,7 +137,12 @@ async def main(argv: list[str] | None = None) -> int:
         pass
 
     selected = providers if args.provider == "all" else [args.provider]
-    checks = {"smoke": check_smoke, "classify": check_classify}
+    checks = {
+        "smoke": check_smoke,
+        "classify": check_classify,
+        "extract": check_extract,
+        "label": check_label,
+    }
     names = list(checks) if args.check == "all" else [args.check]
 
     failures = 0

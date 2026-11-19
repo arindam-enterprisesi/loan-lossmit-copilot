@@ -1,14 +1,19 @@
 """Schema Registry (CPS-03): one entry per document type.
 
 Each type has a one-paragraph description that the classify prompt shows the
-model. Adding a type means adding it here (and its field schema on D3). The
-type names must match ``DocumentType`` in contracts/openapi.yaml; a test checks.
+model, and the field schema extract@1 reads (``None`` for types that are only
+classified here: credit reports and hardship letters are analysed in Features 4
+and 7). Adding a type means adding it here. The type names must match
+``DocumentType`` in contracts/openapi.yaml; a test checks.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import StrEnum
+
+from app.prompts.schemas import documents as d
+from app.prompts.schemas.fields import Schema
 
 
 class DocumentType(StrEnum):
@@ -31,6 +36,7 @@ class DocumentTypeSpec:
     label: str
     pillars: tuple[int, ...]
     description: str
+    fields_model: type[Schema] | None
 
 
 REGISTRY: dict[DocumentType, DocumentTypeSpec] = {
@@ -44,6 +50,7 @@ REGISTRY: dict[DocumentType, DocumentTypeSpec] = {
             "pay period and pay date, earnings lines (regular, overtime, bonus) with hours and "
             "rates, deductions (taxes, benefits, retirement), gross pay, net pay and "
             "year-to-date totals.",
+            d.PayStubFields,
         ),
         DocumentTypeSpec(
             DocumentType.BANK_STATEMENT,
@@ -52,6 +59,7 @@ REGISTRY: dict[DocumentType, DocumentTypeSpec] = {
             "A statement from a bank or credit union for one account and period: institution "
             "name, account holder, masked account number, statement period, opening and closing "
             "balances, and a list of dated deposits and withdrawals.",
+            d.BankStatementFields,
         ),
         DocumentTypeSpec(
             DocumentType.TAX_RETURN_1040,
@@ -59,6 +67,7 @@ REGISTRY: dict[DocumentType, DocumentTypeSpec] = {
             (1, 2),
             "A US individual income tax return on IRS Form 1040 for one tax year: filing status, "
             "taxpayer names, wages, total income, adjusted gross income, and numbered form lines.",
+            d.TaxReturn1040Fields,
         ),
         DocumentTypeSpec(
             DocumentType.W2,
@@ -66,6 +75,7 @@ REGISTRY: dict[DocumentType, DocumentTypeSpec] = {
             (1,),
             "An IRS Form W-2 Wage and Tax Statement for one tax year: employer and employee, "
             "numbered boxes 1 to 6 for wages and withheld taxes, and Box 12 codes.",
+            d.W2Fields,
         ),
         DocumentTypeSpec(
             DocumentType.CREDIT_REPORT,
@@ -74,6 +84,7 @@ REGISTRY: dict[DocumentType, DocumentTypeSpec] = {
             "A consumer credit report: personal identification, credit scores, a list of "
             "trade accounts with creditor, balance, payment and status history, inquiries and "
             "public records.",
+            None,
         ),
         DocumentTypeSpec(
             DocumentType.MORTGAGE_ASSISTANCE_APPLICATION,
@@ -82,6 +93,7 @@ REGISTRY: dict[DocumentType, DocumentTypeSpec] = {
             "A servicer's mortgage assistance or loss mitigation application form completed by a "
             "borrower: stated monthly income, expenses and assets, hardship reasons checked, and "
             "whether the borrower intends to keep or sell the property.",
+            d.MortgageAssistanceApplicationFields,
         ),
         DocumentTypeSpec(
             DocumentType.MORTGAGE_STATEMENT,
@@ -90,6 +102,7 @@ REGISTRY: dict[DocumentType, DocumentTypeSpec] = {
             "A periodic mortgage billing statement from a loan servicer: loan number, principal "
             "balance, payment breakdown (principal, interest, escrow), past-due amount, fees and "
             "total amount due.",
+            d.MortgageStatementFields,
         ),
         DocumentTypeSpec(
             DocumentType.BENEFITS_LETTER,
@@ -98,6 +111,7 @@ REGISTRY: dict[DocumentType, DocumentTypeSpec] = {
             "A letter from an agency or plan confirming benefit payments, such as unemployment, "
             "Social Security, disability or pension: payee, amount, frequency and start or end "
             "dates.",
+            d.BenefitsLetterFields,
         ),
         DocumentTypeSpec(
             DocumentType.EXPENSE_BILL,
@@ -105,6 +119,7 @@ REGISTRY: dict[DocumentType, DocumentTypeSpec] = {
             (2,),
             "A bill or invoice for a household expense such as a utility, insurance premium, "
             "medical or childcare cost: payee, amount due, billing period and due date.",
+            d.ExpenseBillFields,
         ),
         DocumentTypeSpec(
             DocumentType.HARDSHIP_LETTER,
@@ -113,6 +128,7 @@ REGISTRY: dict[DocumentType, DocumentTypeSpec] = {
             "A letter written by a borrower to their mortgage servicer explaining a financial "
             "hardship: what happened, when it started, how it affects their ability to pay, and "
             "what they hope to do with the home.",
+            None,
         ),
     ]
 }
