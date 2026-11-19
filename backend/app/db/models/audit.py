@@ -32,13 +32,17 @@ class AuditEvent(Base):
 
     id: Mapped[int] = mapped_column(sa.BigInteger, sa.Identity(), primary_key=True)
     at: Mapped[datetime] = mapped_column(TIMESTAMPTZ, server_default=sa.func.now())
-    # A user ID, or "system" / "worker". Plain text so system actors fit.
-    actor: Mapped[str] = mapped_column(sa.Text)
+    # The user who acted; NULL means the system or a worker. Deliberately no foreign key: a
+    # SET NULL cascade would be an UPDATE (blocked), and history must outlive its users.
+    actor_id: Mapped[uuid.UUID | None] = mapped_column(sa.Uuid, nullable=True)
+    # The user's role, or "system" / "worker" when actor_id is NULL. Plain text, no CHECK.
+    role: Mapped[str] = mapped_column(sa.Text)
     # Deliberately no foreign key: audit history must survive deleting a case,
     # and that deletion is itself logged.
     case_id: Mapped[uuid.UUID | None] = mapped_column(sa.Uuid, nullable=True)
     action: Mapped[str] = mapped_column(sa.Text)
-    entity: Mapped[str] = mapped_column(sa.Text)
+    entity_type: Mapped[str] = mapped_column(sa.Text)
+    entity_id: Mapped[uuid.UUID | None] = mapped_column(sa.Uuid, nullable=True)
     before: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     after: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     reason: Mapped[str | None] = mapped_column(sa.Text, nullable=True)

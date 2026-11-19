@@ -57,6 +57,21 @@ class JobStatus(StrEnum):
     FAILED = "failed"
 
 
+# The next two come from docs/database-schema.md; the contract does not mention them.
+class DocTypeSource(StrEnum):
+    """Who decided ``documents.doc_type``: the classifier or a person."""
+
+    AI = "ai"
+    USER = "user"
+
+
+class ReadBy(StrEnum):
+    """How a page's text was read."""
+
+    TEXT_LAYER = "text_layer"
+    TESSERACT = "tesseract"
+
+
 class DocumentType(StrEnum):
     """The contract's document types.
 

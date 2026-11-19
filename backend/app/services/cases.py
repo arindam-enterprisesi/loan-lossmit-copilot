@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from datetime import date
 from typing import Any
 
+import sqlalchemy as sa
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -26,6 +27,42 @@ ROLE_PILLARS: dict[Role, frozenset[Pillar]] = {
     Role.LM_SPECIALIST: frozenset({Pillar.LOSS_MITIGATION}),
     Role.ADMIN: frozenset({Pillar.UNDERWRITING, Pillar.LOSS_MITIGATION}),
 }
+
+# Human case references: LP-0001 (the underwriting pillar, "loan processing" in the schema doc)
+# and LM-0001 (loss mitigation). Each prefix has its own Postgres sequence, created by migration
+# 0001, so a number is never reused after a case is deleted.
+CASE_REF_PREFIX: dict[Pillar, str] = {Pillar.UNDERWRITING: "LP", Pillar.LOSS_MITIGATION: "LM"}
+CASE_REF_SEQUENCE: dict[Pillar, str] = {
+    Pillar.UNDERWRITING: "case_ref_lp_seq",
+    Pillar.LOSS_MITIGATION: "case_ref_lm_seq",
+}
+
+
+async def next_case_ref(session: AsyncSession, pillar: Pillar) -> str:
+    number = await session.scalar(select(sa.Sequence(CASE_REF_SEQUENCE[pillar]).next_value()))
+    return f"{CASE_REF_PREFIX[pillar]}-{number:04d}"
+
+
+async def advance_case_ref_sequences(session: AsyncSession) -> None:
+    """Make the next generated ref higher than every ref already stored. Never lowers a sequence.
+
+    Needed after rows are inserted with explicit refs (the seed), which do not touch the sequence.
+    """
+    for pillar, prefix in CASE_REF_PREFIX.items():
+        sequence = CASE_REF_SEQUENCE[pillar]  # a constant from this module, never user input
+        await session.execute(
+            sa.text(
+                f"""
+                SELECT setval('{sequence}', greatest(
+                    (SELECT max(CAST(substr(case_ref, 4) AS integer)) FROM cases
+                     WHERE case_ref LIKE :prefix),
+                    (SELECT last_value FROM {sequence})
+                ))
+                WHERE EXISTS (SELECT 1 FROM cases WHERE case_ref LIKE :prefix)
+                """
+            ),
+            {"prefix": f"{prefix}-%"},
+        )
 
 
 @dataclass(frozen=True)
@@ -76,17 +113,29 @@ async def get_case(session: AsyncSession, role: Role, case_id: uuid.UUID) -> Cas
 async def create_case(
     session: AsyncSession, user: CurrentUser, title: str, pillar: Pillar
 ) -> CaseView:
-    case = Case(title=title, pillar=pillar, created_by=uuid.UUID(user.id))
+    case = Case(
+        title=title,
+        pillar=pillar,
+        case_ref=await next_case_ref(session, pillar),
+        created_by=uuid.UUID(user.id),
+    )
     session.add(case)
     await session.flush()
     await session.refresh(case)
     await audit.record(
         session,
-        actor=user.id,
+        actor_id=uuid.UUID(user.id),
+        role=user.role.value,
         action="case.created",
-        entity=f"case:{case.id}",
+        entity_type="case",
+        entity_id=case.id,
         case_id=case.id,
-        after={"title": case.title, "pillar": case.pillar.value, "status": case.status},
+        after={
+            "case_ref": case.case_ref,
+            "title": case.title,
+            "pillar": case.pillar.value,
+            "status": case.status,
+        },
     )
     return CaseView(case, 0)
 
@@ -122,9 +171,11 @@ async def set_profile(
 
     await audit.record(
         session,
-        actor=user.id,
+        actor_id=uuid.UUID(user.id),
+        role=user.role.value,
         action="case.profile_updated",
-        entity=f"case:{case.id}",
+        entity_type="case",
+        entity_id=case.id,
         case_id=case.id,
         before=before,
         after=_profile_snapshot(case),

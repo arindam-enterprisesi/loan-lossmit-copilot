@@ -9,10 +9,9 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Any
 
 import sqlalchemy as sa
-from sqlalchemy.dialects.postgresql import ARRAY, JSONB
+from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -63,18 +62,17 @@ class Field(Base):
     document_id: Mapped[uuid.UUID] = mapped_column(sa.Uuid)
     run_id: Mapped[uuid.UUID] = mapped_column(sa.Uuid)
     name: Mapped[str] = mapped_column(sa.String(100))
-    # Strings exactly as normalised by code (amounts "2033.61", dates "2026-07-31").
     value: Mapped[str | None] = mapped_column(sa.Text, nullable=True)
+    # The code-normalised form of the value (amounts "2033.61", dates "2026-07-31"). Which of
+    # value / normalized_value the API's Field.value reads is decided with the extraction endpoint.
+    normalized_value: Mapped[str | None] = mapped_column(sa.Text, nullable=True)
     # The value as first extracted. Never changed by a correction (rule 6).
     original_value: Mapped[str | None] = mapped_column(sa.Text, nullable=True)
     certainty: Mapped[Certainty] = mapped_column(enum_type(Certainty, "certainty"))
-    # Line IDs such as "p1-L31", within this document.
-    line_ids: Mapped[list[str]] = mapped_column(
+    # Line refs such as "p1-L31", within this document. The API calls them line_ids.
+    # Flags live in their own table (D3); until then the API returns an empty list.
+    line_refs: Mapped[list[str]] = mapped_column(
         ARRAY(sa.Text), default=list, server_default=sa.text("'{}'")
-    )
-    # [{"code", "severity", "message", "evidence"}], the contract's Flag shape.
-    flags: Mapped[list[dict[str, Any]]] = mapped_column(
-        JSONB, default=list, server_default=sa.text("'[]'::jsonb")
     )
     review_status: Mapped[ReviewStatus] = mapped_column(
         enum_type(ReviewStatus, "review_status"),
@@ -86,3 +84,4 @@ class Field(Base):
     review_reason: Mapped[str | None] = mapped_column(sa.Text, nullable=True)
     # Incremented on every change; the API uses it to detect edit conflicts.
     version: Mapped[int] = mapped_column(sa.Integer, default=1, server_default="1")
+    created_at: Mapped[datetime] = created_at_column()

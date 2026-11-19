@@ -33,7 +33,8 @@ uv sync
 uv run ruff check . && uv run ruff format --check .
 uv run mypy app
 uv run pytest                 # live provider tests are skipped unless -m live and keys are set
-uv run pytest -m live         # real provider calls
+uv run pytest -m live         # real provider calls; each provider skips without credentials
+uv run python -m app.llm.smoke --provider all   # smoke + classify per provider, reads ../.env
 
 # contract
 npx @redocly/cli lint contracts/openapi.yaml
