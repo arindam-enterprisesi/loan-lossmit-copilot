@@ -37,7 +37,10 @@ from app.prompts.schemas.transactions import (
 # Feature Design 1.5: classify reads the first pages only.
 CLASSIFY_PAGES = 2
 
-_CLOSING_TAG_RE = re.compile(r"</\s*(document|transactions)\s*>", re.IGNORECASE)
+# Every tag a prompt wraps untrusted text in. Text cannot close one of them early.
+_CLOSING_TAG_RE = re.compile(
+    r"</\s*(document|transactions|letter|application|flags|evidence)\s*>", re.IGNORECASE
+)
 
 
 @dataclass(frozen=True)
@@ -53,7 +56,7 @@ class DocumentLine:
         return f"p{self.page}-L{self.line}"
 
 
-def _clean(text: str) -> str:
+def clean_text(text: str) -> str:
     """Flatten whitespace and defuse closing tags, so document text cannot leave its block."""
     return _CLOSING_TAG_RE.sub(lambda m: f"[/{m.group(1).lower()}]", " ".join(text.split()))
 
@@ -62,7 +65,7 @@ def format_numbered_lines(lines: Sequence[DocumentLine]) -> str:
     """``p1-L1: text`` per line; text is flattened and cannot close the document tag."""
     rendered = []
     for ln in lines:
-        text = _clean(ln.text)
+        text = clean_text(ln.text)
         rendered.append(f"{ln.line_id}: {text}")
     return "\n".join(rendered)
 
@@ -317,7 +320,7 @@ class LabelOutcome:
 
 def format_transactions(transactions: Sequence[TransactionInput]) -> str:
     return "\n".join(
-        f"{t.line_id} | {_clean(t.date)} | {_clean(t.description)} | {_clean(t.amount)}"
+        f"{t.line_id} | {clean_text(t.date)} | {clean_text(t.description)} | {clean_text(t.amount)}"
         for t in transactions
     )
 
@@ -343,8 +346,8 @@ async def label_transactions(
     calls: list[GatewayResult[LabelTransactionsResult]] = []
     variables = {
         "categories": "\n".join(f"- {c.value}" for c in TransactionCategory),
-        "borrower_names": ", ".join(_clean(n) for n in borrower_names) or "(none given)",
-        "employer_names": ", ".join(_clean(n) for n in employer_names) or "(none given)",
+        "borrower_names": ", ".join(clean_text(n) for n in borrower_names) or "(none given)",
+        "employer_names": ", ".join(clean_text(n) for n in employer_names) or "(none given)",
     }
 
     pending = list(transactions)
