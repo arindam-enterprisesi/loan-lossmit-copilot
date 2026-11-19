@@ -11,6 +11,7 @@ import {
   uploadMock,
 } from "@/mocks/store";
 import { ApiError } from "./api-error";
+import { cleanReason } from "./documents";
 import type {
   Case,
   DocumentSummary,
@@ -126,20 +127,37 @@ export async function setDocumentType(
   docType: DocumentType,
   reason?: string,
 ): Promise<{ document: DocumentSummary; job?: Job }> {
-  if (USE_MOCKS) return setDocumentTypeMock(caseId, documentId, docType);
+  const cleaned = cleanReason(reason);
+  if (USE_MOCKS) return setDocumentTypeMock(caseId, documentId, docType, cleaned);
   const res = await rawRequest(`/cases/${caseId}/documents/${documentId}/type`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ doc_type: docType, ...(reason ? { reason } : {}) }),
+    body: JSON.stringify({ doc_type: docType, ...(cleaned ? { reason: cleaned } : {}) }),
   });
   const data = (await res.json()) as DocumentSummary | { document: DocumentSummary; job: Job };
   return "document" in data ? data : { document: data };
 }
 
+/** A page picture link. Real links are presigned and expire after a few minutes. */
+export interface PageImage {
+  url: string;
+  /** When the link stops working, if the backend says. */
+  expiresAt?: string;
+}
+
 /**
- * Page image link for the evidence panel. The contract has no page-image endpoint yet (TODO D3+),
- * so only the mock pay stub has one. Returns undefined and the panel shows a blank page.
+ * Asks for the link to one page's image. The contract has no page-image endpoint yet (TODO D3+), so
+ * in real mode this answers "none" and the viewer draws a blank page. When the endpoint lands, only
+ * this function changes. Always ask again for a fresh link: an old one may have expired.
  */
-export function getPageImageUrl(documentId: string, page: number): string | undefined {
-  return USE_MOCKS ? pageImageUrlMock(documentId, page) : undefined;
+export async function getPageImage(
+  _caseId: string,
+  documentId: string,
+  page: number,
+): Promise<PageImage | undefined> {
+  if (USE_MOCKS) {
+    const url = pageImageUrlMock(documentId, page);
+    return url ? { url } : undefined;
+  }
+  return undefined;
 }
