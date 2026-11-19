@@ -26,6 +26,15 @@ export function docTypeLabel(type: DocumentType | null | undefined): string {
   return TYPE_LABEL_OVERRIDES[type] ?? humanize(type);
 }
 
+/** The contract allows a reason of up to 500 characters when a document type is set. */
+export const TYPE_REASON_MAX = 500;
+
+/** Trims the reason. A blank reason becomes undefined, so it is left out of the request. */
+export function cleanReason(reason: string | undefined | null): string | undefined {
+  const trimmed = reason?.trim();
+  return trimmed ? trimmed : undefined;
+}
+
 export const ACCEPTED_MIME = ["application/pdf", "image/png", "image/jpeg"] as const;
 
 export interface FileCheck {

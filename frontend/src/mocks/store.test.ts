@@ -9,9 +9,11 @@ import {
   JOB_QUEUE_MS,
   JOB_RUN_MS,
   listDocumentsMock,
+  pageImageUrlMock,
   resetMockStore,
   reviewFieldMock,
   setDocumentTypeMock,
+  typeChangesMock,
   uploadMock,
 } from "./store";
 
@@ -149,6 +151,35 @@ describe("uploading and processing", () => {
     expect(unknown.flags[0].code).toBe("DI-W501");
   });
 
+  it("an uploaded pay stub gets the demo reading: net pay flagged, and its own page picture", () => {
+    const { documents, job } = uploadMock(DANIEL_CASE_ID, ["reyes_paystub_nov.pdf"], "auto", 0);
+    getJobMock(job.id, JOB_QUEUE_MS + JOB_RUN_MS);
+    const id = documents[0].id;
+
+    const extraction = getExtractionMock(DANIEL_CASE_ID, id);
+    expect(extraction.document_id).toBe(id);
+    expect(extraction.fields[0].name).toBe("net_pay_current");
+    expect(extraction.fields[0].flags[0].code).toBe("DI-CHK-02");
+    expect(extraction.fields.every((f) => f.evidence?.document_id === id)).toBe(true);
+
+    const doc = listDocumentsMock(DANIEL_CASE_ID).find((d) => d.id === id)!;
+    expect(doc.status).toBe("needs_review");
+    expect(doc.flags[0].code).toBe("DI-CHK-02");
+    expect(pageImageUrlMock(id, 1)).toBe("/mock/paystub-p1.svg");
+    expect(pageImageUrlMock(id, 2)).toBeUndefined();
+  });
+
+  it("an uploaded copy of the pay stub does not share its fields with the original", () => {
+    const { documents, job } = uploadMock(DANIEL_CASE_ID, ["paystub_copy.pdf"], "auto", 0);
+    getJobMock(job.id, JOB_QUEUE_MS + JOB_RUN_MS);
+    const copy = getExtractionMock(DANIEL_CASE_ID, documents[0].id).fields[0];
+    reviewFieldMock(DANIEL_CASE_ID, documents[0].id, copy.name, {
+      action: "confirm",
+      expected_version: copy.version!,
+    });
+    expect(netPay().review_status).toBe("unreviewed"); // the original pay stub is untouched
+  });
+
   it("an unknown job is a 404", () => {
     expect(statusOf(() => getJobMock("nope"))).toBe(404);
   });
@@ -165,7 +196,7 @@ describe("choosing a type", () => {
 
   it("re-queues extraction for a document that needed a type", () => {
     const doc = needsType();
-    const result = setDocumentTypeMock(DANIEL_CASE_ID, doc.id, "w2", 0);
+    const result = setDocumentTypeMock(DANIEL_CASE_ID, doc.id, "w2", undefined, 0);
     expect(result.document.doc_type).toBe("w2");
     expect(result.document.status).toBe("processing");
     expect(result.job?.status).toBe("queued");
@@ -178,6 +209,38 @@ describe("choosing a type", () => {
   it("confirming the same type on a typed document queues nothing", () => {
     const result = setDocumentTypeMock(DANIEL_CASE_ID, PAYSTUB_DOC_ID, "pay_stub");
     expect(result.job).toBeUndefined();
+    expect(typeChangesMock()).toEqual([]); // nothing changed, so nothing is recorded
+  });
+
+  it("records the change with the reason, who it was from and to, and when", () => {
+    const doc = needsType();
+    setDocumentTypeMock(DANIEL_CASE_ID, doc.id, "w2", "Scanned W-2, no title on page", Date.parse("2026-11-18T09:00:00Z"));
+    expect(typeChangesMock()).toEqual([
+      {
+        documentId: doc.id,
+        from: null,
+        to: "w2",
+        reason: "Scanned W-2, no title on page",
+        at: "2026-11-18T09:00:00.000Z",
+      },
+    ]);
+  });
+
+  it("records a change with no reason as null, since the reason is optional", () => {
+    setDocumentTypeMock(DANIEL_CASE_ID, needsType().id, "w2");
+    expect(typeChangesMock()[0].reason).toBeNull();
+  });
+
+  it("refuses a reason longer than 500 characters with 422 and changes nothing", () => {
+    const doc = needsType();
+    const status = statusOf(() => setDocumentTypeMock(DANIEL_CASE_ID, doc.id, "w2", "x".repeat(501)));
+    expect(status).toBe(422);
+    expect(typeChangesMock()).toEqual([]);
+    expect(listDocumentsMock(DANIEL_CASE_ID).find((d) => d.id === doc.id)!.status).toBe("type_needed");
+  });
+
+  it("accepts a reason of exactly 500 characters", () => {
+    expect(() => setDocumentTypeMock(DANIEL_CASE_ID, needsType().id, "w2", "x".repeat(500))).not.toThrow();
   });
 });
 

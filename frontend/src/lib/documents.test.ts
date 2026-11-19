@@ -2,12 +2,31 @@ import { describe, expect, it } from "vitest";
 import {
   certaintyTone,
   checkFiles,
+  cleanReason,
   DOCUMENT_TYPES,
   docTypeLabel,
   hasOpenFlags,
   sortFlaggedFirst,
+  TYPE_REASON_MAX,
 } from "./documents";
 import type { Field } from "./types";
+
+describe("cleanReason", () => {
+  it("trims spaces around a reason", () => {
+    expect(cleanReason("  scanned sideways  ")).toBe("scanned sideways");
+  });
+
+  it("turns a blank or missing reason into undefined so it is not sent", () => {
+    expect(cleanReason("")).toBeUndefined();
+    expect(cleanReason("   ")).toBeUndefined();
+    expect(cleanReason(undefined)).toBeUndefined();
+    expect(cleanReason(null)).toBeUndefined();
+  });
+
+  it("matches the 500 character limit in the contract", () => {
+    expect(TYPE_REASON_MAX).toBe(500);
+  });
+});
 
 const field = (name: string, over: Partial<Field> = {}): Field => ({
   name,

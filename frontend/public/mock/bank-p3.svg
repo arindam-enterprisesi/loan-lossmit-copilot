@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 850 1100" width="850" height="1100" role="img" aria-label="Mock bank statement, page 3 (synthetic)">
+  <!-- Synthetic demo page. Positions match the bounding boxes in src/mocks/extraction.ts (fractions of 850 x 1100). -->
+  <rect width="850" height="1100" fill="#ffffff"/>
+  <rect x="85" y="60" width="680" height="2" fill="#10202b"/>
+  <text x="85" y="95" font-family="Georgia, serif" font-size="18" font-weight="700" fill="#10202b">HARBORLIGHT BANK</text>
+  <text x="85" y="130" font-family="Arial, sans-serif" font-size="11" font-weight="700" fill="#1d5062">STATEMENT TOTALS</text>
+  <rect x="85" y="150" width="680" height="1" fill="#d9e2e1"/>
+  <g fill="#e6ebea">
+    <rect x="85" y="180" width="300" height="8" rx="2"/>
+    <rect x="85" y="202" width="240" height="8" rx="2"/>
+    <rect x="85" y="224" width="360" height="8" rx="2"/>
+  </g>
+  <text x="85" y="640" font-family="Arial, sans-serif" font-size="10" font-weight="700" fill="#6f7b85">Ending balance</text>
+  <text x="206" y="640" font-family="monospace" font-size="10" font-weight="700" fill="#10202b">4,210.35</text>
+  <text x="85" y="1040" font-family="Arial, sans-serif" font-size="9" fill="#9aa5ad">Synthetic document for demonstration only. Page 3 of 3.</text>
+</svg>

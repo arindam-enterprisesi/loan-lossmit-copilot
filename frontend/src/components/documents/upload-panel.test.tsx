@@ -5,6 +5,7 @@ import { UploadPanel } from "./upload-panel";
 const api = vi.hoisted(() => ({
   uploadDocuments: vi.fn(),
   getJob: vi.fn(),
+  USE_MOCKS: true, // the job polling hook reads this flag to pick its interval
 }));
 vi.mock("@/lib/api", () => api);
 
