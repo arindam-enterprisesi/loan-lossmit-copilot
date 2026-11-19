@@ -25,7 +25,7 @@ class AdapterRequest:
     messages: list[Message]
     output_model: type[BaseModel]
     max_tokens: int
-    temperature: float
+    temperature: float | None  # None: do not send a temperature
     options: dict[str, Any] = field(default_factory=dict)
 
 

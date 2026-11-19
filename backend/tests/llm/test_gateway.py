@@ -1,35 +1,20 @@
 import json
 import logging
-from dataclasses import dataclass, field
 from pathlib import Path
 
 import pytest
 from pydantic import BaseModel
 
-from app.llm.config import LLMConfig, TaskConfig
+from app.llm.config import LLMConfig
 from app.llm.gateway import Gateway, GatewayError
-from app.llm.types import AdapterRequest, AdapterResponse, ProviderCallError
+from app.llm.types import AdapterResponse, ProviderCallError
+
+from .fakes import FakeAdapter, fake_config
 
 
 class Answer(BaseModel):
     echo: str
     length: int
-
-
-@dataclass
-class FakeAdapter:
-    """Returns queued responses in order and records every request."""
-
-    responses: list[AdapterResponse | Exception]
-    name: str = "fake"
-    requests: list[AdapterRequest] = field(default_factory=list)
-
-    async def complete(self, request: AdapterRequest) -> AdapterResponse:
-        self.requests.append(request)
-        item = self.responses.pop(0)
-        if isinstance(item, Exception):
-            raise item
-        return item
 
 
 @pytest.fixture
@@ -43,12 +28,7 @@ def prompts_dir(tmp_path: Path) -> Path:
 
 @pytest.fixture
 def config() -> LLMConfig:
-    return LLMConfig(
-        version="test",
-        label="illustrative",
-        defaults=TaskConfig(provider="fake", model="fake-model", options={"effort": "low"}),
-        tasks={"special": {"model": "other-model", "options": {"effort": "high"}}},
-    )
+    return fake_config(special={"model": "other-model", "options": {"effort": "high"}})
 
 
 VALID = AdapterResponse(text='{"echo": "loan", "length": 4}', input_tokens=10, output_tokens=5)
@@ -158,3 +138,18 @@ async def test_call_log_has_metadata_but_no_document_text(
             "success",
         }
     assert secret not in caplog.text
+
+
+async def test_provider_override_uses_that_providers_default_model(
+    prompts_dir: Path, config: LLMConfig
+) -> None:
+    fake, other = FakeAdapter([]), FakeAdapter([VALID], name="other")
+    gateway = Gateway({"fake": fake, "other": other}, config, prompts_dir)
+
+    result = await gateway.run("special", "echo@1", {"word": "loan"}, Answer, provider="other")
+
+    assert (result.provider, result.model) == ("other", "other-default")
+    assert other.requests[0].temperature is None
+    assert fake.requests == []
+    with pytest.raises(GatewayError, match="not configured"):
+        await gateway.run("smoke", "echo@1", {"word": "loan"}, Answer, provider="missing")
