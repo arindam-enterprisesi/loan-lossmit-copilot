@@ -1,0 +1,95 @@
+{
+ "source": "data/synthetic/scenarios/angela_whitfield.json -> hardship_letter.pdf (rendered by data/synthetic/generate.py, read by app.services.ingestion.parse_pdf)",
+ "lines": [
+  {
+   "page": 1,
+   "line": 1,
+   "text": "Angela Whitfield"
+  },
+  {
+   "page": 1,
+   "line": 2,
+   "text": "2210 Larkspur Court, Dayton, OH 45420"
+  },
+  {
+   "page": 1,
+   "line": 3,
+   "text": "Date: 2026-10-14"
+  },
+  {
+   "page": 1,
+   "line": 4,
+   "text": "Re: Loan 8800412271 - request for help with my mortgage"
+  },
+  {
+   "page": 1,
+   "line": 5,
+   "text": "Dear Loss Mitigation Team,"
+  },
+  {
+   "page": 1,
+   "line": 6,
+   "text": "Because my employer cut my hours from 40 to 30 a week in July, my pay fell by a quarter."
+  },
+  {
+   "page": 1,
+   "line": 7,
+   "text": "I fell behind in August and I now owe 5,160.00 in missed payments."
+  },
+  {
+   "page": 1,
+   "line": 8,
+   "text": "My take-home pay no longer covers my bills and the mortgage together."
+  },
+  {
+   "page": 1,
+   "line": 9,
+   "text": "I do not know whether my hours will return to 40 a week."
+  },
+  {
+   "page": 1,
+   "line": 10,
+   "text": "I have cut my spending where I can and I have used up my savings."
+  },
+  {
+   "page": 1,
+   "line": 11,
+   "text": "I am enclosing my application, my recent pay stubs and my recent bank statements."
+  },
+  {
+   "page": 1,
+   "line": 12,
+   "text": "I am asking for help to lower my payment so I can stay current."
+  },
+  {
+   "page": 1,
+   "line": 13,
+   "text": "I have lived in this house for nine years and my family is here."
+  },
+  {
+   "page": 1,
+   "line": 14,
+   "text": "I want to keep my home and I will do everything I can to make that work."
+  },
+  {
+   "page": 1,
+   "line": 15,
+   "text": "Sincerely,"
+  },
+  {
+   "page": 1,
+   "line": 16,
+   "text": "Angela Whitfield"
+  },
+  {
+   "page": 1,
+   "line": 17,
+   "text": "Page 1 of 1"
+  },
+  {
+   "page": 1,
+   "line": 18,
+   "text": "SYNTHETIC SAMPLE - invented data, not a real document"
+  }
+ ]
+}

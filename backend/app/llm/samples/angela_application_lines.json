@@ -1,0 +1,165 @@
+{
+ "source": "data/synthetic/scenarios/angela_whitfield.json -> mortgage_assistance_application.pdf (rendered by data/synthetic/generate.py, read by app.services.ingestion.parse_pdf)",
+ "lines": [
+  {
+   "page": 1,
+   "line": 1,
+   "text": "MORTGAGE ASSISTANCE APPLICATION"
+  },
+  {
+   "page": 1,
+   "line": 2,
+   "text": "Borrower: Angela Whitfield"
+  },
+  {
+   "page": 1,
+   "line": 3,
+   "text": "Mailing address: 2210 Larkspur Court, Dayton, OH 45420"
+  },
+  {
+   "page": 1,
+   "line": 4,
+   "text": "Phone: (937) 555-0147"
+  },
+  {
+   "page": 1,
+   "line": 5,
+   "text": "Loan number: 8800412271"
+  },
+  {
+   "page": 1,
+   "line": 6,
+   "text": "Servicer: Pinebrook Mortgage Servicing"
+  },
+  {
+   "page": 1,
+   "line": 7,
+   "text": "Property address: 2210 Larkspur Court, Dayton, OH 45420"
+  },
+  {
+   "page": 1,
+   "line": 8,
+   "text": "Occupancy: Owner-occupied primary residence"
+  },
+  {
+   "page": 1,
+   "line": 9,
+   "text": "REASON FOR HARDSHIP"
+  },
+  {
+   "page": 1,
+   "line": 10,
+   "text": "[X] Reduction in income"
+  },
+  {
+   "page": 1,
+   "line": 11,
+   "text": "[ ] Unemployment"
+  },
+  {
+   "page": 1,
+   "line": 12,
+   "text": "[ ] Increase in housing expense"
+  },
+  {
+   "page": 1,
+   "line": 13,
+   "text": "[ ] Medical or disability"
+  },
+  {
+   "page": 1,
+   "line": 14,
+   "text": "[ ] Divorce or separation"
+  },
+  {
+   "page": 1,
+   "line": 15,
+   "text": "[ ] Other"
+  },
+  {
+   "page": 1,
+   "line": 16,
+   "text": "What do you want to do with the home? Keep the home"
+  },
+  {
+   "page": 1,
+   "line": 17,
+   "text": "MONTHLY INCOME"
+  },
+  {
+   "page": 1,
+   "line": 18,
+   "text": "Gross monthly income 4,200.00"
+  },
+  {
+   "page": 1,
+   "line": 19,
+   "text": "Other income 0.00"
+  },
+  {
+   "page": 1,
+   "line": 20,
+   "text": "MONTHLY EXPENSES"
+  },
+  {
+   "page": 1,
+   "line": 21,
+   "text": "Housing (mortgage) 1,720.00"
+  },
+  {
+   "page": 1,
+   "line": 22,
+   "text": "Utilities 310.00"
+  },
+  {
+   "page": 1,
+   "line": 23,
+   "text": "Food and everyday 780.00"
+  },
+  {
+   "page": 1,
+   "line": 24,
+   "text": "Loan payments 410.00"
+  },
+  {
+   "page": 1,
+   "line": 25,
+   "text": "Other 200.00"
+  },
+  {
+   "page": 1,
+   "line": 26,
+   "text": "Total monthly expenses 3,420.00"
+  },
+  {
+   "page": 1,
+   "line": 27,
+   "text": "ASSETS"
+  },
+  {
+   "page": 1,
+   "line": 28,
+   "text": "Checking account 640.25"
+  },
+  {
+   "page": 1,
+   "line": 29,
+   "text": "Documents enclosed: Hardship letter, Pay stubs, Bank statements"
+  },
+  {
+   "page": 1,
+   "line": 30,
+   "text": "Signature: Angela Whitfield Date signed: 2026-10-14"
+  },
+  {
+   "page": 1,
+   "line": 31,
+   "text": "Page 1 of 1"
+  },
+  {
+   "page": 1,
+   "line": 32,
+   "text": "SYNTHETIC SAMPLE - invented data, not a real document"
+  }
+ ]
+}
