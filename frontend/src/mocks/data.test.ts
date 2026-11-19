@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { listCases, listDocuments } from "@/lib/api";
 import { ANGELA_CASE_ID, DANIEL_CASE_ID, mockCases, mockDocuments } from "./data";
+import { seedExtractions } from "./extraction";
 
 describe("mock data", () => {
   it("every document belongs to a mock case", () => {
@@ -34,6 +35,36 @@ describe("mock data", () => {
   it("never uses decision wording (CLAUDE.md rule 3)", () => {
     const text = JSON.stringify([mockCases, mockDocuments]);
     expect(text).not.toMatch(/approv|deny|denied|offer|eligib|qualif/i);
+  });
+});
+
+describe("mock extractions", () => {
+  it("belong to mock documents, with unique field names per document", () => {
+    const ids = new Set(mockDocuments.map((d) => d.id));
+    for (const e of seedExtractions) {
+      expect(ids.has(e.document_id)).toBe(true);
+      const names = e.fields.map((f) => f.name);
+      expect(new Set(names).size).toBe(names.length);
+    }
+  });
+
+  it("keep every field's evidence box inside the page (fractions 0 to 1)", () => {
+    for (const e of seedExtractions) {
+      for (const f of e.fields) {
+        const b = f.evidence?.bbox;
+        if (!b) continue;
+        for (const n of [b.x0, b.y0, b.x1, b.y1]) {
+          expect(n).toBeGreaterThanOrEqual(0);
+          expect(n).toBeLessThanOrEqual(1);
+        }
+        expect(b.x1).toBeGreaterThan(b.x0);
+        expect(b.y1).toBeGreaterThan(b.y0);
+      }
+    }
+  });
+
+  it("never use decision wording (CLAUDE.md rule 3)", () => {
+    expect(JSON.stringify(seedExtractions)).not.toMatch(/approv|deny|denied|offer|eligib|qualif/i);
   });
 });
 

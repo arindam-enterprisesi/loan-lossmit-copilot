@@ -49,6 +49,11 @@ describe("nav config", () => {
     expect(findNavItem("underwriting", "hardship-budget")).toBeUndefined();
   });
 
+  it("marks the document screens as live in both pillars", () => {
+    expect(findNavItem("underwriting", "document-intelligence")?.status).toBe("live");
+    expect(findNavItem("loss_mitigation", "document-intake")?.status).toBe("live");
+  });
+
   it("never uses decision wording in menu labels (CLAUDE.md rule 3)", () => {
     const banned = /approv|deny|denied|offer|eligib|qualif/i;
     for (const p of pillars) {

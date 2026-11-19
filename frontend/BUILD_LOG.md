@@ -47,3 +47,34 @@ Goal: scaffold the app, PRD-based theme, app shell with left nav for both copilo
 - To raise with Arindam on the call: ask him to add `npm test` to the CI frontend job, and ask about the two `npm audit` warnings (dev-only `minimatch`, `postcss` bundled in Next 15). The only fix is a forced jump to Next 16, which I didn't take.
 - Staying on mocks until the backend sends real data: case references like `LP-0001`, the "Cases" menu item, and every screen whose endpoint isn't in the contract yet. Mocks are easy to edit and good for design review.
 - Sidebar is desktop-only for now.
+
+---
+
+## Day 2 (Tue 17 Nov 2026)
+
+Goal: Document Intelligence screens. An upload screen and a review screen with the page image beside the extracted fields. Both pillars use them (Document intelligence for Loan Processing, Document intake for Loss Mitigation).
+
+### Decisions
+- Built on mocks. The contract has the upload, job, extraction, field review and document type endpoints, so `src/lib/api.ts` has a function for each and flips to the real API with `NEXT_PUBLIC_USE_MOCKS=false`.
+- The contract has no page image endpoint yet (marked TODO D3+), so the page image is a mock pay stub drawn as an SVG in `public/mock/`, lined up with the mock evidence boxes.
+- The review screen lives under each menu item (`/underwriting/document-intelligence/<case>/<document>`), so the menu stays highlighted while reviewing.
+- Used plain `<select>` for the type pickers. They are accessible and easy to test.
+- No "Show working" drawer on this screen. The contract returns the check as a flag message ("Gross 3,070.50 minus deductions 1,036.89 is 2,033.61, not 2,083.61"), so I show that text as is. The UI does no arithmetic.
+
+### What I did
+1. **Mock backend for documents** in `src/mocks/store.ts`. It follows the contract rules: a stale `expected_version` gives 409, a missing reason gives 422, a correction keeps `original_value`, and a processing job moves queued, running, succeeded over a few seconds. Fixtures in `src/mocks/extraction.ts` include the pay stub net pay mismatch (DI-CHK-02, line p1-L31).
+2. **API layer**: `uploadDocuments`, `getJob`, `getExtraction`, `reviewField`, `setDocumentType`, `getPageImageUrl`. Added `ApiError` so screens can react to 409 and 422. Job polling is a small hook, `useJobPoll`.
+3. **Upload screen**: case picker, drop zone, document type (Auto-detect or a type), file checks (PDF, PNG, JPEG only), progress bar while the job runs, and a document table. Documents whose type could not be told show a type picker. There is a filter for documents with flagged fields.
+4. **Review screen**: page image with the cited box on the left, fields on the right with flagged ones first. Picking a field moves the box. Each field can be confirmed, corrected (value and reason needed) or rejected (reason needed). A correction shows the original value struck through. The "Records a review. Not a decision." note sits next to the controls.
+5. **Edit conflict**: if the value changed since the screen loaded, the review is refused and the screen asks for a reload instead of overwriting.
+6. Switched both menu items from "soon" to live.
+
+### Tests
+- Went from 29 to 87 tests in 14 files. New ones cover the review payload rules, file checks, field ordering, the mock store (409, 422, original kept, job timing, type change), the upload panel, field list and form, job progress, the document table, and the whole review screen (box position, correction, conflict and reload).
+- `eslint`, `tsc --noEmit`, `npm run build` and `npm test` all pass. Banned decision wording scan is clean.
+- Running `npm run build` while the dev server is up breaks the dev server's cache (500 errors). Fix is to stop it, delete `.next` and start again.
+
+### Open items
+- Ask Arindam: the contract takes a multipart upload while the technical design describes a presigned upload to S3, so which one should the screen follow? And when will the page image endpoint land?
+- The type picker has no reason box yet (the contract allows an optional reason).
+- Pages with more than one image are not switchable yet. The panel shows the page cited by the selected field.
