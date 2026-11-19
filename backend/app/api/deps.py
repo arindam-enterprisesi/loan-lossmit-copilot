@@ -9,15 +9,18 @@ request. Roles are checked per router and nothing is implicitly all-powerful, so
 
 from __future__ import annotations
 
+import uuid
 from collections.abc import Awaitable, Callable
+from functools import lru_cache
 from typing import Annotated
 
 from fastapi import Depends
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
-from app.api.errors import forbidden, unauthorized
+from app.api.errors import ApiError, forbidden, unauthorized
 from app.db.enums import Role
 from app.services.security import CurrentUser, TokenError, decode_access_token
+from app.storage import Storage
 
 # auto_error=False so a missing token gives our contract-shaped 401, not FastAPI's default.
 _bearer = HTTPBearer(auto_error=False)
@@ -44,3 +47,24 @@ def require_roles(*roles: Role) -> Callable[[CurrentUser], Awaitable[CurrentUser
         return user
 
     return dependency
+
+
+def case_not_found() -> ApiError:
+    return ApiError(404, "not_found", "Case not found")
+
+
+def _case_id(case_id: str) -> uuid.UUID:
+    """A malformed ID is a 404, like an unknown one (the contract lists no 422 here)."""
+    try:
+        return uuid.UUID(case_id)
+    except ValueError:
+        raise case_not_found() from None
+
+
+CaseIdPath = Annotated[uuid.UUID, Depends(_case_id)]
+
+
+@lru_cache
+def get_storage() -> Storage:
+    """The S3 wrapper (tests override this with a moto-backed one)."""
+    return Storage()

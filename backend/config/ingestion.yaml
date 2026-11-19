@@ -1,0 +1,11 @@
+# Settings for document upload and ingestion. Read by app/services/ingestion_config.py.
+# Every setting is versioned and labelled; change the version when you change a value.
+version: "2026-11-18.1"
+label: illustrative
+
+# Largest single file the upload endpoint accepts, in MiB (1 MiB = 1,048,576 bytes).
+max_file_mb: 25
+
+# Resolution page images are rendered at (dots per inch). Bounding boxes are stored as
+# fractions of the page, so they do not depend on this.
+render_dpi: 200

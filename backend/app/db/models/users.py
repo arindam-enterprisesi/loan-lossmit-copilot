@@ -19,6 +19,7 @@ class User(Base):
     id: Mapped[uuid.UUID] = uuid_pk()
     username: Mapped[str] = mapped_column(sa.String(64), unique=True)
     name: Mapped[str] = mapped_column(sa.String(200))
+    email: Mapped[str | None] = mapped_column(sa.String(254), nullable=True)
     role: Mapped[Role] = mapped_column(enum_type(Role, "role"))
     password_hash: Mapped[str] = mapped_column(sa.Text)
     created_at: Mapped[datetime] = created_at_column()

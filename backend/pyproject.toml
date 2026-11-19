@@ -23,6 +23,8 @@ dependencies = [
     "pypdfium2>=4.30",
     "pdfplumber>=0.11",
     "python-jose[cryptography]>=3.3",
+    "python-multipart>=0.0.34",
+    "pillow>=13.0.0",
 ]
 
 [dependency-groups]

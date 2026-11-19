@@ -52,6 +52,12 @@ make data        # or: cd backend && uv run python ../data/synthetic/generate.py
 
 It writes `data/synthetic/rendered/` (git-ignored): `daniel_reyes/` (7 documents), `daniel_reyes/withheld/` (the 2024 W-2 and return the case is meant to be missing), `angela_whitfield/` (8 documents), `broken/` (a password-protected PDF, a corrupt PDF, an unsupported CSV, a duplicate and two degraded scans) and `manifest.json` (type, role, pages, SHA-256, expected behaviour for each file). Known defects are built in: Daniel's stub prints net pay 2,083.61 (true 2,033.61) and his August statement says "Page 1 of 3" with two pages. Each scenario file separates `documented`, `derived` and `invented` values in its `provenance` block. All people and accounts are invented.
 
+## Document upload
+
+`POST /api/v1/cases/{case_id}/documents` (multipart: `files`, optional `declared_type`) takes PDF, PNG or JPEG up to the size in `backend/config/ingestion.yaml` (25 MiB). The type comes from the file's own bytes. The original is stored unchanged in S3 under `{S3_PREFIX}cases/{case_id}/documents/{document_id}/original` (IDs only, never the file name), the row and an audit event are written, and one `document_ingest` job is queued for the worker. The worker (`app/services/ingestion.py`) renders each page to PNG at the configured DPI and stores the text layer as numbered lines (`p1-L31`) with boxes. A file that is already in the case is accepted and carries the warning flag `DI-W206`. Locked, corrupt and image-only files end as `failed` with the reason in the job's `error`; there is no OCR yet (`OcrAdapter` is a stub). `GET` on the same path lists the case's documents.
+
+Uploading needs `S3_BUCKET` (and AWS credentials) in `.env`; without it the endpoint answers 503 `storage_unavailable`. Tests use moto, so they need neither S3 nor Redis.
+
 ## Layout
 
 | Path | What | Owner |

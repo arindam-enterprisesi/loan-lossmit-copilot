@@ -17,7 +17,9 @@ class Job(Base):
     __tablename__ = "jobs"
     __table_args__ = (
         sa.CheckConstraint("progress >= 0 AND progress <= 1", name="progress_range"),
+        sa.CheckConstraint("attempts >= 0", name="attempts_non_negative"),
         sa.Index("ix_jobs_case_id", "case_id"),
+        sa.Index("ix_jobs_document_id", "document_id"),
     )
 
     id: Mapped[uuid.UUID] = uuid_pk()
@@ -26,12 +28,18 @@ class Job(Base):
     case_id: Mapped[uuid.UUID | None] = mapped_column(
         sa.ForeignKey("cases.id", ondelete="CASCADE"), nullable=True
     )
+    # NULL for jobs that are not about one document (e.g. a completeness run).
+    document_id: Mapped[uuid.UUID | None] = mapped_column(
+        sa.ForeignKey("documents.id", ondelete="CASCADE"), nullable=True
+    )
     status: Mapped[JobStatus] = mapped_column(
         enum_type(JobStatus, "status"),
         default=JobStatus.QUEUED,
         server_default=JobStatus.QUEUED.value,
     )
     progress: Mapped[float] = mapped_column(sa.Float, default=0.0, server_default="0")
+    # How many times the worker has tried it.
+    attempts: Mapped[int] = mapped_column(sa.Integer, default=0, server_default="0")
     stage: Mapped[str | None] = mapped_column(sa.String(64), nullable=True)
     error: Mapped[str | None] = mapped_column(sa.Text, nullable=True)
     created_at: Mapped[datetime] = created_at_column()

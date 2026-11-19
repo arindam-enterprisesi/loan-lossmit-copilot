@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.enums import Pillar, Role
 from app.db.models import Case, User
 from app.db.session import get_engine, get_sessionmaker
+from app.services.cases import advance_case_ref_sequences
 from app.services.security import hash_password
 from app.settings import get_settings
 
@@ -30,10 +31,10 @@ DEMO_USERS: tuple[tuple[str, str, Role], ...] = (
     ("admin", "Demo Administrator", Role.ADMIN),
 )
 
-# (title, pillar, username of the creating user)
-DEMO_CASES: tuple[tuple[str, Pillar, str], ...] = (
-    ("Daniel Reyes — purchase", Pillar.UNDERWRITING, "underwriter"),
-    ("Angela Whitfield — hardship", Pillar.LOSS_MITIGATION, "lm_specialist"),
+# (title, pillar, case_ref, username of the creating user)
+DEMO_CASES: tuple[tuple[str, Pillar, str, str], ...] = (
+    ("Daniel Reyes — purchase", Pillar.UNDERWRITING, "LP-0001", "underwriter"),
+    ("Angela Whitfield — hardship", Pillar.LOSS_MITIGATION, "LM-0001", "lm_specialist"),
 )
 
 
@@ -71,13 +72,23 @@ async def seed(session: AsyncSession, demo_password: str) -> SeedResult:
         )
         users_created += result.rowcount  # type: ignore[attr-defined]
 
-    for title, pillar, creator in DEMO_CASES:
+    for title, pillar, case_ref, creator in DEMO_CASES:
         result = await session.execute(
             insert(Case)
-            .values(id=case_id(title), title=title, pillar=pillar, created_by=user_id(creator))
+            .values(
+                id=case_id(title),
+                case_ref=case_ref,
+                title=title,
+                pillar=pillar,
+                created_by=user_id(creator),
+            )
             .on_conflict_do_nothing()
         )
         cases_created += result.rowcount  # type: ignore[attr-defined]
+
+    # The refs above were written explicitly, so the sequences must be moved past them or the
+    # first case created through the API would try to take LP-0001 again.
+    await advance_case_ref_sequences(session)
 
     return SeedResult(users_created, cases_created)
 
