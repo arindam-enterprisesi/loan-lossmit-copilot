@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 850 1100" width="850" height="1100" role="img" aria-label="Mock pay stub, page 1 (synthetic)">
+  <!-- Synthetic demo page. Positions match the bounding boxes in src/mocks/extraction.ts (fractions of 850 x 1100). -->
+  <rect width="850" height="1100" fill="#ffffff"/>
+  <rect x="85" y="60" width="680" height="2" fill="#10202b"/>
+  <text x="85" y="95" font-family="Georgia, serif" font-size="18" font-weight="700" fill="#10202b">NORTHWIND LOGISTICS INC.</text>
+  <text x="85" y="130" font-family="Arial, sans-serif" font-size="11" fill="#6f7b85" letter-spacing="1.5">EARNINGS STATEMENT</text>
+  <text x="85" y="170" font-family="Arial, sans-serif" font-size="10" fill="#6f7b85">Employee</text>
+  <text x="206" y="170" font-family="monospace" font-size="10" fill="#10202b">Daniel Reyes</text>
+  <text x="85" y="190" font-family="Arial, sans-serif" font-size="10" fill="#6f7b85">Employee ID</text>
+  <text x="206" y="190" font-family="monospace" font-size="10" fill="#10202b">NW-004217</text>
+  <text x="85" y="210" font-family="Arial, sans-serif" font-size="10" fill="#6f7b85">Pay frequency</text>
+  <text x="206" y="210" font-family="monospace" font-size="10" fill="#10202b">Biweekly</text>
+  <rect x="85" y="262" width="680" height="1" fill="#d9e2e1"/>
+  <text x="85" y="290" font-family="Arial, sans-serif" font-size="11" font-weight="700" fill="#1d5062">PAY PERIOD</text>
+
+  <text x="85" y="339" font-family="Arial, sans-serif" font-size="10" fill="#6f7b85">Period start</text>
+  <text x="206" y="339" font-family="monospace" font-size="10" fill="#10202b">2026-09-14</text>
+  <text x="85" y="361" font-family="Arial, sans-serif" font-size="10" fill="#6f7b85">Period end</text>
+  <text x="206" y="361" font-family="monospace" font-size="10" fill="#10202b">2026-09-27</text>
+
+  <text x="85" y="383" font-family="Arial, sans-serif" font-size="11" font-weight="700" fill="#1d5062">CURRENT PERIOD</text>
+  <text x="85" y="405" font-family="Arial, sans-serif" font-size="10" fill="#6f7b85">Gross pay</text>
+  <text x="206" y="405" font-family="monospace" font-size="10" fill="#10202b">3,070.50</text>
+  <text x="85" y="427" font-family="Arial, sans-serif" font-size="10" fill="#6f7b85">Deductions</text>
+  <text x="206" y="427" font-family="monospace" font-size="10" fill="#10202b">1,036.89</text>
+  <text x="85" y="449" font-family="Arial, sans-serif" font-size="10" font-weight="700" fill="#6f7b85">Net pay</text>
+  <text x="206" y="449" font-family="monospace" font-size="10" font-weight="700" fill="#10202b">2,083.61</text>
+
+  <rect x="85" y="500" width="680" height="1" fill="#d9e2e1"/>
+  <!-- filler lines so the page looks like a document -->
+  <g fill="#e6ebea">
+    <rect x="85" y="530" width="320" height="8" rx="2"/>
+    <rect x="85" y="552" width="260" height="8" rx="2"/>
+    <rect x="85" y="574" width="380" height="8" rx="2"/>
+    <rect x="85" y="596" width="220" height="8" rx="2"/>
+    <rect x="85" y="640" width="600" height="8" rx="2"/>
+    <rect x="85" y="662" width="540" height="8" rx="2"/>
+    <rect x="85" y="684" width="570" height="8" rx="2"/>
+  </g>
+  <text x="85" y="1040" font-family="Arial, sans-serif" font-size="9" fill="#9aa5ad">Synthetic document for demonstration only. Page 1 of 1.</text>
+</svg>
