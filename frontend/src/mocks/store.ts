@@ -3,6 +3,7 @@
 // reason, corrections keep original_value) so the UI is built against real behaviour. A page reload
 // resets it. It is replaced by the real API, never extended with business logic.
 import { ApiError } from "@/lib/api-error";
+import type { ChecklistResult } from "@/lib/completeness";
 import { DOCUMENT_TYPES, TYPE_REASON_MAX } from "@/lib/documents";
 import type {
   DocumentSummary,
@@ -13,17 +14,32 @@ import type {
   Flag,
   Job,
 } from "@/lib/types";
+import type {
+  BudgetAdjustmentRequest,
+  HardshipAssessment,
+  ProfileConfirmation,
+} from "@/lib/hardship-types";
+import type { IncomeAnalysis, IncomeDecision } from "@/lib/income-types";
+import { applyOverride, buildCompleteness } from "./completeness";
 import { mockDocuments } from "./data";
+import { applyBudgetAdjustment, applyConfirmation, buildAngelaHardship, hasHardshipSeed } from "./hardship";
 import { MOCK_PAGE_IMAGES, PAYSTUB_DOC_ID, seedExtractions } from "./extraction";
+import { applyIncomeDecision, buildDanielIncome, hasIncomeSeed } from "./income";
 
 /** Job timing: waits in the queue, then runs. Exported so tests can step through it. */
 export const JOB_QUEUE_MS = 600;
 export const JOB_RUN_MS = 3000;
 
+type JobKind = "document_processing" | "income_analysis" | "hardship_assessment";
+
 interface MockJob {
   id: string;
+  kind: JobKind;
   createdAtMs: number;
+  /** Documents being read (document jobs). Empty for an income or hardship run. */
   documentIds: string[];
+  /** The case an income or hardship run belongs to. */
+  caseId?: string;
   finalized: boolean;
 }
 
@@ -41,6 +57,12 @@ interface StoreState {
   extractions: Map<string, Extraction>;
   jobs: Map<string, MockJob>;
   typeChanges: TypeChange[];
+  /** Latest income analysis per case, set when a run's job finishes. */
+  incomes: Map<string, IncomeAnalysis>;
+  /** Latest completeness result per case, set when the checklist is run. */
+  completeness: Map<string, ChecklistResult>;
+  /** Latest hardship assessment per case, set when a run's job finishes. */
+  hardship: Map<string, HardshipAssessment>;
   counter: number;
 }
 
@@ -50,6 +72,9 @@ function createState(): StoreState {
     extractions: new Map(structuredClone(seedExtractions).map((e) => [e.document_id, e])),
     jobs: new Map(),
     typeChanges: [],
+    incomes: new Map(),
+    completeness: new Map(),
+    hardship: new Map(),
     counter: 0,
   };
 }
@@ -153,8 +178,18 @@ function refreshDocument(doc: DocumentSummary, extraction: Extraction): void {
   doc.status = doc.flags.length > 0 ? "needs_review" : "reviewed";
 }
 
-/** What the worker does when a job finishes: settle each document in the job. */
+/** What the worker does when a job finishes: settle each document in the job, or store the income run. */
 function finalizeJob(job: MockJob): void {
+  if (job.kind === "income_analysis" && job.caseId) {
+    state.incomes.set(job.caseId, buildDanielIncome(iso(job.createdAtMs + JOB_QUEUE_MS + JOB_RUN_MS)));
+    job.finalized = true;
+    return;
+  }
+  if (job.kind === "hardship_assessment" && job.caseId) {
+    state.hardship.set(job.caseId, buildAngelaHardship(iso(job.createdAtMs + JOB_QUEUE_MS + JOB_RUN_MS)));
+    job.finalized = true;
+    return;
+  }
   for (const id of job.documentIds) {
     const doc = state.documents.find((d) => d.id === id);
     if (!doc) continue;
@@ -174,13 +209,17 @@ function finalizeJob(job: MockJob): void {
   job.finalized = true;
 }
 
-function createJob(documentIds: string[], now: number): Job {
-  const job: MockJob = { id: newId("b"), createdAtMs: now, documentIds, finalized: false };
+function createJob(documentIds: string[], now: number, kind: JobKind = "document_processing", caseId?: string): Job {
+  const job: MockJob = { id: newId("b"), kind, createdAtMs: now, documentIds, caseId, finalized: false };
   state.jobs.set(job.id, job);
   return jobView(job, now);
 }
 
-const STAGES = ["ocr", "classify", "extract", "checks"] as const;
+const STAGES: Record<JobKind, readonly string[]> = {
+  document_processing: ["ocr", "classify", "extract", "checks"],
+  income_analysis: ["gather", "calculate", "explain", "checks"],
+  hardship_assessment: ["read", "compare", "budget", "checks"],
+};
 
 function jobView(job: MockJob, now: number): Job {
   const elapsed = now - job.createdAtMs;
@@ -193,11 +232,12 @@ function jobView(job: MockJob, now: number): Job {
   } else if (elapsed >= JOB_QUEUE_MS) {
     status = "running";
     progress = Math.round(((elapsed - JOB_QUEUE_MS) / JOB_RUN_MS) * 100) / 100;
-    stage = STAGES[Math.min(STAGES.length - 1, Math.floor(progress * STAGES.length))];
+    const stages = STAGES[job.kind];
+    stage = stages[Math.min(stages.length - 1, Math.floor(progress * stages.length))];
   }
   return {
     id: job.id,
-    kind: "document_processing",
+    kind: job.kind,
     status,
     progress,
     stage,
@@ -323,6 +363,107 @@ export function reviewFieldMock(
 
   refreshDocument(doc, extraction);
   return structuredClone(target);
+}
+
+/** POST .../income/analysis: queues a run. Only a case with income documents can be run (422 otherwise). */
+export function runIncomeMock(caseId: string, now: number = Date.now()): Job {
+  if (!hasIncomeSeed(caseId)) throw new ApiError(422, "This case has no income documents to analyse");
+  return createJob([], now, "income_analysis", caseId);
+}
+
+/** GET .../income/analysis/latest: 404 until a run has finished. */
+export function getLatestIncomeMock(caseId: string): IncomeAnalysis {
+  const latest = state.incomes.get(caseId);
+  if (!latest) throw new ApiError(404, "No income analysis yet. Run it first.");
+  return structuredClone(latest);
+}
+
+/**
+ * PATCH .../income/analysis/components/{id}: include or exclude one component, reason required (422).
+ * The latest analysis is replaced by the recalculated one and returned, so the screen updates at once.
+ */
+export function setIncomeComponentMock(
+  caseId: string,
+  componentId: string,
+  decision: IncomeDecision,
+  now: number = Date.now(),
+): IncomeAnalysis {
+  const latest = state.incomes.get(caseId);
+  if (!latest) throw new ApiError(404, "No income analysis yet. Run it first.");
+  const updated = applyIncomeDecision(latest, componentId, decision, "demo.reviewer", iso(now));
+  state.incomes.set(caseId, updated);
+  return structuredClone(updated);
+}
+
+/** POST .../hardship-assessment: queues a run. Only a case with a hardship letter can be run (422 otherwise). */
+export function runHardshipMock(caseId: string, now: number = Date.now()): Job {
+  if (!hasHardshipSeed(caseId)) throw new ApiError(422, "This case has no hardship letter to read");
+  return createJob([], now, "hardship_assessment", caseId);
+}
+
+/** GET .../hardship-assessment/latest: 404 until a run has finished. */
+export function getLatestHardshipMock(caseId: string): HardshipAssessment {
+  const latest = state.hardship.get(caseId);
+  if (!latest) throw new ApiError(404, "No hardship assessment yet. Run it first.");
+  return structuredClone(latest);
+}
+
+/** PUT .../confirmations: confirm or correct one profile item. Returns the whole updated assessment. */
+export function confirmProfileItemMock(
+  caseId: string,
+  confirmation: ProfileConfirmation,
+  now: number = Date.now(),
+): HardshipAssessment {
+  const latest = state.hardship.get(caseId);
+  if (!latest) throw new ApiError(404, "No hardship assessment yet. Run it first.");
+  const updated = applyConfirmation(latest, confirmation, "demo.reviewer", iso(now));
+  state.hardship.set(caseId, updated);
+  return structuredClone(updated);
+}
+
+/** PATCH .../budget-items/{item}: adjust one expense, reason required (422). Returns the recalculated assessment. */
+export function adjustBudgetItemMock(
+  caseId: string,
+  itemId: string,
+  request: BudgetAdjustmentRequest,
+  now: number = Date.now(),
+): HardshipAssessment {
+  const latest = state.hardship.get(caseId);
+  if (!latest) throw new ApiError(404, "No hardship assessment yet. Run it first.");
+  const updated = applyBudgetAdjustment(latest, itemId, request, "demo.reviewer", iso(now));
+  state.hardship.set(caseId, updated);
+  return structuredClone(updated);
+}
+
+/** POST .../completeness: runs the checklist at once (the contract answers 200 with the result, no job). */
+export function runCompletenessMock(caseId: string, checklistId: string, now: number = Date.now()): ChecklistResult {
+  const result = buildCompleteness(caseId, checklistId, iso(now), newId("c"));
+  state.completeness.set(caseId, result);
+  return structuredClone(result);
+}
+
+/** GET .../completeness/latest: 404 until the checklist has been run for the case. */
+export function getLatestCompletenessMock(caseId: string): ChecklistResult {
+  const latest = state.completeness.get(caseId);
+  if (!latest) throw new ApiError(404, "No completeness result yet. Run the checklist first.");
+  return structuredClone(latest);
+}
+
+/**
+ * PATCH .../completeness/items/{item_id}: a person overrides an item, reason required (422).
+ * The latest result is replaced by the recalculated one and returned.
+ */
+export function overrideCompletenessItemMock(
+  caseId: string,
+  itemId: string,
+  reason: string,
+  now: number = Date.now(),
+): ChecklistResult {
+  const latest = state.completeness.get(caseId);
+  if (!latest) throw new ApiError(404, "No completeness result yet. Run the checklist first.");
+  const updated = applyOverride(latest, itemId, reason, "demo.reviewer", iso(now));
+  state.completeness.set(caseId, updated);
+  return structuredClone(updated);
 }
 
 export function pageImageUrlMock(documentId: string, page: number): string | undefined {

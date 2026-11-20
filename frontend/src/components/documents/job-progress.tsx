@@ -6,6 +6,14 @@ const STAGE_LABEL: Record<string, string> = {
   classify: "Identifying the document type",
   extract: "Extracting the fields",
   checks: "Running checks",
+  // Income analysis stages
+  gather: "Gathering figures from the documents",
+  calculate: "Calculating income",
+  explain: "Suggesting possible explanations",
+  // Hardship and budget stages
+  read: "Reading the hardship letter",
+  compare: "Comparing the letter with the documents",
+  budget: "Building the budget",
 };
 
 /** Plain-language status for a processing job. */
