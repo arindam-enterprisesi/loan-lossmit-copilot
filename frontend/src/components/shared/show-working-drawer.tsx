@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Calculator } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import {
@@ -21,10 +22,22 @@ export interface WorkingStep {
   note?: string;
 }
 
+/** Where an input came from: a document and line, optionally linked to the page that shows it. */
+export interface WorkingEvidence {
+  label: string;
+  /** e.g. "Page 2, line p2-L7". */
+  detail?: string;
+  href?: string;
+}
+
 interface ShowWorkingDrawerProps {
   title: string;
   steps: WorkingStep[];
+  /** The documents and lines the inputs were read from. */
+  evidence?: WorkingEvidence[];
   triggerLabel?: string;
+  /** Accessible name for the trigger when several drawers share a screen, e.g. "Show working for Base pay, monthly". */
+  triggerAriaLabel?: string;
   className?: string;
 }
 
@@ -35,12 +48,17 @@ interface ShowWorkingDrawerProps {
 export function ShowWorkingDrawer({
   title,
   steps,
+  evidence = [],
   triggerLabel = "Show working",
+  triggerAriaLabel,
   className,
 }: ShowWorkingDrawerProps) {
   return (
     <Sheet>
-      <SheetTrigger className={cn(buttonVariants({ variant: "outline", size: "sm" }), className)}>
+      <SheetTrigger
+        aria-label={triggerAriaLabel}
+        className={cn(buttonVariants({ variant: "outline", size: "sm" }), className)}
+      >
         <Calculator className="size-4" />
         {triggerLabel}
       </SheetTrigger>
@@ -61,6 +79,25 @@ export function ShowWorkingDrawer({
               ) : null}
             </div>
           ))}
+          {evidence.length > 0 ? (
+            <div>
+              <div className="text-sm font-semibold text-teal">Read from</div>
+              <ul className="mt-1 space-y-1.5 text-sm">
+                {evidence.map((e, i) => (
+                  <li key={`${e.label}-${e.detail ?? ""}-${i}`}>
+                    {e.href ? (
+                      <Link href={e.href} className="font-medium text-navy underline underline-offset-2">
+                        {e.label}
+                      </Link>
+                    ) : (
+                      <span className="font-medium text-navy">{e.label}</span>
+                    )}
+                    {e.detail ? <span className="text-xs text-muted-foreground"> · {e.detail}</span> : null}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
         </div>
       </SheetContent>
     </Sheet>

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { setDocumentType, listDocuments } from "@/lib/api";
 import type { Case, DocumentSummary, DocumentType } from "@/lib/types";
 import { useJobPoll } from "@/lib/use-job";
+import { CompletenessPanel } from "@/components/completeness/completeness-panel";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SELECT_CLASS } from "./select-class";
 import { DocumentTable } from "./document-table";
@@ -109,6 +110,17 @@ export function DocumentsWorkspace({ cases, pillarSlug, section }: DocumentsWork
           <Skeleton className="h-40 w-full" />
         )}
       </section>
+
+      {caseId ? (
+        <CompletenessPanel
+          key={caseId}
+          caseId={caseId}
+          caseTitle={selectedCase?.title}
+          pillarSlug={pillarSlug}
+          section={section}
+          documents={documents}
+        />
+      ) : null}
     </div>
   );
 }
