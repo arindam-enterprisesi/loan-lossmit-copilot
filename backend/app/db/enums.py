@@ -125,6 +125,146 @@ class AnalysisStatus(StrEnum):
     FAILED = "failed"
 
 
+class HardshipSource(StrEnum):
+    """``hardship_profiles.source``: who or what produced the reading."""
+
+    MODEL = "model"  # hardship@1 read the letter
+    SEEDED_SAMPLE = "seeded_sample"  # the Feature Design 7.8 example, stored without a model call
+
+
+class TransactionCategory(StrEnum):
+    """``transactions.category``: the fixed list of Feature Design 3.5.
+
+    Mirrors ``app.prompts.schemas.transactions.TransactionCategory`` (a test keeps them equal), so
+    the database layer does not import the prompts package.
+    """
+
+    PAYROLL_DEPOSIT = "payroll deposit"
+    OTHER_INCOME_DEPOSIT = "other income deposit"
+    TRANSFER_IN = "transfer in"
+    TRANSFER_OUT = "transfer out"
+    HOUSING_PAYMENT = "housing payment"
+    LOAN_PAYMENT = "loan payment"
+    CREDIT_CARD_PAYMENT = "credit card payment"
+    UTILITY = "utility"
+    INSURANCE = "insurance"
+    EVERYDAY_SPENDING = "everyday spending"
+    OVERDRAFT_OR_RETURNED_ITEM_FEE = "overdraft or returned-item fee"
+    OTHER_FEE = "other fee"
+    REFUND = "refund"
+    OTHER = "other"
+
+
+class TransactionDirection(StrEnum):
+    """Which way money moved. ``transactions.amount`` is always the size, never negative."""
+
+    CREDIT = "credit"
+    DEBIT = "debit"
+
+
+class CategorySource(StrEnum):
+    """Who decided ``transactions.category``: the labelling model or a person."""
+
+    AI = "ai"
+    USER = "user"
+
+
+class ObligationSource(StrEnum):
+    """Where a recurring debt was found (Feature Design 3.2)."""
+
+    BANK = "bank"
+    CREDIT_REPORT = "credit_report"
+    BOTH = "both"
+
+
+class LoanRecordSource(StrEnum):
+    """``loan_records.source``. The servicing record is simulated, never real."""
+
+    SYNTHETIC = "synthetic"
+
+
+class ReportKind(StrEnum):
+    """``reports.kind``: which pillar's report it is."""
+
+    UNDERWRITING = "underwriting"
+    LM_RECOMMENDATION = "lm_recommendation"
+
+
+class ReportStatus(StrEnum):
+    """A report is a draft until a person has reviewed it; a sign-off records that review.
+
+    ``signed_off`` says a person reviewed the report. It is not a decision (rule 3).
+    """
+
+    DRAFT = "draft"
+    IN_REVIEW = "in_review"
+    SIGNED_OFF = "signed_off"
+
+
+class ReportSource(StrEnum):
+    """Who wrote a report: the agents, or the seeded sample the demo starts from."""
+
+    AGENTS = "agents"
+    SEEDED_SAMPLE = "seeded_sample"
+
+
+class ReviewPriority(StrEnum):
+    """Review order for findings and conditions. It describes what to look at first, never
+    eligibility (Feature Design 6.5)."""
+
+    SIGNIFICANT = "significant"
+    ATTENTION = "attention"
+    INFORMATION = "information"
+
+
+class ConditionSource(StrEnum):
+    AGENT = "agent"
+    USER = "user"
+
+
+class ConditionDecision(StrEnum):
+    """What the reviewer did with a suggested condition. Recording it is not a loan decision."""
+
+    PENDING = "pending"
+    ACCEPTED = "accepted"
+    EDITED = "edited"
+    REJECTED = "rejected"
+
+
+class AgentName(StrEnum):
+    RESEARCHER = "researcher"
+    WRITER = "writer"
+    CRITIC = "critic"
+
+
+class AgentRunStatus(StrEnum):
+    QUEUED = "queued"
+    RUNNING = "running"
+    SUCCEEDED = "succeeded"
+    FAILED = "failed"
+
+
+class WaterfallOption(StrEnum):
+    """The loss mitigation options in waterfall order (Feature Design 8.3)."""
+
+    REPAYMENT_PLAN = "repayment_plan"
+    FORBEARANCE = "forbearance"
+    PAYMENT_DEFERRAL = "payment_deferral"
+    LOAN_MODIFICATION = "loan_modification"
+    SHORT_SALE = "short_sale"
+    DEED_IN_LIEU = "deed_in_lieu"
+
+
+class WaterfallStatus(StrEnum):
+    """What the rules found for an option. ``met`` says its conditions are met, nothing more."""
+
+    MET = "met"
+    NOT_MET = "not_met"
+    NOT_EVALUABLE = "not_evaluable"
+    NOT_REACHED = "not_reached"
+    NEEDS_CONFIRMATION = "needs_confirmation"
+
+
 class IncomeComponentKind(StrEnum):
     """``income_components.component`` (Feature Design 2.3: earnings are grouped by type)."""
 

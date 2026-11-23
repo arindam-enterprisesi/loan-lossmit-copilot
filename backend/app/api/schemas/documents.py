@@ -146,3 +146,17 @@ class UploadResult(BaseModel):
             documents=[summary_from_view(v) for v in outcome.documents],
             job=JobOut.model_validate(outcome.job),
         )
+
+
+class PageImageOut(BaseModel):
+    """A short-lived link to one page image, and the image's size in pixels.
+
+    Boxes in ``Evidence.bbox`` are fractions of this image (origin top left), so a viewer needs
+    ``width`` and ``height`` to draw them. The link stops working at ``expires_at``; ask again.
+    """
+
+    page: int = Field(ge=1)
+    url: str
+    expires_at: datetime
+    width: int = Field(gt=0)
+    height: int = Field(gt=0)

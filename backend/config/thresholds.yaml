@@ -1,11 +1,14 @@
-# Thresholds for the analyses (Feature Design 2.3). Read by app/services/analysis_config.py.
+# Thresholds for the analyses (Feature Design 2.3, 3.3, 7.3 and 7.5). Read by
+# app/services/analysis_config.py.
 #
 # Every setting carries its value, its label (illustrative or authoritative) and its source
 # (CLAUDE.md rule 4). Illustrative samples: real values must come from the lender or program.
 # Change `version` when a value changes. Amounts are strings so they stay exact (Decimal).
-version: "2026-11-19.1"
+version: "2026-11-24.1"
 label: illustrative
-source: "Feature Design 2.3, illustrative sample settings"
+source: "Feature Design 2.3, 3.3, 7.3 and 7.5, illustrative sample settings"
+
+# --- Income (Feature Design 2.3) -----------------------------------------------------------------
 
 # Cross-document comparisons agree when they differ by no more than 1.00 or 0.5% of the larger
 # figure, whichever is larger.
@@ -23,3 +26,146 @@ decline_threshold:
   value: "0.05"
   label: illustrative
   source: "Feature Design 2.3: a year-over-year drop above 5% is flagged"
+
+# --- Assets and liabilities (Feature Design 3.3) -------------------------------------------------
+
+# A credit of this much or more that is not payroll or a transfer between the borrower's own accounts
+# is flagged as a large deposit.
+large_deposit_minimum:
+  value: "1000.00"
+  label: illustrative
+  source: "Feature Design 3.3: large deposit, a credit of 1,000.00 or more"
+
+# A debit to the same payee in this many statement months, with amounts within the tolerance, is a
+# recurring debit.
+recurring_debit_min_months:
+  value: 2
+  label: illustrative
+  source: "Feature Design 3.3: recurring debit, same payee in 2 or more statement months"
+recurring_debit_tolerance:
+  value: "1.00"
+  label: illustrative
+  source: "Feature Design 3.3: recurring debit, amounts within 1.00"
+
+# A deposit matches a pay stub when the employer is in the description, the amount is within the
+# tolerance and the date is within this many days of a pay date.
+payroll_match_tolerance:
+  value: "1.00"
+  label: illustrative
+  source: "Feature Design 3.3: payroll match, amount within 1.00"
+payroll_match_days:
+  value: 3
+  label: illustrative
+  source: "Feature Design 3.3: payroll match, date within 3 days of a pay date"
+
+# A debt on the credit report counts toward DTI when its payment is above this; current rent does
+# not count on a purchase of a primary residence. DTI above the review level is flagged for review.
+dti_min_liability_payment:
+  value: "0.00"
+  label: illustrative
+  source: "Feature Design 3.3: include credit report liabilities with a payment above zero"
+dti_exclude_rent_on_purchase:
+  value: true
+  label: illustrative
+  source: "Feature Design 3.3: exclude current rent on a purchase of a primary residence"
+dti_review_level:
+  value: "0.43"
+  label: illustrative
+  source: "Feature Design 3.3: DTI review level 43%"
+
+# --- The hardship budget (Feature Design 7.3 and 7.5) --------------------------------------------
+
+# A stated and an observed amount that differ by more than this share of the larger figure or this
+# amount, whichever is larger, are flagged.
+stated_vs_observed_share:
+  value: "0.10"
+  label: illustrative
+  source: "Feature Design 7.3: stated against observed, a difference above 10% or 25.00"
+stated_vs_observed_amount:
+  value: "25.00"
+  label: illustrative
+  source: "Feature Design 7.3: stated against observed, a difference above 10% or 25.00"
+
+# The letter's hours cut and the change in pay on the stubs should agree. A difference above this many
+# percentage points is flagged. The Feature Design shows the check but gives no limit.
+pay_vs_hours_points:
+  value: "5"
+  label: illustrative
+  source: "Abhay's choice: Feature Design 7.2 shows the hours-against-pay check without a limit"
+
+# The budget's lines, in display order, and which budget line each kind of bank debit belongs to.
+# A debit category that is not listed (a transfer out, for one) is not an expense and is left out.
+# The Feature Design does not name the lines; these are the ones on the sample application.
+budget_categories:
+  value:
+    - "Housing (mortgage)"
+    - "Utilities"
+    - "Food and everyday"
+    - "Loan payments"
+    - "Other"
+  label: illustrative
+  source: "The sample application's expense lines (Angela Whitfield's, Feature Design 7.8)"
+budget_category_map:
+  value:
+    "housing payment": "Housing (mortgage)"
+    "utility": "Utilities"
+    "everyday spending": "Food and everyday"
+    "loan payment": "Loan payments"
+    "credit card payment": "Loan payments"
+    "insurance": "Other"
+    "overdraft or returned-item fee": "Other"
+    "other fee": "Other"
+    "other": "Other"
+  label: illustrative
+  source: "Abhay's reading of the transaction categories (Feature Design 3.5) against the budget lines"
+
+# --- Flag messages for the asset and budget checks ---------------------------------------------
+# Templates filled in by code. They say what was found and never decide anything.
+flags:
+  AL-W101:
+    severity: warning
+    message: "Large deposit of {amount} on {date} — source may need documenting under program rules."
+  AL-W102:
+    severity: warning
+    message: "Overdraft or returned-item fee of {amount} on {date}."
+  AL-W103:
+    severity: warning
+    message: "Recurring payment to {creditor} ({amount} a month) is in the bank statements but not on the credit report."
+  AL-W104:
+    severity: warning
+    message: "Payroll deposit of {amount} on {date} does not match a pay stub."
+  AL-W105:
+    severity: warning
+    message: "Documented assets of {assets} are {shortfall} short of the {needed} needed to close."
+  AL-W106:
+    severity: warning
+    message: "DTI {dti} is above the review level of {level}."
+  AL-W107:
+    severity: warning
+    message: "{count} transactions could not be labelled and need review."
+  "AL-W107:one":
+    severity: warning
+    message: "1 transaction could not be labelled and needs review."
+  AL-I101:
+    severity: info
+    message: "Cannot compute {what}: {missing} not found."
+
+  # The hardship budget's consistency checks (Feature Design 7.2).
+  HB-W101:
+    severity: warning
+    message: "{category}: {stated} stated against {observed} in the statements, a difference of {difference}."
+  HB-W102:
+    severity: warning
+    message: "Pay on the stubs changed by {pay_change}, but the letter says hours changed by {hours_change}."
+  HB-W103:
+    severity: warning
+    message: "The application ticks \"{application}\" but the letter's main reason is \"{letter}\"."
+  HB-W104:
+    severity: warning
+    message: "The application says the intent is \"{application}\" but the letter says \"{letter}\"."
+  HB-W105:
+    severity: warning
+    message: "Stated monthly income of {stated} against {documented} on the pay stubs, a difference of {difference}."
+  HB-I101:
+    severity: info
+    message: "Cannot compute {what}: {missing} not found."

@@ -5,7 +5,8 @@ Why not LangChain here: current Claude models reject sampling parameters
 structured output relies on. The SDK's ``output_config.format`` JSON-schema
 mode constrains the reply to the schema directly, and the gateway still
 validates it with Pydantic. Bedrock uses the same Messages API through the
-SDK's Mantle client, so both providers share one request builder.
+SDK's bedrock-runtime client (InvokeModel), so both providers share one request
+builder.
 
 Task options read from config (all optional):
   effort:    low | medium | high | xhigh | max
@@ -18,7 +19,7 @@ import os
 from typing import Any
 
 import anthropic
-from anthropic import AsyncAnthropic, AsyncAnthropicBedrockMantle, transform_schema
+from anthropic import AsyncAnthropic, AsyncAnthropicBedrock, transform_schema
 
 from app.llm.types import AdapterRequest, AdapterResponse, ProviderCallError
 
@@ -103,11 +104,18 @@ class AnthropicAdapter:
 
 
 class BedrockClaudeAdapter(AnthropicAdapter):
-    """Claude on Amazon Bedrock via the Mantle (Messages API) endpoint.
+    """Claude on Amazon Bedrock via the bedrock-runtime endpoint (InvokeModel).
 
     Credentials come from the standard AWS chain (env keys, AWS_PROFILE, SSO);
-    the region from AWS_REGION. Model IDs take the ``anthropic.`` prefix or are
-    inference-profile IDs supplied by the AWS admin.
+    the region from AWS_REGION. Newer models are called through an inference
+    profile, so model IDs are usually profile IDs supplied by the AWS admin, for
+    example ``global.anthropic.claude-sonnet-4-6``. The IAM user needs
+    ``bedrock:InvokeModel`` on that profile.
+
+    This was the SDK's Mantle client (``bedrock-mantle:CreateInference``) until
+    2026-11-23. The project's IAM user was never allowed that action, while
+    InvokeModel works for the models the AWS admin named, with the same Messages
+    API request and JSON-schema output.
     """
 
     name = "bedrock"
@@ -117,4 +125,4 @@ class BedrockClaudeAdapter(AnthropicAdapter):
         region = os.environ.get("AWS_REGION") or os.environ.get("AWS_DEFAULT_REGION")
         if not region:
             raise ProviderCallError(self.name, "AWS_REGION is not set")
-        return AsyncAnthropicBedrockMantle(aws_region=region)
+        return AsyncAnthropicBedrock(aws_region=region)

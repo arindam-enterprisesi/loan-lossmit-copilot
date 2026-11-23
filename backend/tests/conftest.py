@@ -6,6 +6,8 @@ import os
 
 # No test may call a real model. Tests that want the real classify task pass their own gateway.
 os.environ.setdefault("PIPELINE_LLM", "fake")
+# Nor does any test need the tesseract program: OCR tests build the adapter themselves.
+os.environ.setdefault("OCR_ENGINE", "none")
 
 from dataclasses import dataclass
 from pathlib import Path

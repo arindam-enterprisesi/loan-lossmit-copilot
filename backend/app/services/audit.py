@@ -9,9 +9,10 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
+import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.models import AuditEvent
+from app.db.models import AuditEvent, User
 
 
 async def record(
@@ -46,3 +47,31 @@ async def record(
     session.add(event)
     await session.flush()
     return event
+
+
+async def list_events(
+    session: AsyncSession,
+    case_id: uuid.UUID,
+    *,
+    action: str | None = None,
+    entity_type: str | None = None,
+    limit: int = 50,
+    before: int | None = None,
+) -> list[tuple[AuditEvent, str | None]]:
+    """A case's events, newest first, with the actor's name. ``before`` is the id of the last event
+    already seen, so a client pages by passing the last id it got. Asks for one more than ``limit``
+    so the caller can tell whether there is another page."""
+    query = (
+        sa.select(AuditEvent, User.name)
+        .outerjoin(User, User.id == AuditEvent.actor_id)
+        .where(AuditEvent.case_id == case_id)
+        .order_by(AuditEvent.id.desc())
+        .limit(limit + 1)
+    )
+    if action:
+        query = query.where(AuditEvent.action == action)
+    if entity_type:
+        query = query.where(AuditEvent.entity_type == entity_type)
+    if before is not None:
+        query = query.where(AuditEvent.id < before)
+    return [(event, name) for event, name in (await session.execute(query)).all()]

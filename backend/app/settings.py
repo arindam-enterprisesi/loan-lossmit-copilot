@@ -42,6 +42,10 @@ class Settings(BaseSettings):
     # worker logs which); "fake" forces the fake (offline development, tests).
     pipeline_llm: Literal["auto", "fake"] = "auto"
 
+    # Which engine reads pages that have no text layer: "tesseract" (needs the tesseract program;
+    # without it such pages fail with the DI-E301 flag) or "none" (tests, and machines without it).
+    ocr_engine: Literal["tesseract", "none"] = "tesseract"
+
     # arq job limits. One job reads every document of an upload and a real model call can take
     # minutes (Gemini classify took 75 to 142 s each when tested), so arq's default timeout of
     # 300 s would cut a job off part way. Seconds, and how many jobs one worker runs at once.
@@ -51,6 +55,23 @@ class Settings(BaseSettings):
     jwt_secret: SecretStr = SecretStr("change-me")
     # Password for the three seeded demo logins (synthetic demo only).
     demo_password: SecretStr = SecretStr("demo")
+
+    # Browser origins allowed to call the API, comma-separated. The frontend (Next.js) runs on
+    # http://localhost:3000 and the API on :8000, which a browser treats as different origins.
+    cors_origins: str = "http://localhost:3000"
+
+    @property
+    def cors_origin_list(self) -> list[str]:
+        """``cors_origins`` as a list: trimmed, blanks dropped, no trailing slash."""
+        return [o.strip().rstrip("/") for o in self.cors_origins.split(",") if o.strip()]
+
+    @field_validator("cors_origins")
+    @classmethod
+    def _no_wildcard_origin(cls, value: str) -> str:
+        # The API is called with a bearer token, so "any origin" is never what is wanted.
+        if any(part.strip() == "*" for part in value.split(",")):
+            raise ValueError("CORS_ORIGINS must list origins; a wildcard is not allowed")
+        return value
 
     @field_validator("aws_profile", "aws_region", mode="before")
     @classmethod

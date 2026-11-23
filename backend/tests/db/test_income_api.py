@@ -9,7 +9,7 @@ and write an audit event; none of it calls a model.
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
 import httpx
@@ -53,8 +53,13 @@ async def seed_document(
     *,
     minutes: int = 0,
     status: DocumentStatus = DocumentStatus.NEEDS_REVIEW,
+    lines: dict[str, str] | None = None,
+    period: tuple[date, date] | None = None,
 ) -> uuid.UUID:
-    """A document with an active extraction run and its fields, as the pipeline leaves it."""
+    """A document with an active extraction run and its fields, as the pipeline leaves it.
+
+    ``lines`` names the line a field was read from (default: ``p1-L`` and the field's number).
+    """
     document = Document(
         case_id=case,
         file_name=f"{doc_type}.pdf",
@@ -65,6 +70,8 @@ async def seed_document(
         status=status,
         doc_type=doc_type,
         created_at=BASE_TIME + timedelta(minutes=minutes),
+        period_start=period[0] if period else None,
+        period_end=period[1] if period else None,
     )
     session.add(document)
     await session.flush()
@@ -83,7 +90,7 @@ async def seed_document(
                 normalized_value=normalized,
                 original_value=normalized,
                 certainty=Certainty.HIGH,
-                line_refs=[f"p1-L{number}"],
+                line_refs=[(lines or {}).get(name, f"p1-L{number}")],
             )
         )
     await session.flush()
@@ -187,7 +194,7 @@ async def test_the_settings_a_run_used_are_recorded_once(
     )
     assert [tuple(v) for v in versions] == [
         ("income_method", "income_method", "2026-11-19.1", "illustrative", True),
-        ("thresholds", "thresholds", "2026-11-19.1", "illustrative", True),
+        ("thresholds", "thresholds", "2026-11-24.1", "illustrative", True),
     ]
 
 
@@ -254,7 +261,7 @@ async def test_every_figure_shows_its_working_and_where_it_was_read(
     calc = part(analysis, "base")["calculation"]
     assert calc["working"] == "34.50 x 80.00 x 26 / 12 = 5,980.00"
     assert calc["formula"] == "rate x regular hours x periods per year / 12"
-    assert calc["config_version"] == "income_method@2026-11-19.1, thresholds@2026-11-19.1"
+    assert calc["config_version"] == "income_method@2026-11-19.1, thresholds@2026-11-24.1"
     assert calc["inputs"] == {"rate": "34.50", "hours": "80.00", "periods_per_year": "26"}
     assert {e["document_id"] for e in calc["evidence"]} == {str(ids["stub"])}
     assert {"earnings_001_hours", "earnings_001_rate"} <= {e["field"] for e in calc["evidence"]}

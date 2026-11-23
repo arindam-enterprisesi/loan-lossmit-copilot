@@ -47,7 +47,9 @@ def test_every_file_is_versioned_labelled_and_sourced() -> None:
         assert part.version and part.label in {"illustrative", "authoritative"} and part.source
     assert (CFG.income.version, CFG.thresholds.version, CFG.checklists.version) == (
         "2026-11-19.1",
-    ) * 3
+        "2026-11-24.1",  # the assets and budget settings were added on D6
+        "2026-11-19.1",
+    )
 
 
 def _settings(node: object) -> list[Setting[Any]]:
@@ -68,8 +70,9 @@ def _settings(node: object) -> list[Setting[Any]]:
 
 def test_every_single_setting_carries_a_label_and_a_source() -> None:
     settings = _settings(CFG.income) + _settings(CFG.thresholds) + _settings(CFG.checklists)
-    # 8 in the income method, 3 thresholds, 7 checklist parameters.
-    assert len(settings) == 18
+    # 8 in the income method, 15 thresholds (3 for income, 12 for assets and the budget), 7
+    # checklist parameters.
+    assert len(settings) == 31
     assert {s.label for s in settings} == {"illustrative"}  # nothing is claimed authoritative
     assert all(s.source.strip() for s in settings)
 
@@ -189,6 +192,127 @@ def test_the_cross_document_tolerance_is_one_or_half_a_percent_whichever_is_larg
     assert CFG.thresholds.tolerance_for(Decimal(a), Decimal(b)) == Decimal(tolerance)
 
 
+# --- the assets and budget settings (Feature Design 3.3 and 7.3) -----------------------------
+
+
+def test_the_assets_settings_are_the_feature_designs_sample_values() -> None:
+    t = CFG.thresholds
+    assert t.large_deposit_minimum.value == Decimal("1000.00")
+    assert (t.recurring_debit_min_months.value, t.recurring_debit_tolerance.value) == (
+        2,
+        Decimal("1.00"),
+    )
+    assert (t.payroll_match_tolerance.value, t.payroll_match_days.value) == (Decimal("1.00"), 3)
+    assert t.dti_review_level.value == Decimal("0.43")
+    # "Include credit report liabilities with a payment above zero; exclude current rent on a
+    # purchase of a primary residence."
+    assert t.dti_min_liability_payment.value == Decimal("0.00")
+    assert t.dti_exclude_rent_on_purchase.value is True
+
+
+def test_the_budget_checks_have_their_flag_templates_and_a_labelled_pay_against_hours_limit() -> (
+    None
+):
+    t = CFG.thresholds
+
+    assert (
+        t.pay_vs_hours_points.value == Decimal("5")
+        and t.pay_vs_hours_points.label == "illustrative"
+    )
+    severity, message = t.flag("HB-W102", pay_change="-25.00%", hours_change="-25.00%")
+    assert severity == "warning"
+    assert (
+        message
+        == "Pay on the stubs changed by -25.00%, but the letter says hours changed by -25.00%."
+    )
+    assert t.flag("HB-I101", what="the budget", missing="the application")[0] == "info"
+    for code in ("HB-W101", "HB-W103", "HB-W104", "HB-W105"):
+        assert code in t.flags and t.flags[code].severity == "warning"
+
+
+def test_the_stated_against_observed_tolerance_is_ten_percent_or_25_whichever_is_larger() -> None:
+    t = CFG.thresholds
+    assert (t.stated_vs_observed_share.value, t.stated_vs_observed_amount.value) == (
+        Decimal("0.10"),
+        Decimal("25.00"),
+    )
+    # The tolerance is 10% of the larger figure or 25.00, whichever is larger.
+    assert t.stated_vs_observed_tolerance(Decimal("200.00"), Decimal("410.00")) == Decimal("41.00")
+    assert t.stated_vs_observed_tolerance(Decimal("3420.00"), Decimal("3630.00")) == Decimal(
+        "363.00"
+    )
+    assert t.stated_vs_observed_tolerance(Decimal("100.00"), Decimal("110.00")) == Decimal("25.00")
+
+
+def test_the_budget_categories_and_the_map_from_transaction_categories() -> None:
+    t = CFG.thresholds
+    assert t.budget_categories.value == [
+        "Housing (mortgage)",
+        "Utilities",
+        "Food and everyday",
+        "Loan payments",
+        "Other",
+    ]
+    mapping = t.budget_category_map.value
+    assert mapping["housing payment"] == "Housing (mortgage)"
+    assert mapping["utility"] == "Utilities"
+    assert mapping["everyday spending"] == "Food and everyday"
+    assert mapping["loan payment"] == mapping["credit card payment"] == "Loan payments"
+    assert mapping["other"] == "Other"
+    # Money moving between accounts is not an expense.
+    assert "transfer out" not in mapping and "transfer in" not in mapping
+
+
+def test_the_assets_settings_are_decimals_not_floats() -> None:
+    t = CFG.thresholds
+    for setting in (
+        t.large_deposit_minimum,
+        t.recurring_debit_tolerance,
+        t.payroll_match_tolerance,
+        t.dti_review_level,
+        t.dti_min_liability_payment,
+        t.stated_vs_observed_share,
+        t.stated_vs_observed_amount,
+    ):
+        assert isinstance(setting.value, Decimal)
+
+
+@pytest.mark.parametrize(
+    ("name", "value"),
+    [
+        ("large_deposit_minimum", "-1.00"),
+        ("recurring_debit_min_months", 0),
+        ("recurring_debit_tolerance", "-0.01"),
+        ("payroll_match_days", -1),
+        ("dti_review_level", "1.50"),
+        ("dti_review_level", "0"),
+        ("stated_vs_observed_share", "1.5"),
+        ("stated_vs_observed_amount", "-5"),
+        ("pay_vs_hours_points", "-1"),
+    ],
+)
+def test_a_nonsensical_assets_setting_is_rejected(tmp_path: Path, name: str, value: Any) -> None:
+    def tweak(data: dict[str, Any]) -> None:
+        data[name]["value"] = value
+
+    with pytest.raises(ValidationError):
+        load_analysis_config(thresholds_path=_edited(tmp_path, THRESHOLDS_PATH, tweak))
+
+
+def test_the_budget_map_must_use_real_transaction_categories_and_known_budget_lines(
+    tmp_path: Path,
+) -> None:
+    def unknown_key(data: dict[str, Any]) -> None:
+        data["budget_category_map"]["value"]["gift"] = "Other"
+
+    def unknown_line(data: dict[str, Any]) -> None:
+        data["budget_category_map"]["value"]["utility"] = "Hobbies"
+
+    for tweak in (unknown_key, unknown_line):
+        with pytest.raises(ValidationError):
+            load_analysis_config(thresholds_path=_edited(tmp_path, THRESHOLDS_PATH, tweak))
+
+
 # --- versions and hashes --------------------------------------------------------------------
 
 
@@ -196,7 +320,7 @@ def test_a_run_records_each_file_it_used_with_a_hash_of_its_bytes() -> None:
     uses = CFG.uses()
     assert [(u.kind, u.name, u.version, u.label) for u in uses] == [
         ("income_method", "income_method", "2026-11-19.1", "illustrative"),
-        ("thresholds", "thresholds", "2026-11-19.1", "illustrative"),
+        ("thresholds", "thresholds", "2026-11-24.1", "illustrative"),
     ]
     assert all(re.fullmatch(r"[0-9a-f]{64}", u.content_hash) for u in uses)
     snapshot = AnalysisConfig.snapshot(uses)
@@ -226,7 +350,7 @@ def test_editing_a_file_changes_its_hash_even_when_the_version_is_not_bumped(
 
 def test_calc_version_names_the_files_a_figure_used() -> None:
     assert CFG.calc_version("income_method", "thresholds") == (
-        "income_method@2026-11-19.1, thresholds@2026-11-19.1"
+        "income_method@2026-11-19.1, thresholds@2026-11-24.1"
     )
 
 

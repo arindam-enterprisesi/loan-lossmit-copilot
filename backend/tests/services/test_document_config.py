@@ -123,8 +123,9 @@ def test_failures_are_errors_and_cannot_check_is_info() -> None:
 def test_pay_stub_and_bank_statement_have_fields_and_roles() -> None:
     assert CFG.has_fields("pay_stub") and CFG.has_fields("bank_statement")
     assert CFG.has_fields("w2") and CFG.has_fields("tax_return_1040")
-    # Classified here and read by a later feature: no field list.
-    assert not CFG.has_fields("credit_report") and not CFG.has_fields("nonsense")
+    # The credit report has no extract schema yet, but its tradeline fields are defined ahead of it
+    # (see test_loss_mitigation_fields.py). A type the config does not know has none.
+    assert CFG.has_fields("credit_report") and not CFG.has_fields("nonsense")
     assert CFG.role("pay_stub", "net") == "net_pay_current"
     assert CFG.role("bank_statement", "closing") == "closing_balance"
     assert CFG.role("pay_stub", "nope") is None and CFG.role("nonsense", "net") is None

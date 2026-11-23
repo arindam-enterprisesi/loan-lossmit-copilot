@@ -16,7 +16,7 @@ from app.api.schemas.documents import DocumentSummaryOut
 from app.db.enums import Role
 from app.db.seed import case_id, seed, user_id
 from app.main import app
-from app.services.ingestion_config import IngestionConfig, get_ingestion_config
+from app.services.ingestion_config import get_ingestion_config
 from app.storage import Storage, StorageError
 from tests.conftest import Rendered
 from tests.db.conftest import S3_PREFIX, FakeQueue, auth_headers, s3_keys, s3_object
@@ -285,8 +285,8 @@ async def test_one_bad_file_refuses_the_whole_upload(
 async def test_a_file_over_the_limit_is_too_large(
     docs_client: httpx.AsyncClient, session: AsyncSession
 ) -> None:
-    app.dependency_overrides[get_ingestion_config] = lambda: IngestionConfig(
-        version="t", label="illustrative", max_file_mb=1, render_dpi=200
+    app.dependency_overrides[get_ingestion_config] = lambda: get_ingestion_config().model_copy(
+        update={"max_file_mb": 1}
     )
     pdf = b"%PDF-1.7\n"
     at_limit = pdf + b"\x00" * (MIB - len(pdf))

@@ -1,6 +1,6 @@
 # Settings for document upload and ingestion. Read by app/services/ingestion_config.py.
 # Every setting is versioned and labelled; change the version when you change a value.
-version: "2026-11-18.1"
+version: "2026-11-23.1"
 label: illustrative
 
 # Largest single file the upload endpoint accepts, in MiB (1 MiB = 1,048,576 bytes).
@@ -9,3 +9,20 @@ max_file_mb: 25
 # Resolution page images are rendered at (dots per inch). Bounding boxes are stored as
 # fractions of the page, so they do not depend on this.
 render_dpi: 200
+
+# OCR (Tesseract) for pages that have no usable text layer, and for PNG and JPEG uploads.
+# A line read by OCR below `min_line_confidence` in validation.yaml lowers its field's certainty.
+ocr:
+  # A page whose text layer holds fewer characters than this is treated as an image and read by OCR.
+  min_text_chars: 20
+  # The page image is scaled to about this resolution before reading (from render_dpi).
+  target_dpi: 300
+  # Pages are straightened when tilted, up to this many degrees either way.
+  max_skew_degrees: 10
+  # Light noise removal (median blur), then an adaptive threshold. Both sizes are odd pixel counts.
+  denoise_kernel: 3
+  threshold_block_size: 31
+  threshold_c: 15
+  language: eng
+  # Tesseract's LSTM engine (--oem 1) reading the page as one uniform block of text (--psm 6).
+  tesseract_config: "--oem 1 --psm 6"

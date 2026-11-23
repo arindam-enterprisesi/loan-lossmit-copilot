@@ -1,0 +1,47 @@
+{
+  "source": "Feature Design 7.8: how Angela Whitfield's hardship letter reads (data/synthetic/scenarios/angela_whitfield.json). Stored as a seeded sample so the demo shows the profile before any model is called. Synthetic.",
+  "profile": {
+    "primary_reason": {
+      "quote": "cut my hours from 40 to 30 a week in July",
+      "lines": ["p1-L6"],
+      "category": "reduction_in_income",
+      "financial_effect": "hours and pay reduced by a quarter"
+    },
+    "other_reasons": [],
+    "onset": {
+      "quote": "in July",
+      "lines": ["p1-L6"],
+      "as_stated": "July",
+      "month": "2026-07"
+    },
+    "duration": {
+      "quote": "I do not know whether my hours will return to 40 a week",
+      "lines": ["p1-L9"],
+      "category": "unknown"
+    },
+    "intent": {
+      "quote": "I want to keep my home",
+      "lines": ["p1-L14"],
+      "category": "keep"
+    },
+    "timeline": [
+      {
+        "quote": "my employer cut my hours from 40 to 30 a week in July",
+        "lines": ["p1-L6"],
+        "when": "July",
+        "event": "Working hours reduced from 40 to 30 a week"
+      },
+      {
+        "quote": "I fell behind in August",
+        "lines": ["p1-L7"],
+        "when": "August",
+        "event": "Fell behind on payments"
+      }
+    ],
+    "enclosed_documents": [
+      {"quote": "my application", "lines": ["p1-L11"], "document": "Mortgage assistance application"},
+      {"quote": "my recent pay stubs", "lines": ["p1-L11"], "document": "Pay stubs"},
+      {"quote": "my recent bank statements", "lines": ["p1-L11"], "document": "Bank statements"}
+    ]
+  }
+}

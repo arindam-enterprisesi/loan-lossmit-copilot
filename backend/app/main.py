@@ -6,12 +6,46 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.errors import register_error_handlers
-from app.api.routers import auth, cases, completeness, documents, income, jobs
+from app.api.routers import (
+    asset_liability,
+    audit,
+    auth,
+    cases,
+    completeness,
+    documents,
+    guidelines,
+    hardship,
+    income,
+    jobs,
+    lm_recommendation,
+    underwriting,
+)
 from app.services.queue import close_queue
+from app.settings import get_settings
 
 API_PREFIX = "/api/v1"
+CORS_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
+CORS_HEADERS = ["Authorization", "Content-Type"]
+
+
+def install_cors(app: FastAPI, origins: list[str]) -> None:
+    """Let a browser app on one of ``origins`` call the API.
+
+    The login token is sent in the ``Authorization`` header, so cookies and credentials stay off.
+    With no origins nothing is installed and browsers on other origins stay blocked.
+    """
+    if not origins:
+        return
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=origins,
+        allow_methods=CORS_METHODS,
+        allow_headers=CORS_HEADERS,
+        allow_credentials=False,
+    )
 
 
 @asynccontextmanager
@@ -26,12 +60,19 @@ app = FastAPI(
     lifespan=lifespan,
 )
 register_error_handlers(app)
+install_cors(app, get_settings().cors_origin_list)
 app.include_router(auth.router, prefix=API_PREFIX)
 app.include_router(cases.router, prefix=API_PREFIX)
 app.include_router(documents.router, prefix=API_PREFIX)
 app.include_router(jobs.router, prefix=API_PREFIX)
 app.include_router(income.router, prefix=API_PREFIX)
+app.include_router(asset_liability.router, prefix=API_PREFIX)
+app.include_router(underwriting.router, prefix=API_PREFIX)
+app.include_router(lm_recommendation.router, prefix=API_PREFIX)
+app.include_router(audit.router, prefix=API_PREFIX)
+app.include_router(guidelines.router, prefix=API_PREFIX)
 app.include_router(completeness.router, prefix=API_PREFIX)
+app.include_router(hardship.router, prefix=API_PREFIX)
 
 
 @app.get("/health", tags=["infra"])

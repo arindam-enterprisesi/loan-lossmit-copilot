@@ -1,0 +1,188 @@
+{
+  "label": "Seeded sample: the Feature Design 8.8 worked example, written by hand. The rules engine replaces it on D7.",
+  "rule_set": {
+    "name": "Sample Investor A",
+    "version": "1",
+    "label": "illustrative",
+    "banner": "Illustrative: not an actual investor's requirements."
+  },
+  "options": [
+    {
+      "option": "repayment_plan",
+      "status": "not_met",
+      "conditions": [
+        {
+          "id": "repayment_plan.hardship_resolved",
+          "label": "Hardship resolved (confirmed)",
+          "expression": "hardship.duration == resolved",
+          "values": {"duration": "unknown"},
+          "passage_id": "sample-investor-a-v1.repayment-plan.1",
+          "status": "not_met"
+        },
+        {
+          "id": "repayment_plan.surplus",
+          "label": "Monthly surplus at least arrears / 6",
+          "expression": "surplus >= arrears / 6",
+          "values": {"surplus": "-70.00", "arrears": "5160.00", "needed": "860.00"},
+          "passage_id": "sample-investor-a-v1.repayment-plan.2",
+          "status": "not_met"
+        }
+      ]
+    },
+    {
+      "option": "forbearance",
+      "status": "not_met",
+      "conditions": [
+        {
+          "id": "forbearance.hardship_temporary",
+          "label": "Hardship temporary (confirmed)",
+          "expression": "hardship.duration == temporary",
+          "values": {"duration": "unknown"},
+          "passage_id": "sample-investor-a-v1.forbearance.1",
+          "status": "not_met"
+        }
+      ]
+    },
+    {
+      "option": "payment_deferral",
+      "status": "not_met",
+      "conditions": [
+        {
+          "id": "payment_deferral.hardship_resolved",
+          "label": "Hardship resolved (confirmed)",
+          "expression": "hardship.duration == resolved",
+          "values": {"duration": "unknown"},
+          "passage_id": "sample-investor-a-v1.payment-deferral.1",
+          "status": "not_met"
+        },
+        {
+          "id": "payment_deferral.surplus",
+          "label": "Surplus at the contractual payment of zero or more",
+          "expression": "surplus >= 0",
+          "values": {"surplus": "-70.00"},
+          "passage_id": "sample-investor-a-v1.payment-deferral.2",
+          "status": "not_met"
+        },
+        {
+          "id": "payment_deferral.months_delinquent",
+          "label": "6 or fewer months delinquent",
+          "expression": "months_delinquent <= 6",
+          "values": {"months_delinquent": "3", "limit": "6"},
+          "passage_id": "sample-investor-a-v1.payment-deferral.3",
+          "status": "met"
+        }
+      ]
+    },
+    {
+      "option": "loan_modification",
+      "status": "met",
+      "conditions": [
+        {
+          "id": "loan_modification.hardship_long_term",
+          "label": "Hardship long-term or unknown (confirmed)",
+          "expression": "hardship.duration in (long_term, unknown)",
+          "values": {"duration": "unknown"},
+          "passage_id": "sample-investor-a-v1.loan-modification.1",
+          "status": "met"
+        },
+        {
+          "id": "loan_modification.intent",
+          "label": "Intent to keep the home (confirmed)",
+          "expression": "hardship.intent == keep",
+          "values": {"intent": "keep"},
+          "passage_id": "sample-investor-a-v1.loan-modification.2",
+          "status": "met"
+        },
+        {
+          "id": "loan_modification.target_payment",
+          "label": "Target payment of 35% of documented gross monthly income is below the contractual payment",
+          "expression": "0.35 * gross_monthly_income < contractual_payment",
+          "values": {
+            "gross_monthly_income": "4200.00",
+            "target_payment": "1470.00",
+            "contractual_payment": "1720.00"
+          },
+          "passage_id": "sample-investor-a-v1.loan-modification.3",
+          "status": "met"
+        }
+      ]
+    },
+    {
+      "option": "short_sale",
+      "status": "not_reached",
+      "conditions": [
+        {
+          "id": "short_sale.reached",
+          "label": "No earlier option's conditions are met",
+          "expression": "no earlier option met",
+          "values": {},
+          "passage_id": "sample-investor-a-v1.order.1",
+          "status": "not_reached",
+          "derived": true
+        },
+        {
+          "id": "short_sale.rules",
+          "label": "The sample rule set defines no further conditions for this option",
+          "expression": "none defined",
+          "values": {},
+          "passage_id": "sample-investor-a-v1.order.1",
+          "status": "not_evaluable"
+        }
+      ]
+    },
+    {
+      "option": "deed_in_lieu",
+      "status": "not_reached",
+      "conditions": [
+        {
+          "id": "deed_in_lieu.reached",
+          "label": "No earlier option's conditions are met",
+          "expression": "no earlier option met",
+          "values": {},
+          "passage_id": "sample-investor-a-v1.order.1",
+          "status": "not_reached",
+          "derived": true
+        },
+        {
+          "id": "deed_in_lieu.rules",
+          "label": "The sample rule set defines no further conditions for this option",
+          "expression": "none defined",
+          "values": {},
+          "passage_id": "sample-investor-a-v1.order.1",
+          "status": "not_evaluable"
+        }
+      ]
+    }
+  ],
+  "lender_view": {
+    "settings": {
+      "property_value": "265000.00",
+      "liquidation_discount_pct": "15",
+      "foreclosure_and_carrying_costs": "24000.00",
+      "horizon_months": 36,
+      "redefault_chance_pct": "30"
+    },
+    "figures": [
+      {"name": "foreclosure_claim", "value": "217560.00", "unit": "usd", "formula": "unpaid balance + arrears", "working": "212,400.00 + 5,160.00 = 217,560.00"},
+      {"name": "foreclosure_net_recovery", "value": "201250.00", "unit": "usd", "formula": "property value less the liquidation discount, less foreclosure and carrying costs", "working": "265,000.00 - 15% (39,750.00) - 24,000.00 = 201,250.00"},
+      {"name": "foreclosure_loss", "value": "16310.00", "unit": "usd", "formula": "claim - net recovery", "working": "217,560.00 - 201,250.00 = 16,310.00"},
+      {"name": "modification_payment_reduction_total", "value": "9000.00", "unit": "usd", "formula": "monthly payment reduction x horizon months", "working": "250.00 x 36 = 9,000.00"},
+      {"name": "modification_expected_redefault_loss", "value": "4893.00", "unit": "usd", "formula": "foreclosure loss x chance of re-default", "working": "16,310.00 x 30% = 4,893.00"},
+      {"name": "modification_cost", "value": "13893.00", "unit": "usd", "formula": "payment reduction over the horizon + expected re-default loss", "working": "9,000.00 + 4,893.00 = 13,893.00"},
+      {"name": "modification_advantage", "value": "2417.00", "unit": "usd", "formula": "foreclosure loss - modification cost", "working": "16,310.00 - 13,893.00 = 2,417.00"}
+    ]
+  },
+  "report_sections": {
+    "lender_view": "Foreclosure: a claim of 217,560.00 against a net recovery of 201,250.00 is a loss of 16,310.00. Modification: a payment reduction of 250.00 for 36 months (9,000.00) plus a 30% chance of that loss (4,893.00) is an expected cost of 13,893.00, which is 2,417.00 lower. These figures use illustrative settings.",
+    "borrower_situation": "Income fell by 25% from July 2026 after hours were cut from 40 to 30. The borrower says they intend to keep the home.",
+    "missing_information": ["The August 2026 bank statement"],
+    "compliance_points": ["12 CFR 1024.41(b): notify the borrower about missing documents. The date the application was received is a fact to check."],
+    "items_for_human_review": ["Confirm the hardship duration and intent before relying on the waterfall."],
+    "note": "Illustrative sample. The rules mark one option as 'conditions met'. Nothing here is a decision."
+  },
+  "agents": [
+    {"agent": "researcher", "summary": "Found the passage for each option the rules reached (seeded: no search was run)."},
+    {"agent": "writer", "summary": "Drafted the report from the stored results (seeded: written by hand)."},
+    {"agent": "critic", "summary": "Checked every figure against a stored result (seeded: not run)."}
+  ]
+}

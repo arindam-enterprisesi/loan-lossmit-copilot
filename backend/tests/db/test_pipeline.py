@@ -28,7 +28,7 @@ from app.services.classification import Classification, LlmClassifier
 from app.services.doc_lines import DocLine
 from app.services.extractor import ExtractedField, ExtractionOutcome
 from app.services.fake_reader import FakeClassifier, FakeExtractor
-from app.services.ingestion_config import IngestionConfig
+from app.services.ingestion_config import get_ingestion_config
 from app.storage import Storage
 from app.worker import process_documents
 from tests.conftest import Rendered
@@ -43,7 +43,7 @@ AUGUST = "daniel_reyes/bank_statement_2026-08.pdf"
 SEPTEMBER = "daniel_reyes/bank_statement_2026-09.pdf"
 CREDIT_REPORT = "daniel_reyes/credit_report_2026-10-12.pdf"  # classified here, read by Feature 4
 ANGELA_JULY = "angela_whitfield/bank_statement_2026-07.pdf"
-CONFIG = IngestionConfig(version="t", label="illustrative", max_file_mb=25, render_dpi=50)
+CONFIG = get_ingestion_config().model_copy(update={"render_dpi": 50})
 NET_PAY_MESSAGE = "Gross 3,070.50 minus deductions 1,036.89 is 2,033.61, not 2,083.61."
 
 

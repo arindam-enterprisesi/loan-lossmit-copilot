@@ -12,7 +12,7 @@ providers:
     temperature: null   # current Claude models reject sampling parameters
     options:
       effort: medium
-  bedrock:              # Claude on Amazon Bedrock (Mantle endpoint); region from AWS_REGION
+  bedrock:              # Claude on Amazon Bedrock (bedrock-runtime, InvokeModel); region from AWS_REGION
     model: anthropic.claude-opus-5-5   # confirm the exact model or inference-profile ID with the AWS admin
     temperature: null
     options:
