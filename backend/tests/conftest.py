@@ -2,6 +2,11 @@
 
 from __future__ import annotations
 
+import os
+
+# No test may call a real model. Tests that want the real classify task pass their own gateway.
+os.environ.setdefault("PIPELINE_LLM", "fake")
+
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any

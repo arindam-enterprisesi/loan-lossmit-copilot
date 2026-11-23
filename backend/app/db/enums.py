@@ -72,6 +72,76 @@ class ReadBy(StrEnum):
     TESSERACT = "tesseract"
 
 
+class FlagSeverity(StrEnum):
+    """The contract's Severity values."""
+
+    ERROR = "error"
+    WARNING = "warning"
+    INFO = "info"
+
+
+class FlagStatus(StrEnum):
+    """docs/database-schema.md: open until a person, or a re-run of its check, closes it."""
+
+    OPEN = "open"
+    RESOLVED = "resolved"
+    OVERRIDDEN = "overridden"
+
+
+class ConfigKind(StrEnum):
+    """docs/database-schema.md, ``config_versions.kind``: which settings file a version is of."""
+
+    CHECKLIST = "checklist"
+    INCOME_METHOD = "income_method"
+    THRESHOLDS = "thresholds"
+    RULE_SET = "rule_set"
+    LLM = "llm"
+    TEMPLATES = "templates"
+
+
+class ConfigLabel(StrEnum):
+    """Every setting is labelled (CLAUDE.md rule 4)."""
+
+    ILLUSTRATIVE = "illustrative"
+    AUTHORITATIVE = "authoritative"
+
+
+class AnalysisFeature(StrEnum):
+    """``analysis_runs.feature``: what a run is of."""
+
+    INCOME = "income"
+    ASSETS = "assets"
+    CREDIT = "credit"
+    HARDSHIP = "hardship"
+    UNDERWRITING = "underwriting"
+    LM_RECOMMENDATION = "lm_recommendation"
+    COMPLETENESS = "completeness"
+
+
+class AnalysisStatus(StrEnum):
+    QUEUED = "queued"
+    RUNNING = "running"
+    SUCCEEDED = "succeeded"
+    FAILED = "failed"
+
+
+class IncomeComponentKind(StrEnum):
+    """``income_components.component`` (Feature Design 2.3: earnings are grouped by type)."""
+
+    BASE = "base"
+    OVERTIME = "overtime"
+    BONUS = "bonus"
+    COMMISSION = "commission"
+
+
+class CompletenessOverall(StrEnum):
+    """FSD section 7. The contract's overall status has only complete and incomplete."""
+
+    COMPLETE = "complete"
+    INCOMPLETE = "incomplete"
+    NEEDS_REVIEW = "needs_review"
+
+
 class DocumentType(StrEnum):
     """The contract's document types.
 

@@ -1,6 +1,6 @@
 # LLM provider and model per task. Switch a task's provider here; no code change needed.
 # Read by app/llm/config.py. Every result records the provider and model it used.
-version: "2026-11-17.1"
+version: "2026-11-19.1"
 label: illustrative
 
 default_provider: anthropic
@@ -36,6 +36,21 @@ tasks:
   extract:
     options:
       effort: medium
+  label_transactions:     # Feature Design 3.7 names Gemini; switch after the D9 provider evaluation
+    max_tokens: 8000
+    options:
+      effort: low
+  hardship:               # Feature Design 7.7 names Gemini; switch after the D9 provider evaluation
+    max_tokens: 4096
+    options:
+      effort: medium
+  income_explain:         # Feature Design 2.7 names Gemini; switch after the D9 provider evaluation
+    max_tokens: 4096
+    options:
+      effort: low
+
+extraction:
+  max_pages_per_call: 4   # longer documents go in batches of this many pages
 
 embeddings:
   provider: openai

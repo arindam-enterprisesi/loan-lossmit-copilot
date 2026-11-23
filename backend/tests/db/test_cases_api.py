@@ -69,7 +69,16 @@ async def test_create_case(client: httpx.AsyncClient, session: AsyncSession) -> 
 
     assert response.status_code == 201
     body = response.json()
-    assert set(body) == {"id", "title", "pillar", "profile", "document_count", "created_at"}
+    assert set(body) == {
+        "id",
+        "case_ref",
+        "title",
+        "pillar",
+        "profile",
+        "document_count",
+        "created_at",
+    }
+    assert re.fullmatch(r"LP-[0-9]{4,}", body["case_ref"])  # the contract's pattern
     assert body["title"] == "New borrower — purchase"
     assert (body["pillar"], body["profile"], body["document_count"]) == ("underwriting", None, 0)
     created_by = await session.scalar(
@@ -81,7 +90,7 @@ async def test_create_case(client: httpx.AsyncClient, session: AsyncSession) -> 
 async def test_new_cases_get_a_ref_from_their_pillars_sequence(
     client: httpx.AsyncClient, session: AsyncSession
 ) -> None:
-    # case_ref is not in the contract's Case, so it is stored but never sent.
+    # case_ref is in the contract's Case (since #6), so it is sent and equals the stored one.
     refs = []
     for role, pillar in [
         (Role.UNDERWRITER, "underwriting"),
@@ -91,12 +100,11 @@ async def test_new_cases_get_a_ref_from_their_pillars_sequence(
         response = await client.post(
             "/api/v1/cases", json={"title": "T", "pillar": pillar}, headers=auth(role)
         )
-        assert "case_ref" not in response.json()
-        refs.append(
-            await session.scalar(
-                sa.text("SELECT case_ref FROM cases WHERE id = :c"), {"c": response.json()["id"]}
-            )
+        stored = await session.scalar(
+            sa.text("SELECT case_ref FROM cases WHERE id = :c"), {"c": response.json()["id"]}
         )
+        assert response.json()["case_ref"] == stored
+        refs.append(stored)
 
     assert all(re.fullmatch(r"(LP|LM)-\d{4,}", ref) for ref in refs)
     assert [ref[:2] for ref in refs] == ["LP", "LP", "LM"]

@@ -1,0 +1,101 @@
+# The required-document checklists (Feature Design 1.3, FSD section 7) and the gap messages.
+# Read by app/services/analysis_config.py and app/services/completeness.py.
+#
+# Every checklist and every number in it carries its label (illustrative or authoritative) and its
+# source (CLAUDE.md rule 4). These are illustrative samples: real requirements must come from the
+# lender or program. Change `version` when a value changes. Code decides every status.
+#
+# Rules (FSD section 7):
+#   coverage_days    pay stubs and similar: merged date ranges must cover `days` days
+#   coverage_months  statements, per account: merged ranges must cover `months` months
+#   tax_years        one document for each of the last years (reference year minus each offset)
+#   recency          the latest document date is at most `max_age_days` before the reference date
+#   present          at least one usable document of the type; `signed` also needs a signature date
+version: "2026-11-19.1"
+label: illustrative
+source: "Feature Design 1.3 and FSD section 7, illustrative sample checklists"
+
+# What each item says. {noun} is the item's plural name, for example "pay stubs".
+messages:
+  missing: "No {noun} found for {borrower}"
+  coverage_days: "{found} of {required} days of {noun} found"
+  coverage_months: "{found} of {required} months of {noun} found for the account ending {account}"
+  tax_years: "{noun} found for {found}; missing {missing}"
+  recency: "{noun} dated {days} days before the reference date; at most {limit} days is allowed"
+  present: "{noun} found"
+  signed: "{noun} found, but no signature date was read"
+  incomplete_document: "{noun}: a document is incomplete ({problem})"
+  needs_review: "{noun}: {why}"
+  satisfied: "{noun} cover what the checklist asks for"
+
+checklists:
+  "pillar1-wage-earner@1":
+    title: Wage earner, purchase file
+    pillar: underwriting
+    employment_types: [wage_earner]
+    version: "1"
+    label: illustrative
+    source: "Feature Design 1.3: pay stubs covering 30 days, W-2s and tax returns for two years, bank statements covering two months, a credit report"
+    items:
+      - id: pay_stubs_30_days
+        label: Pay stubs covering 30 days
+        noun: pay stubs
+        doc_type: pay_stub
+        rule: coverage_days
+        days: {value: 30, label: illustrative, source: "Feature Design 1.3: pay stubs covering 30 days"}
+      - id: w2_two_years
+        label: W-2s for the last two tax years
+        noun: W-2s
+        doc_type: w2
+        rule: tax_years
+        year_offsets: {value: [1, 2], label: illustrative, source: "Feature Design 1.3: W-2s for two years (reference year minus 1 and 2)"}
+      - id: tax_returns_two_years
+        label: Tax returns for the last two tax years
+        noun: tax returns
+        doc_type: tax_return_1040
+        rule: tax_years
+        year_offsets: {value: [1, 2], label: illustrative, source: "Feature Design 1.3: tax returns for two years (reference year minus 1 and 2)"}
+      - id: bank_statements_2_months
+        label: Bank statements covering two months
+        noun: bank statements
+        doc_type: bank_statement
+        rule: coverage_months
+        months: {value: 2, label: illustrative, source: "Feature Design 1.3: bank statements covering two months"}
+      - id: credit_report_120_days
+        label: Credit report within 120 days
+        noun: credit report
+        doc_type: credit_report
+        rule: recency
+        max_age_days: {value: 120, label: illustrative, source: "FSD section 7: a credit report within 120 days of the reference date"}
+
+  "pillar2-hardship@1":
+    title: Loss mitigation application
+    pillar: loss_mitigation
+    employment_types: [wage_earner, self_employed, retired, other]
+    version: "1"
+    label: illustrative
+    source: "FSD section 7: signed application, hardship letter, pay stubs (30 days), bank statements (2 months)"
+    items:
+      - id: signed_application
+        label: Signed mortgage assistance application
+        noun: mortgage assistance application
+        doc_type: mortgage_assistance_application
+        rule: present
+        signed: true
+      - id: hardship_letter
+        label: Hardship letter
+        noun: hardship letter
+        doc_type: hardship_letter
+        rule: present
+      - id: pay_stubs_30_days
+        label: Pay stubs covering 30 days
+        noun: pay stubs
+        doc_type: pay_stub
+        rule: coverage_days
+        days: {value: 30, label: illustrative, source: "FSD section 7: pay stubs (30 days)"}
+      - id: bank_statements_2_months
+        label: Bank statements covering two months
+        noun: bank statements
+        doc_type: bank_statement
+        rule: coverage_months
+        months: {value: 2, label: illustrative, source: "FSD section 7: bank statements (2 months)"}

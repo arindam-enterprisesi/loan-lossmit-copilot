@@ -46,21 +46,21 @@ The copilot needs 34 tables in PostgreSQL, in five groups (plus two deferred). T
 | `obligations` | Recurring debts and whether they count toward DTI | id, run_id, case_id, creditor, kind, monthly_payment, balance, source (bank, credit_report, both), counts_toward_dti, reason | 3 | Abhay | D6 |
 | `hardship_profiles` | Letter read into reason, onset, duration, intent | id, run_id, case_id, primary_reason, reasons (jsonb with quote, line_refs, verified), onset, duration, intent, timeline (jsonb), confirmed_by, confirmed_at | 7 | Abhay (prompt output from Arindam) | D6 |
 | `budget_lines` | Budget by category on stated and observed bases | id, run_id, category, stated_amount, observed_amount, adjusted_amount, adjustment_reason, flagged | 7 | Abhay | D6 |
-| `credit_scores` | Bureau scores from the sample report | id, run_id, bureau, score, is_representative | 4 (P1) | Abhay | D8 |
-| `tradelines` | Accounts on the sample credit report | id, run_id, document_id, creditor, account_type, ownership, opened_on, status, balance, credit_limit, monthly_payment, past_due, late_30, late_60, late_90, last_late_on, remarks, line_refs | 4 (P1) | Abhay | D8 |
-| `credit_inquiries` | Inquiries and their matched new account | id, run_id, creditor, inquired_on, matched_tradeline_id | 4 (P1) | Abhay | D8 |
+| `credit_scores` | Bureau scores from the sample report | id, run_id, bureau, score, is_representative | 4 (P1) | Abhay | D7 |
+| `tradelines` | Accounts on the sample credit report | id, run_id, document_id, creditor, account_type, ownership, opened_on, status, balance, credit_limit, monthly_payment, past_due, late_30, late_60, late_90, last_late_on, remarks, line_refs | 4 (P1) | Abhay | D7 |
+| `credit_inquiries` | Inquiries and their matched new account | id, run_id, creditor, inquired_on, matched_tradeline_id | 4 (P1) | Abhay | D7 |
 
 ## 4. Rules, agents and reports
 
 | Table | Purpose | Key columns | Feature | Owner | Due |
 |---|---|---|---|---|---|
-| `waterfall_results` | Each loss mitigation option and its status | id, run_id, rule_set_version, order_no, option, status (met, not_met, not_evaluable, not_reached, needs_confirmation), conditions (jsonb: values used, passage ids), overridden, override_reason, overridden_by | 8 | Abhay | D7 |
-| `lender_views` | Option cost against foreclosure | id, run_id, foreclosure_loss, modification_cost, advantage, settings (jsonb), calculation_ids | 8 | Abhay | D7 |
-| `agent_runs` | One row per Researcher, Writer or Critic attempt | id, run_id, agent, attempt, status, provider, model, prompt_id, output (jsonb), error, started_at, finished_at | 6, 8 | Arindam (shape), Abhay (migration) | D7 |
-| `reports` | Draft underwriting or recommendation report | id, run_id, case_id, kind (underwriting, lm_recommendation), version, sections (jsonb), guardrail_results (jsonb), status (draft, in_review, signed_off) | 6, 8 | Arindam (shape), Abhay (migration) | D7 |
-| `findings` | Findings in a report, each with evidence | id, report_id, priority (significant, attention, information), title, detail, evidence (jsonb), flag_id | 6 | Abhay | D7 |
-| `conditions` | Suggested conditions and the reviewer's decision | id, report_id, text, priority, source (agent, user), decision (pending, accepted, edited, rejected), edited_text, reason, decided_by, decided_at | 6 | Abhay | D8 |
-| `sign_offs` | Record that a person reviewed a report; never a decision | id, report_id, case_id, signed_by, role, signed_at, note | 6, 8 | Abhay | D8 |
+| `waterfall_results` | Each loss mitigation option and its status | id, run_id, rule_set_version, order_no, option, status (met, not_met, not_evaluable, not_reached, needs_confirmation), conditions (jsonb: values used, passage ids), overridden, override_reason, overridden_by | 8 | Abhay | D6 |
+| `lender_views` | Option cost against foreclosure | id, run_id, foreclosure_loss, modification_cost, advantage, settings (jsonb), calculation_ids | 8 | Abhay | D6 |
+| `agent_runs` | One row per Researcher, Writer or Critic attempt | id, run_id, agent, attempt, status, provider, model, prompt_id, output (jsonb), error, started_at, finished_at | 6, 8 | Arindam (shape), Abhay (migration) | D6 |
+| `reports` | Draft underwriting or recommendation report | id, run_id, case_id, kind (underwriting, lm_recommendation), version, sections (jsonb), guardrail_results (jsonb), status (draft, in_review, signed_off) | 6, 8 | Arindam (shape), Abhay (migration) | D6 |
+| `findings` | Findings in a report, each with evidence | id, report_id, priority (significant, attention, information), title, detail, evidence (jsonb), flag_id | 6 | Abhay | D6 |
+| `conditions` | Suggested conditions and the reviewer's decision | id, report_id, text, priority, source (agent, user), decision (pending, accepted, edited, rejected), edited_text, reason, decided_by, decided_at | 6 | Abhay | D6 |
+| `sign_offs` | Record that a person reviewed a report; never a decision | id, report_id, case_id, signed_by, role, signed_at, note | 6, 8 | Abhay | D6 |
 
 ## 5. Guideline search (RAG)
 
