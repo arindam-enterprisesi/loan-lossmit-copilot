@@ -30,7 +30,23 @@ D1_TABLES = {
     "completeness_results",
     # D5 (migration 0006).
     "hardship_profiles",
+    # D6 (migration 0007).
+    "loan_scenarios",
+    "loan_records",
+    "transactions",
+    "obligations",
+    "budget_lines",
+    # D6 (migration 0008).
+    "reports",
+    "findings",
+    "conditions",
+    "sign_offs",
+    "agent_runs",
+    "waterfall_results",
+    "lender_views",
 }
+# loan_scenarios is keyed by its case, as docs/database-schema.md says, so it has no `id` column.
+NO_ID_COLUMN = {"loan_scenarios"}
 SEQUENCES = {"case_ref_lp_seq", "case_ref_lm_seq"}
 
 
@@ -57,9 +73,10 @@ async def test_every_row_has_a_uuid_key_and_a_timestamp(conn: AsyncConnection) -
     )
     columns = {(r.table_name, r.column_name): r for r in rows}
     for table in D1_TABLES - {"audit_events"}:
-        key = columns[(table, "id")]
-        assert key.data_type == "uuid", table
-        assert key.column_default == "gen_random_uuid()", table
+        if table not in NO_ID_COLUMN:
+            key = columns[(table, "id")]
+            assert key.data_type == "uuid", table
+            assert key.column_default == "gen_random_uuid()", table
         created = columns[(table, "created_at")]
         assert (created.data_type, created.is_nullable) == ("timestamp with time zone", "NO"), table
     # audit_events keeps a bigint identity key (orders events within one transaction) and `at`.
