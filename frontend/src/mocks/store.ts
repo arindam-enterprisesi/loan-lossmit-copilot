@@ -3,7 +3,7 @@
 // reason, corrections keep original_value) so the UI is built against real behaviour. A page reload
 // resets it. It is replaced by the real API, never extended with business logic.
 import { ApiError } from "@/lib/api-error";
-import { DOCUMENT_TYPES } from "@/lib/documents";
+import { DOCUMENT_TYPES, TYPE_REASON_MAX } from "@/lib/documents";
 import type {
   DocumentSummary,
   DocumentType,
@@ -14,7 +14,7 @@ import type {
   Job,
 } from "@/lib/types";
 import { mockDocuments } from "./data";
-import { MOCK_PAGE_IMAGES, seedExtractions } from "./extraction";
+import { MOCK_PAGE_IMAGES, PAYSTUB_DOC_ID, seedExtractions } from "./extraction";
 
 /** Job timing: waits in the queue, then runs. Exported so tests can step through it. */
 export const JOB_QUEUE_MS = 600;
@@ -27,10 +27,20 @@ interface MockJob {
   finalized: boolean;
 }
 
+/** One recorded change of document type. The real backend keeps this in its audit store. */
+export interface TypeChange {
+  documentId: string;
+  from: DocumentType | null;
+  to: DocumentType;
+  reason: string | null;
+  at: string;
+}
+
 interface StoreState {
   documents: DocumentSummary[];
   extractions: Map<string, Extraction>;
   jobs: Map<string, MockJob>;
+  typeChanges: TypeChange[];
   counter: number;
 }
 
@@ -39,6 +49,7 @@ function createState(): StoreState {
     documents: structuredClone(mockDocuments),
     extractions: new Map(structuredClone(seedExtractions).map((e) => [e.document_id, e])),
     jobs: new Map(),
+    typeChanges: [],
     counter: 0,
   };
 }
@@ -118,6 +129,23 @@ function basicExtraction(doc: DocumentSummary): Extraction {
   };
 }
 
+/**
+ * What a finished job leaves behind for one document. An uploaded pay stub gets a copy of the demo
+ * story's pay stub reading (net pay flagged), so the whole upload, review and correct flow can be
+ * tried. Anything else gets a basic reading. The real reading is the backend's.
+ */
+function extractionFor(doc: DocumentSummary): Extraction {
+  const seed = doc.doc_type === "pay_stub" ? seedExtractions.find((e) => e.document_id === PAYSTUB_DOC_ID) : undefined;
+  if (!seed) return basicExtraction(doc);
+  const copy = structuredClone(seed);
+  copy.document_id = doc.id;
+  for (const f of copy.fields) {
+    if (f.evidence) f.evidence.document_id = doc.id;
+    for (const flag of f.flags) if (flag.evidence) flag.evidence.document_id = doc.id;
+  }
+  return copy;
+}
+
 /** Open field flags plus the document-level flags decide what the document list shows. */
 function refreshDocument(doc: DocumentSummary, extraction: Extraction): void {
   const open = extraction.fields.filter((f) => f.flags.length > 0 && f.review_status === "unreviewed");
@@ -138,9 +166,10 @@ function finalizeJob(job: MockJob): void {
     }
     doc.type_certainty = doc.declared_type ? "high" : "medium";
     doc.page_count = doc.page_count ?? 1;
+    const extraction = extractionFor(doc);
+    state.extractions.set(doc.id, extraction);
     doc.status = "needs_review"; // fresh extraction: waits for a person to look at it
-    doc.flags = [];
-    state.extractions.set(doc.id, basicExtraction(doc));
+    doc.flags = [...extraction.flags, ...extraction.fields.flatMap((f) => f.flags)];
   }
   job.finalized = true;
 }
@@ -219,13 +248,24 @@ export function setDocumentTypeMock(
   caseId: string,
   documentId: string,
   docType: DocumentType,
+  reason?: string,
   now: number = Date.now(),
 ): { document: DocumentSummary; job?: Job } {
   const doc = find(caseId, documentId);
   if (!DOCUMENT_TYPES.includes(docType)) throw new ApiError(422, "Unknown document type");
+  if (reason && reason.length > TYPE_REASON_MAX) {
+    throw new ApiError(422, `The reason can be at most ${TYPE_REASON_MAX} characters`);
+  }
   if (doc.doc_type === docType && doc.status !== "type_needed") {
     return { document: structuredClone(doc) };
   }
+  state.typeChanges.push({
+    documentId: doc.id,
+    from: doc.doc_type ?? null,
+    to: docType,
+    reason: reason ?? null,
+    at: iso(now),
+  });
   doc.doc_type = docType;
   doc.type_certainty = "high";
   doc.status = "processing";
@@ -233,6 +273,11 @@ export function setDocumentTypeMock(
   state.extractions.delete(doc.id);
   const job = createJob([doc.id], now);
   return { document: structuredClone(doc), job };
+}
+
+/** The recorded type changes, oldest first. Used by tests; the screens never read it. */
+export function typeChangesMock(): TypeChange[] {
+  return structuredClone(state.typeChanges);
 }
 
 export function getExtractionMock(caseId: string, documentId: string): Extraction {
@@ -281,5 +326,9 @@ export function reviewFieldMock(
 }
 
 export function pageImageUrlMock(documentId: string, page: number): string | undefined {
-  return MOCK_PAGE_IMAGES[documentId]?.[page];
+  const listed = MOCK_PAGE_IMAGES[documentId]?.[page];
+  if (listed) return listed;
+  // An uploaded pay stub shows the mock pay stub page, matching the reading it was given.
+  const doc = state.documents.find((d) => d.id === documentId);
+  return doc?.doc_type === "pay_stub" && page === 1 ? MOCK_PAGE_IMAGES[PAYSTUB_DOC_ID][1] : undefined;
 }

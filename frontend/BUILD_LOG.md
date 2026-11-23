@@ -78,3 +78,62 @@ Goal: Document Intelligence screens. An upload screen and a review screen with t
 - Ask Arindam: the contract takes a multipart upload while the technical design describes a presigned upload to S3, so which one should the screen follow? And when will the page image endpoint land?
 - The type picker has no reason box yet (the contract allows an optional reason).
 - Pages with more than one image are not switchable yet. The panel shows the page cited by the selected field.
+
+## Day 3 (Wed 18 Nov 2026)
+
+Goal: finish the upload and review screens against the Day 3 brief: zoom and several pages, a box for every field with hover and click, a type dialog, and 2-second polling. Day 2 already built most of the screens, so Day 3 fills the gaps. I log after each group.
+
+### Group 1: page viewer
+Decisions:
+- A new `PageViewer` instead of changing the shared `EvidencePanel`, which later screens (income, hardship) will reuse.
+- Boxes stay as 0 to 1 fractions and are drawn as percentages of the page canvas. Zoom only resizes the canvas, so boxes stay on their text.
+- The review screen holds `selectedName`, `hoveredName` and `viewPage`. The viewer and the field list both read them, so they always agree.
+
+What I did:
+1. `src/lib/viewer.ts`: zoom steps (50% to 300%), page limits, box to CSS, which fields get a box.
+2. `page-viewer.tsx`: page arrows, zoom buttons, a box for every field (selected gold, hovered teal). Clicking a box selects its field. Picking a field on another page jumps to that page.
+3. Field rows light up when their box is hovered, and the other way round.
+4. Mock: a 3-page bank statement (`public/mock/bank-p1..p3.svg`) with boxes lined up to its text.
+
+Tests: 87 to 118. New tests cover the zoom limits, boxes at any zoom, hover both ways, box click, and page jumping.
+
+Open: I assume the box origin is the top left of the page. Confirm with Abhay before going live. (The Day 2 open item "pages not switchable" is now done.)
+
+### Group 2: type dialog and polling
+Decisions:
+- Job polling is every 2 seconds against the real backend (as the brief says) and 0.7 seconds on mocks, so the demo stays lively. One constant per mode in `use-job.ts`.
+- The reason on a type change is optional, as in the contract (max 500 characters). A blank reason is left out of the request.
+- The dialog does not know about the API. It calls `onConfirm` and shows any error it throws, so it can be reused anywhere.
+- While a re-read is running on the review screen, reviewing is paused. The values on screen belong to the old type, so editing them would be wrong.
+
+What I did:
+1. `use-job.ts`: poll interval picked by mode.
+2. `setDocumentType` sends the trimmed reason. The mock refuses a reason over 500 characters (422) and records each type change (from, to, reason, time), standing in for the audit store.
+3. `type-dialog.tsx`: type dropdown (never "unrecognized"), optional reason box with a character counter, Confirm disabled until a type is chosen, error shown inside the dialog.
+4. The document table's "Choose type" now opens the dialog. The review screen has a "Change type" button; after a change it shows re-reading progress, then reloads the new fields.
+5. Removed the old inline `TypePicker`, which nothing uses any more.
+
+Tests: 118 to 151. New tests cover the poll timing, the reason limit and audit record, the real PUT request body, the dialog, the table flow and the review screen type change (including the paused state and the reload).
+
+Open (Group 2): the reason is only stored, nothing shows it back yet. A type change on a reviewed document drops the old extraction in the mock. Check with Abhay that the real backend does the same, so old corrections are not lost silently.
+
+### Group 3: page image link and the full flow
+Decisions:
+- The page image is now an async call, `getPageImage`, not a sync helper. Presigned links expire after about 5 minutes, so the screen always asks for the link and never keeps one for long.
+- If an image fails to load, I ask for one fresh link and try again. If the fresh link fails too, I stop and show the blank page. No retry loop. Boxes and review still work without the picture.
+- The contract has no page-image endpoint yet (TODO D3+), so in real mode `getPageImage` answers "none". When Arindam adds the endpoint, only that one function changes.
+- In the mock, an uploaded pay stub now gets the demo story's reading (net pay flagged) and the mock pay stub picture. Before, it got an empty reading, so the demo flow could not be tried.
+
+What I did:
+1. `getPageImage` in `api.ts`, and a `usePageImage` hook that loads the link per page and handles the expired-link retry.
+2. `PageViewer` reports image load and error to the screen, which passes them to the hook.
+3. Mock: uploaded pay stubs get a copy of the demo reading, with their own document ID, plus the picture.
+4. One end-to-end test: upload a pay stub, wait for the job, open it, see the box on the picture, try to save a correction without a reason (refused), correct it with a reason, see the original struck through and the flag cleared.
+
+Tests: 151 to 167. A test bug cost me some time: a `beforeEach` that returned the mock made Vitest call it as a cleanup step.
+
+Open:
+- Real mode: no picture until the endpoint exists, and the login screen and CORS are still missing, so real mode cannot be switched on yet.
+- Ask Arindam what the page-image response will look like (just a URL, or URL plus expiry).
+
+Day 3 done-when: Daniel's pay stub can be uploaded, reviewed and corrected in the browser, on mocks.

@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { DocStatusChip } from "@/components/shared/doc-status-chip";
 import { FlagChip, severityTone } from "@/components/shared/flag-chip";
-import { buttonVariants } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Table,
   TableBody,
@@ -16,14 +17,15 @@ import { docTypeLabel } from "@/lib/documents";
 import { formatDate } from "@/lib/format";
 import type { DocumentSummary, DocumentType } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { TypePicker } from "./type-picker";
+import { TypeDialog } from "./type-dialog";
 
 interface DocumentTableProps {
   documents: DocumentSummary[];
   /** URL pieces for the review link: /{pillarSlug}/{section}/{caseId}/{documentId}. */
   pillarSlug: string;
   section: string;
-  onSetType: (documentId: string, type: DocumentType) => void | Promise<void>;
+  /** Sends the chosen type and optional reason. Throws when it fails, so the dialog can show why. */
+  onSetType: (documentId: string, type: DocumentType, reason?: string) => Promise<void>;
 }
 
 function period(doc: DocumentSummary): string {
@@ -32,6 +34,9 @@ function period(doc: DocumentSummary): string {
 }
 
 export function DocumentTable({ documents, pillarSlug, section, onSetType }: DocumentTableProps) {
+  // The document whose type dialog is open, if any.
+  const [typing, setTyping] = useState<DocumentSummary | null>(null);
+
   if (documents.length === 0) {
     return (
       <div className="rounded-xl border border-dashed bg-panel p-8 text-center text-sm text-muted-foreground">
@@ -81,7 +86,9 @@ export function DocumentTable({ documents, pillarSlug, section, onSetType }: Doc
               <TableCell className="text-right">
                 {d.status === "type_needed" ? (
                   <div className="flex justify-end">
-                    <TypePicker onConfirm={(type) => onSetType(d.id, type)} />
+                    <Button size="sm" onClick={() => setTyping(d)}>
+                      Choose type
+                    </Button>
                   </div>
                 ) : d.status === "processing" || d.status === "uploaded" ? (
                   <span className="text-xs text-muted-foreground">Processing…</span>
@@ -100,6 +107,17 @@ export function DocumentTable({ documents, pillarSlug, section, onSetType }: Doc
           ))}
         </TableBody>
       </Table>
+      <TypeDialog
+        open={typing !== null}
+        onOpenChange={(open) => {
+          if (!open) setTyping(null);
+        }}
+        fileName={typing?.file_name ?? ""}
+        currentType={typing?.doc_type}
+        onConfirm={async (type, reason) => {
+          if (typing) await onSetType(typing.id, type, reason);
+        }}
+      />
     </div>
   );
 }

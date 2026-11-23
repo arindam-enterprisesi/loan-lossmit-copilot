@@ -16,22 +16,30 @@ import { FieldReviewForm } from "./field-review-form";
 interface FieldRowProps {
   field: Field;
   selected: boolean;
+  /** True while the matching box on the page is hovered, so the row lights up too. */
+  highlighted?: boolean;
   onSelect: () => void;
+  /** Called with true when the pointer enters the row and false when it leaves. */
+  onHover?: (hovering: boolean) => void;
   onReview: (review: FieldReview) => Promise<boolean>;
   disabled?: boolean;
 }
 
 /** One extracted value: value, certainty, flags and review status. The selected row shows the review form. */
-export function FieldRow({ field, selected, onSelect, onReview, disabled }: FieldRowProps) {
+export function FieldRow({ field, selected, highlighted, onSelect, onHover, onReview, disabled }: FieldRowProps) {
   const changed = field.value !== field.original_value;
   const open = hasOpenFlags(field);
 
   return (
     <li
+      onMouseEnter={() => onHover?.(true)}
+      onMouseLeave={() => onHover?.(false)}
+      data-highlighted={highlighted ? "true" : undefined}
       className={cn(
         "rounded-lg border bg-card p-3 transition-colors",
         selected ? "border-teal ring-1 ring-teal/40" : "hover:border-teal/50",
-        open && !selected && "border-danger/40",
+        highlighted && !selected && "border-teal/70 bg-teal/5",
+        open && !selected && !highlighted && "border-danger/40",
       )}
     >
       <button

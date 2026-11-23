@@ -5,16 +5,21 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { PageHeader } from "@/components/layout/page-header";
 import { DocStatusChip } from "@/components/shared/doc-status-chip";
-import { EvidencePanel } from "@/components/shared/evidence-panel";
 import { FlagChip, severityTone } from "@/components/shared/flag-chip";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { getExtraction, getPageImageUrl, listDocuments, reviewField } from "@/lib/api";
+import { getExtraction, listDocuments, reviewField, setDocumentType } from "@/lib/api";
 import { ApiError, isEditConflict } from "@/lib/api-error";
 import { docTypeLabel, hasOpenFlags, sortFlaggedFirst } from "@/lib/documents";
-import type { DocumentSummary, Extraction, FieldReview } from "@/lib/types";
+import type { DocumentSummary, DocumentType, Extraction, FieldReview } from "@/lib/types";
+import { useJobPoll } from "@/lib/use-job";
+import { usePageImage } from "@/lib/use-page-image";
 import { cn } from "@/lib/utils";
+import { boxesFromFields, clampPage, pageCountFor } from "@/lib/viewer";
 import { FieldList } from "./field-list";
+import { JobProgress } from "./job-progress";
+import { PageViewer } from "./page-viewer";
+import { TypeDialog } from "./type-dialog";
 
 interface ReviewWorkspaceProps {
   caseId: string;
@@ -30,15 +35,23 @@ export function ReviewWorkspace({ caseId, documentId, backHref }: ReviewWorkspac
   const [doc, setDoc] = useState<DocumentSummary | null>(null);
   const [extraction, setExtraction] = useState<Extraction | null>(null);
   const [selectedName, setSelectedName] = useState<string | null>(null);
+  const [hoveredName, setHoveredName] = useState<string | null>(null);
+  // The page being looked at. Picking a field on another page jumps here; the arrows change it too.
+  const [viewPage, setViewPage] = useState<number | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [notice, setNotice] = useState<Notice | null>(null);
+  const [typeOpen, setTypeOpen] = useState(false);
+  // Set while the document is being read again after its type changed.
+  const [rereadJobId, setRereadJobId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
       const [docs, ext] = await Promise.all([listDocuments(caseId), getExtraction(caseId, documentId)]);
       setDoc(docs.find((d) => d.id === documentId) ?? null);
       setExtraction(ext);
-      setSelectedName((current) => current ?? sortFlaggedFirst(ext.fields)[0]?.name ?? null);
+      const first = sortFlaggedFirst(ext.fields)[0];
+      setSelectedName((current) => current ?? first?.name ?? null);
+      setViewPage((current) => current ?? first?.evidence?.page ?? 1);
       setLoadError(null);
       setNotice(null);
     } catch (e) {
@@ -55,6 +68,25 @@ export function ReviewWorkspace({ caseId, documentId, backHref }: ReviewWorkspac
   useEffect(() => {
     load();
   }, [load]);
+
+  // When the re-read finishes, forget the old selection (the new type has different fields) and reload.
+  const { job: rereadJob } = useJobPoll(rereadJobId, () => {
+    setRereadJobId(null);
+    setSelectedName(null);
+    setViewPage(null);
+    load();
+  });
+
+  // The picture of the page being looked at. It asks again for a fresh link if the old one expired.
+  const pageImage = usePageImage(caseId, documentId, viewPage ?? 1);
+
+  // Sends the new type. A 202 starts the re-read; a 200 only confirmed the type. Failures are thrown
+  // so the dialog can show them.
+  const onSetType = async (type: DocumentType, reason?: string) => {
+    const result = await setDocumentType(caseId, documentId, type, reason);
+    if (result.job) setRereadJobId(result.job.id);
+    else await load();
+  };
 
   const onReview = async (fieldName: string, review: FieldReview): Promise<boolean> => {
     try {
@@ -77,6 +109,12 @@ export function ReviewWorkspace({ caseId, documentId, backHref }: ReviewWorkspac
       );
       return false;
     }
+  };
+
+  const selectField = (name: string) => {
+    setSelectedName(name);
+    const fieldPage = extraction?.fields.find((f) => f.name === name)?.evidence?.page;
+    if (fieldPage) setViewPage(fieldPage);
   };
 
   const backLink = (
@@ -108,8 +146,10 @@ export function ReviewWorkspace({ caseId, documentId, backHref }: ReviewWorkspac
 
   const selected = extraction.fields.find((f) => f.name === selectedName) ?? null;
   const evidence = selected?.evidence ?? null;
-  const page = evidence?.page ?? 1;
+  const pageCount = pageCountFor(doc?.page_count, extraction.fields);
+  const page = clampPage(viewPage ?? 1, pageCount);
   const openCount = extraction.fields.filter(hasOpenFlags).length;
+  const rereading = rereadJobId !== null;
 
   return (
     <>
@@ -119,10 +159,30 @@ export function ReviewWorkspace({ caseId, documentId, backHref }: ReviewWorkspac
         actions={
           <>
             {doc ? <DocStatusChip status={doc.status} /> : null}
+            <Button size="sm" variant="outline" onClick={() => setTypeOpen(true)} disabled={rereading}>
+              Change type
+            </Button>
             {backLink}
           </>
         }
       />
+
+      <TypeDialog
+        open={typeOpen}
+        onOpenChange={setTypeOpen}
+        fileName={doc?.file_name ?? "This document"}
+        currentType={doc?.doc_type ?? extraction.doc_type}
+        onConfirm={onSetType}
+      />
+
+      {rereading ? (
+        <div className="mb-5 space-y-2">
+          {rereadJob ? <JobProgress job={rereadJob} subject="Re-reading with the chosen type" /> : null}
+          <p className="text-sm text-muted-foreground">
+            The values below are from the old type. Reviewing is paused until the new reading finishes.
+          </p>
+        </div>
+      ) : null}
 
       {extraction.summary || extraction.flags.length > 0 ? (
         <section className="mb-5 rounded-xl border bg-card p-4">
@@ -160,12 +220,20 @@ export function ReviewWorkspace({ caseId, documentId, backHref }: ReviewWorkspac
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
         <div className="lg:sticky lg:top-6 lg:self-start">
-          <EvidencePanel
+          <PageViewer
             title={selected ? `Source of ${selected.name.replace(/_/g, " ")}` : "Evidence"}
             page={page}
+            pageCount={pageCount}
+            onPageChange={setViewPage}
+            imageUrl={pageImage.url}
+            onImageError={pageImage.onImageError}
+            onImageLoad={pageImage.onImageLoad}
+            boxes={boxesFromFields(extraction.fields)}
+            selectedName={selectedName}
+            hoveredName={hoveredName}
+            onSelect={selectField}
+            onHover={setHoveredName}
             lineIds={evidence?.line_ids ?? []}
-            bbox={evidence?.bbox}
-            imageUrl={getPageImageUrl(documentId, page)}
           />
         </div>
         <section aria-labelledby="fields-heading">
@@ -180,8 +248,11 @@ export function ReviewWorkspace({ caseId, documentId, backHref }: ReviewWorkspac
           <FieldList
             fields={extraction.fields}
             selectedName={selectedName}
-            onSelect={setSelectedName}
+            hoveredName={hoveredName}
+            onSelect={selectField}
+            onHover={setHoveredName}
             onReview={onReview}
+            disabled={rereading}
           />
         </section>
       </div>
