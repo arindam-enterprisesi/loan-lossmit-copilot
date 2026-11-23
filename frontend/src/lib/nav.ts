@@ -62,7 +62,7 @@ export const PILLARS: Record<Pillar, PillarConfig> = {
       { slug: "assets-liabilities", label: "Assets and liabilities", icon: Scale, status: "live" },
       { slug: "credit-report", label: "Credit report", icon: Gauge, status: "soon" },
       { slug: "guideline-assistant", label: "Guideline assistant", icon: Search, status: "live" },
-      { slug: "underwriting-copilot", label: "Underwriting copilot", icon: Bot, status: "soon" },
+      { slug: "underwriting-copilot", label: "Underwriting copilot", icon: Bot, status: "live" },
       shared.hitl,
       shared.governance,
       shared.context,
@@ -82,7 +82,7 @@ export const PILLARS: Record<Pillar, PillarConfig> = {
       { slug: "hardship-budget", label: "Hardship and budget", icon: Calculator, status: "live" },
       // Regulation X questions come from this pillar (Feature Design 5.1 lists the loss mitigation specialist as a user).
       { slug: "guideline-assistant", label: "Guideline assistant", icon: Search, status: "live" },
-      { slug: "recommendation", label: "Recommendation", icon: Scale, status: "soon" },
+      { slug: "recommendation", label: "Recommendation", icon: Scale, status: "live" },
       shared.hitl,
       shared.governance,
       { slug: "agent-performance", label: "Agent performance", icon: Gauge, status: "soon" },

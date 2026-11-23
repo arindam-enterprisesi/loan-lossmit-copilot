@@ -103,6 +103,52 @@ export const MOCK_PASSAGES: GuidelinePassage[] = [
 const byId = new Map(MOCK_PASSAGES.map((p) => [p.id, p]));
 const pick = (id: string): GuidelinePassage => byId.get(id)!;
 
+// The rules of the sample investor the Loss Mitigation recommendation applies (backend/app/db/demo/
+// guideline_passages.json). Each rule in the waterfall cites one, and its passage opens from the card.
+// They are read by ID only: the assistant does not search them, so its list of sources does not change.
+const INVESTOR_NOTICE = "Illustrative: not an actual investor's requirements.";
+const investor = (id: string, heading: string, text: string): GuidelinePassage => ({
+  id: `sample-investor-a-v1.${id}`,
+  source_id: "sample-investor-a-v1",
+  source_title: "Sample Investor A guide",
+  heading,
+  text,
+  label: "illustrative",
+  page: null,
+  version: "1",
+  notice: INVESTOR_NOTICE,
+});
+
+export const INVESTOR_PASSAGES: GuidelinePassage[] = [
+  investor(
+    "order.1",
+    "Order of options",
+    "Options are evaluated in a fixed order: repayment plan, forbearance, payment deferral, loan modification, short sale, then deed in lieu. The evaluation stops at the first option whose conditions are met. Short sale and deed in lieu are evaluated only when no earlier option's conditions are met.",
+  ),
+  investor("repayment-plan.1", "Repayment plan: hardship", "A repayment plan is considered only when the borrower's hardship has been confirmed as resolved."),
+  investor(
+    "repayment-plan.2",
+    "Repayment plan: surplus",
+    "The borrower's documented monthly surplus must be at least the arrears divided by six, so the arrears can be repaid in six months.",
+  ),
+  investor("forbearance.1", "Forbearance: hardship", "Forbearance is considered only when the borrower's hardship has been confirmed as temporary."),
+  investor("payment-deferral.1", "Payment deferral: hardship", "A payment deferral is considered only when the borrower's hardship has been confirmed as resolved."),
+  investor("payment-deferral.2", "Payment deferral: surplus", "The borrower's documented monthly surplus at the contractual payment must be zero or more."),
+  investor("payment-deferral.3", "Payment deferral: delinquency", "The loan must be six or fewer months delinquent."),
+  investor(
+    "loan-modification.1",
+    "Loan modification: hardship",
+    "A loan modification is considered only when the borrower's hardship has been confirmed as long-term or its duration is unknown.",
+  ),
+  investor("loan-modification.2", "Loan modification: intent", "The borrower must have confirmed that they intend to keep the home."),
+  investor(
+    "loan-modification.3",
+    "Loan modification: target payment",
+    "The target payment is 35% of the borrower's documented gross monthly income. It must be below the current contractual payment.",
+  ),
+];
+const investorById = new Map(INVESTOR_PASSAGES.map((p) => [p.id, p]));
+
 /** GET /guidelines/sources: every loaded source with how many passages it has. */
 export function mockSources(): GuidelineSource[] {
   const kinds: Record<string, string> = {
@@ -122,7 +168,7 @@ export function mockSources(): GuidelineSource[] {
 
 /** GET /guidelines/passages/{id}: one passage, 404 if there is none with that ID. */
 export function getMockPassage(id: string): GuidelinePassage {
-  const found = byId.get(id);
+  const found = byId.get(id) ?? investorById.get(id);
   if (!found) throw new ApiError(404, "Passage not found");
   return structuredClone(found);
 }

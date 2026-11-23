@@ -552,6 +552,27 @@ Open:
 - Completeness overrides carry no who or when in the real answer, which the project's rule on corrections needs. Ask Abhay to add them.
 - All four analysis screens now read the real shapes. What is left before a first real run is Docker with the keys, and the page images.
 
+## Day 7 (Tue 24 Nov 2026): Underwriting copilot, Loss Mitigation recommendation, guideline assistant check
+In one line: the two agent screens are built on the demo data, the way every screen so far was, and the guideline assistant already did everything this day's prompt asks for.
+
+**1. Guideline assistant: nothing to build.** I built it on Day 6 against the same two calls (`POST /guidelines/ask`, `GET /guidelines/passages/{id}`). Each ask in today's prompt already has a test: citation markers are buttons that open the passage panel; an answer that cites two collections shows them side by side; the no-passage answer says so and gives no markers; the Regulation X notice shows on Regulation X answers; feedback is sent. Still open from Day 6: `POST /guidelines/ask` is not on `main`, so real mode says "not available on this backend yet".
+
+**2. The two screens (the design prompt is mine, so I designed and built them).**
+- **Underwriting copilot** (Loan Processing menu, Daniel Reyes). A Run button. Three steps, Researcher, Writer and Critic, each with its job and a status: waiting, running, done or failed. A failed step has a Re-run button that runs only that agent. Then the report: the case snapshot; a conflict callout showing 44.70% (overtime left out) beside 41.61% (overtime counted); findings grouped as significant, attention and information, each with evidence links; missing information, risks and guideline references (a reference opens its passage); suggested conditions; and the sign-off bar.
+- **Recommendation** (Loss Mitigation menu, Angela Whitfield). An "Illustrative - Sample Investor A v1" banner. The lender view first: foreclosure loss 16,310.00, modification expected cost 13,893.00, advantage 2,417.00, each with Show working. Then the waterfall in order: repayment plan, forbearance and payment deferral Not met, loan modification Met, short sale and deed-in-lieu together and greyed as Not reached. A card expands to its conditions, the values the rule used and a button to the cited passage of the sample investor's guide. Override with a reason. Then the agents, the report (lender view, the borrower's situation, missing information, compliance points, items for human review) and the same sign-off bar.
+- **Sign-off bar** (both screens): "Sign off review" with "Records a review. Not a decision." under it, an optional note, a line when suggested conditions were left unreviewed, and earlier sign-offs. A change after a sign-off puts the report back in review and keeps the earlier sign-off.
+- Choices of mine: **Accept needs no reason; Edit and Reject do** (that is what the backend checks, and the brief's "required reason" is read that way). Nothing the agents wrote is changed: an edit sits beside it, a rejected condition stays on the list with its reason. Priority carries a note saying it is the order to review in and says nothing about the loan. The words offer, approve and eligible are not used, even to say "never": the screen says "'Met' says only that an option's conditions are met. It is not a decision."
+
+**3. The demo's mock backend (`mocks/copilot.ts`).** It does what the real one does, so the screens only show: it runs the three agents in turn, applies Sample Investor A's rules to Angela (860.00 needed is 5,160.00 divided by 6; target payment 1,470.00 is 35% of 4,200.00), works out the lender view in whole cents, and recomputes every option's status after an override with the same rule as `backend/app/services/waterfall_status.py`. Tests check that its figures agree with the assets mock (DTI 44.70%, 41.61% with overtime) and the hardship mock (surplus -70.00, arrears 5,160.00).
+- **The Critic fails on the first run of each case, on purpose**, so the failed state and Re-run can be seen. The report still completes with a note that the Critic's check is not available, and a re-run fixes it. One constant, `FAIL_CRITIC_FIRST_RUN` in `mocks/copilot.ts`, turns it off.
+- The rules and the lender view appear as soon as Run is pressed (they are code); the report appears when the three agents finish (about 4 seconds in the demo).
+
+**4. Real backend.** The reading side is on `main` (Abhay's `underwriting.py`, `lm_recommendation.py`, `schemas/reports.py`): read the latest, accept, edit or reject a condition, add a condition, override a waterfall condition, sign off. `lib/copilot-real.ts` turns those answers into the screens' shapes (the latest attempt of each agent; queued is waiting and succeeded is done; the snapshot object becomes a list; an evidence reference becomes a link). **Starting a run and re-running an agent are Arindam's and are not on `main`**, so a real backend answers 404 or 405 and the screen says "not available on this backend yet". Not tried against a running backend.
+
+**5. Checked.** Tests 956 to 1,169. Type check, lint and the production build pass; the banned-wording scan is clean (only the brief's candidate-income label remains); both pages load on the dev server. I could not look at them in a browser (the browser extension was not connected), so the layout has been checked in tests and not by eye.
+
+Not done, on purpose: the optional "sample automated findings" comparison in the underwriting report (the mock sends none, so there is nothing to show); making a draft condition appear in the report for LM (there are none in Pillar 2); "Remove override" for a waterfall condition (the backend has no call for it).
+
 ## Going live checklist (real backend instead of mocks)
 Everything runs on mocks today. Flipping `NEXT_PUBLIC_USE_MOCKS=false` needs the items below. I update this list after every group or day, and tick items when the other side delivers them.
 
@@ -571,6 +592,9 @@ Contract gaps (Arindam owns `contracts/`; I only ask):
 - [ ] Income, completeness override, hardship and asset and liability endpoints are in Abhay's code and in `docs/contract-proposal-d4.md`, but not in `contracts/openapi.yaml`. Ask Arindam to add them, so the contract and not only the code says what they are. (Day 4)
 - [ ] Page image endpoint: now on `main` (#12) as `GET /documents/{id}/pages/{page}` (`getPageImage`). I have not connected it yet: `getPageImage` in `api.ts` still answers "none" in real mode. (Day 3)
 
+- [ ] Underwriting report and loss mitigation recommendation: Abhay's read, review and sign-off endpoints are on `main` but not in `contracts/openapi.yaml` (proposal in `docs/contract-proposal-d4.md`, section 6). Ask Arindam to add them. (Day 7)
+- [ ] The agents' own endpoints, **`POST /cases/{id}/underwriting-report`, `POST /cases/{id}/lm-recommendation` and `POST .../latest/agents/{agent}/rerun`**, are Arindam's and not on `main`. Until they are, real mode cannot start a run (the screens say so). What do they answer: `{ job }` or the report? The screens poll the latest report either way. (Day 7)
+
 Questions for Abhay and Arindam:
 - [ ] Bounding boxes: is the origin the top left of the page, as I assume? (Day 3)
 - [ ] Upload: multipart through the API (the contract) or a presigned S3 upload (the tech design)? (Day 2)
@@ -588,6 +612,13 @@ Questions for Abhay and Arindam:
 - [ ] Asset and liability answer: does a run need an income analysis first (the screen's mock does not), and can the answer list each account with its documented balance? Today the transactions are grouped by the last four digits and the balances are only in the working. And can `change.by` be a name and not a user id? (Day 6)
 - [ ] Guideline assistant: built on a mock (Day 6). The backend has the read side on `main` (sources, passages), which the screen reads. Ask Arindam for `POST /guidelines/ask` (question, source set, optional case) and `POST /guidelines/answers/{id}/feedback`; the answer shape I propose is in `src/lib/guidelines-types.ts` (sentences with citation markers, the retrieved passages, a side-by-side comparison, facts to check for an attached case, the Regulation X notice, how many sentences were removed). Ask also that the passage carries its page and version, and the document name. (Day 6)
 
+- [ ] Agent screens: while a run is in progress, does `GET .../latest` answer 404 or a report with its agent runs? The screens wait out a 404 for 5 minutes, and show the steps if agent runs come back. (Day 7)
+- [ ] Agent runs: can each one carry a one-line summary in `output` (the screens read `output.summary`) and, when it fails, an `error` the person can read? (Day 7)
+- [ ] A condition the reviewer adds themselves: what is its `decision`? The mock marks it accepted (it is theirs); the real answer decides how the sign-off counts undecided ones. (Day 7)
+- [ ] Guideline references in the underwriting report: the seeded sample has none. Are they IDs, or objects with a summary? The screen takes both. Can a waterfall condition's passage ID be fetched with `GET /guidelines/passages/{id}`? (the ID has the form `sample-investor-a-v1.repayment-plan.1`) (Day 7)
+- [ ] Sign-offs and overrides name a user ID, not a person (`signed_by`, `override.by`, `decided_by`). Can they carry a name? (Day 7)
+- [ ] Can a waterfall override be cleared (it is `action: clear` for completeness)? The screen has no way to remove one. (Day 7)
+
 Housekeeping:
 - [ ] Add `npm test` to the CI frontend job (it runs typecheck, lint and build today).
 - [ ] Evidence links on the Income screen open the document's review screen. Make the review screen open on a given page and line (mine, small). (Day 4, Group 2)
@@ -595,3 +626,7 @@ Housekeeping:
 - [ ] The Completeness panel is built on the mock. After it reads the real answer, run Daniel's case and check it shows Incomplete with pay stubs 14 of 30 days and the 2024 W-2 and tax return missing, then Angela's with the August bank statement missing. (Day 4, Group 4)
 - [ ] The Assets and liabilities screen is built on the mock and on a sample of the real answer. Once real mode works, run Daniel's case and check documented assets 9,226.32, shortfall 27,273.68, obligations 693.00, front-end ratio 33.11%, DTI 44.70%, LTV 90.00%, and DTI 41.61% if overtime were counted. (Day 6)
 - [ ] The income screen is built on the mock. After it reads the real answer, run Daniel's case and check it shows 5,980.00 with the backend's working. That is the Day 4 "done when", met on the mock (the end-to-end test `income-flow.test.tsx` walks it). (Day 4, Group 6)
+- [ ] The Underwriting copilot is built on the mock. When Arindam's start and re-run endpoints exist, run Daniel's case and check: the report's DTI 44.70% and 41.61% if overtime is counted, eight findings (three significant), six suggested conditions, and that every evidence link opens something. (Day 7)
+- [ ] The Recommendation is built on the mock. Run Angela's case and check: foreclosure loss 16,310.00, modification expected cost 13,893.00, advantage 2,417.00, loan modification Met and the others Not met or Not reached, the missing August statement, and the 12 CFR 1024.41(b) point. Then override a condition and check the statuses recompute. (Day 7)
+- [ ] The demo's first run fails the Critic on purpose (`FAIL_CRITIC_FIRST_RUN` in `mocks/copilot.ts`). Turn it off before any demo where a failure would distract. (Day 7)
+- [ ] Port 3000: the dev server runs on 3000, and the compose `web` placeholder also binds 3000, so a plain `docker compose up` fails on that port. Until Abhay swaps the placeholder for our frontend, start only the real services: `docker compose up -d postgres redis api worker`.

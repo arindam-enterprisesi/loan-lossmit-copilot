@@ -2,7 +2,9 @@
 // to the real FastAPI backend (contracts/openapi.yaml) is a flag, not a rewrite.
 import { mockCases } from "@/mocks/data";
 import {
+  addConditionMock,
   adjustBudgetItemMock,
+  decideConditionMock,
   confirmProfileItemMock,
   getExtractionMock,
   getJobMock,
@@ -12,22 +14,28 @@ import {
   getGuidelinePassageMock,
   getLatestAssetsMock,
   getLatestIncomeMock,
+  getLatestLmMock,
+  getLatestUnderwritingMock,
   getLoanScenarioMock,
   listDocumentsMock,
   listGuidelineSourcesMock,
   overrideCompletenessItemMock,
+  overrideConditionMock,
   pageImageUrlMock,
   putLoanScenarioMock,
   reviewFieldMock,
   reviewObligationMock,
+  rerunCopilotAgentMock,
   reviewTransactionMock,
   runAssetsMock,
   runCompletenessMock,
+  runCopilotMock,
   runHardshipMock,
   runIncomeMock,
   sendGuidelineFeedbackMock,
   setDocumentTypeMock,
   setIncomeComponentMock,
+  signOffMock,
   uploadMock,
 } from "@/mocks/store";
 import { ApiError } from "./api-error";
@@ -48,6 +56,26 @@ import type {
   TransactionReview,
 } from "./assets-types";
 import type { ChecklistResult } from "./completeness";
+import type {
+  AgentName,
+  ConditionAddRequest,
+  ConditionDecisionRequest,
+  LmRecommendation,
+  OverrideRequest,
+  SignOffResult,
+  UnderwritingReport,
+} from "./copilot-types";
+import {
+  addBody,
+  decisionBody,
+  overrideBody,
+  toLmRecommendation,
+  toSignOffResult,
+  toUnderwritingReport,
+  type RealLmRecommendation,
+  type RealReportBundle,
+  type RealSignOffResult,
+} from "./copilot-real";
 import { cleanReason } from "./documents";
 import { componentRequest, toIncomeAnalysis, type RealIncomeAnalysis } from "./income-real";
 import { toGuidelinePassage, toGuidelineSource, type RealPassage, type RealSource } from "./guidelines-real";
@@ -479,6 +507,136 @@ export async function sendGuidelineFeedback(answerId: string, rating: FeedbackRa
     return;
   }
   await request<unknown>(`/guidelines/answers/${encodeURIComponent(answerId)}/feedback`, { method: "POST", body: JSON.stringify(body) });
+}
+
+// ---- Underwriting copilot and Loss Mitigation recommendation (Feature Design 6 and 8) ---------------------
+//
+// On `main` (backend/app/api/routers/underwriting.py and lm_recommendation.py), not yet in the contract:
+// reading the latest, deciding or adding a condition, overriding a waterfall condition, and signing off.
+// Starting a run and re-running one agent are Arindam's and are NOT on `main`, so a real backend without
+// them answers 404 or 405, which is turned into a plain message. Statuses and sections are translated in
+// copilot-real.ts.
+
+const agentsNotReady = (e: unknown, what: string): never => {
+  if (e instanceof ApiError && (e.status === 404 || e.status === 405)) {
+    throw new ApiError(e.status, `${what} is not available on this backend yet: the agents are still to come.`);
+  }
+  throw e;
+};
+
+/** POST /cases/{id}/underwriting-report: starts the Researcher, Writer and Critic. Poll getLatestUnderwritingReport for their progress. */
+export async function runUnderwritingReport(caseId: string): Promise<void> {
+  if (USE_MOCKS) return runCopilotMock("underwriting", caseId);
+  try {
+    await request<unknown>(`/cases/${caseId}/underwriting-report`, { method: "POST" });
+  } catch (e) {
+    agentsNotReady(e, "Starting the underwriting copilot");
+  }
+}
+
+/** GET /cases/{id}/underwriting-report/latest. Throws ApiError 404 before the first run. */
+export async function getLatestUnderwritingReport(caseId: string): Promise<UnderwritingReport> {
+  if (USE_MOCKS) return getLatestUnderwritingMock(caseId);
+  return toUnderwritingReport(await request<RealReportBundle>(`/cases/${caseId}/underwriting-report/latest`));
+}
+
+/** POST .../underwriting-report/latest/agents/{agent}/rerun: runs one agent again, alone. */
+export async function rerunUnderwritingAgent(caseId: string, agent: AgentName): Promise<void> {
+  if (USE_MOCKS) return rerunCopilotAgentMock("underwriting", caseId, agent);
+  try {
+    await request<unknown>(`/cases/${caseId}/underwriting-report/latest/agents/${agent}/rerun`, { method: "POST" });
+  } catch (e) {
+    agentsNotReady(e, "Re-running an agent");
+  }
+}
+
+/**
+ * PATCH .../underwriting-report/latest/conditions/{id}: accept, edit or reject a suggested condition. An edit
+ * needs the new text and a reason, a rejection needs a reason (422 otherwise). The agents' own text is kept
+ * beside the edit. Answers with the report as it now stands.
+ */
+export async function decideUnderwritingCondition(
+  caseId: string,
+  conditionId: string,
+  req: ConditionDecisionRequest,
+): Promise<UnderwritingReport> {
+  const body = decisionBody(req);
+  if (USE_MOCKS) return decideConditionMock(caseId, conditionId, body);
+  return toUnderwritingReport(
+    await request<RealReportBundle>(`/cases/${caseId}/underwriting-report/latest/conditions/${encodeURIComponent(conditionId)}`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    }),
+  );
+}
+
+/** POST .../underwriting-report/latest/conditions: the reviewer's own condition. Answers with the report as it now stands. */
+export async function addUnderwritingCondition(caseId: string, req: ConditionAddRequest): Promise<UnderwritingReport> {
+  const body = addBody(req);
+  if (USE_MOCKS) return addConditionMock(caseId, body);
+  return toUnderwritingReport(
+    await request<RealReportBundle>(`/cases/${caseId}/underwriting-report/latest/conditions`, { method: "POST", body: JSON.stringify(body) }),
+  );
+}
+
+/** POST .../underwriting-report/latest/sign-off: records that a person reviewed this version. It is not a decision. */
+export async function signOffUnderwriting(caseId: string, note?: string): Promise<SignOffResult> {
+  const body = note?.trim() ? { note: note.trim() } : {};
+  if (USE_MOCKS) return signOffMock("underwriting", caseId, note);
+  return toSignOffResult(
+    await request<RealSignOffResult>(`/cases/${caseId}/underwriting-report/latest/sign-off`, { method: "POST", body: JSON.stringify(body) }),
+  );
+}
+
+/** POST /cases/{id}/lm-recommendation: applies the investor's rules at once and starts the three agents. */
+export async function runLmRecommendation(caseId: string): Promise<void> {
+  if (USE_MOCKS) return runCopilotMock("lm", caseId);
+  try {
+    await request<unknown>(`/cases/${caseId}/lm-recommendation`, { method: "POST" });
+  } catch (e) {
+    agentsNotReady(e, "Starting the recommendation");
+  }
+}
+
+/** GET /cases/{id}/lm-recommendation/latest: the waterfall and lender view, and the report once the agents are done. 404 before the first run. */
+export async function getLatestLmRecommendation(caseId: string): Promise<LmRecommendation> {
+  if (USE_MOCKS) return getLatestLmMock(caseId);
+  return toLmRecommendation(await request<RealLmRecommendation>(`/cases/${caseId}/lm-recommendation/latest`));
+}
+
+/** POST .../lm-recommendation/latest/agents/{agent}/rerun: runs one agent again, alone. */
+export async function rerunLmAgent(caseId: string, agent: AgentName): Promise<void> {
+  if (USE_MOCKS) return rerunCopilotAgentMock("lm", caseId, agent);
+  try {
+    await request<unknown>(`/cases/${caseId}/lm-recommendation/latest/agents/${agent}/rerun`, { method: "POST" });
+  } catch (e) {
+    agentsNotReady(e, "Re-running an agent");
+  }
+}
+
+/**
+ * PUT .../lm-recommendation/latest/conditions/{id}/override: sets a condition's status, reason required (422).
+ * The rules' own status is kept beside it and every option's status is recomputed by the backend. Answers
+ * with the recommendation as it now stands.
+ */
+export async function overrideLmCondition(caseId: string, conditionId: string, req: OverrideRequest): Promise<LmRecommendation> {
+  const body = overrideBody(req);
+  if (USE_MOCKS) return overrideConditionMock(caseId, conditionId, body);
+  return toLmRecommendation(
+    await request<RealLmRecommendation>(`/cases/${caseId}/lm-recommendation/latest/conditions/${encodeURIComponent(conditionId)}/override`, {
+      method: "PUT",
+      body: JSON.stringify(body),
+    }),
+  );
+}
+
+/** POST .../lm-recommendation/latest/sign-off: records that a person reviewed this version. It is not a decision. */
+export async function signOffLm(caseId: string, note?: string): Promise<SignOffResult> {
+  const body = note?.trim() ? { note: note.trim() } : {};
+  if (USE_MOCKS) return signOffMock("lm", caseId, note);
+  return toSignOffResult(
+    await request<RealSignOffResult>(`/cases/${caseId}/lm-recommendation/latest/sign-off`, { method: "POST", body: JSON.stringify(body) }),
+  );
 }
 
 /** A page picture link. Real links are presigned and expire after a few minutes. */

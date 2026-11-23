@@ -39,7 +39,27 @@ import {
   seededScenario,
   type AssetRun,
 } from "./assets";
+import type {
+  ConditionAddRequest,
+  ConditionDecisionRequest,
+  LmRecommendation,
+  OverrideRequest,
+  SignOffResult,
+  UnderwritingReport,
+} from "@/lib/copilot-types";
 import { applyOverride, buildCompleteness } from "./completeness";
+import {
+  addCondition,
+  decideCondition,
+  overrideCondition,
+  recommendationAt,
+  rerunAgent,
+  signOff,
+  startRun,
+  underwritingAt,
+  type CopilotKind,
+  type CopilotRun,
+} from "./copilot";
 import { buildGuidelineAnswer, getMockPassage, mockSources, type AskInput } from "./guidelines";
 import { DANIEL_CASE_ID, mockDocuments } from "./data";
 import { applyBudgetAdjustment, applyConfirmation, buildAngelaHardship, hasHardshipSeed } from "./hardship";
@@ -92,6 +112,10 @@ interface StoreState {
   /** Every answer the guideline assistant gave, and the feedback on each. */
   guidelineAnswers: Map<string, GuidelineAnswer>;
   guidelineFeedback: Map<string, GuidelineFeedback>;
+  /** The latest agent run per feature and case ("underwriting:{case}" or "lm:{case}"), with what a reviewer did to it. */
+  copilot: Map<string, CopilotRun>;
+  /** Which of those have been run before: only the first run of a case has the demo's failed Critic. */
+  copilotRan: Set<string>;
   counter: number;
 }
 
@@ -113,6 +137,8 @@ function createState(): StoreState {
     assets: new Map(),
     guidelineAnswers: new Map(),
     guidelineFeedback: new Map(),
+    copilot: new Map(),
+    copilotRan: new Set(),
     counter: 0,
   };
 }
@@ -622,4 +648,62 @@ export function pageImageUrlMock(documentId: string, page: number): string | und
   // An uploaded pay stub shows the mock pay stub page, matching the reading it was given.
   const doc = state.documents.find((d) => d.id === documentId);
   return doc?.doc_type === "pay_stub" && page === 1 ? MOCK_PAGE_IMAGES[PAYSTUB_DOC_ID][1] : undefined;
+}
+
+// ---- The agent screens: Underwriting copilot and Loss Mitigation recommendation ---------------------
+
+const copilotKey = (kind: CopilotKind, caseId: string): string => `${kind}:${caseId}`;
+
+function copilotRun(kind: CopilotKind, caseId: string): CopilotRun {
+  const run = state.copilot.get(copilotKey(kind, caseId));
+  if (!run) throw new ApiError(404, "No run yet. Start the agents first.");
+  return run;
+}
+
+/** POST .../underwriting-report or .../lm-recommendation: starts the three agents. A new run replaces the earlier one. */
+export function runCopilotMock(kind: CopilotKind, caseId: string, now: number = Date.now()): void {
+  const key = copilotKey(kind, caseId);
+  state.copilot.set(key, startRun(kind, caseId, now, !state.copilotRan.has(key)));
+  state.copilotRan.add(key);
+}
+
+/** GET .../underwriting-report/latest: the agents' progress, and the report once they are done. 404 before the first run. */
+export function getLatestUnderwritingMock(caseId: string, now: number = Date.now()): UnderwritingReport {
+  return underwritingAt(copilotRun("underwriting", caseId), now);
+}
+
+/** GET .../lm-recommendation/latest: the waterfall and the lender view at once, the report when the agents are done. */
+export function getLatestLmMock(caseId: string, now: number = Date.now()): LmRecommendation {
+  return recommendationAt(copilotRun("lm", caseId), now);
+}
+
+/** POST .../latest/agents/{agent}/rerun: runs one agent again, alone. */
+export function rerunCopilotAgentMock(kind: CopilotKind, caseId: string, agent: string, now: number = Date.now()): void {
+  rerunAgent(copilotRun(kind, caseId), agent, now);
+}
+
+/** PATCH .../latest/conditions/{id}: accept, edit or reject. Returns the report as it stands. */
+export function decideConditionMock(caseId: string, id: string, req: ConditionDecisionRequest, now: number = Date.now()): UnderwritingReport {
+  const run = copilotRun("underwriting", caseId);
+  decideCondition(run, id, req, now);
+  return underwritingAt(run, now);
+}
+
+/** POST .../latest/conditions: the reviewer's own condition. */
+export function addConditionMock(caseId: string, req: ConditionAddRequest, now: number = Date.now()): UnderwritingReport {
+  const run = copilotRun("underwriting", caseId);
+  addCondition(run, req, now);
+  return underwritingAt(run, now);
+}
+
+/** PUT .../latest/conditions/{id}/override: the statuses are recomputed. Returns the recommendation as it stands. */
+export function overrideConditionMock(caseId: string, id: string, req: OverrideRequest, now: number = Date.now()): LmRecommendation {
+  const run = copilotRun("lm", caseId);
+  overrideCondition(run, id, req, now);
+  return recommendationAt(run, now);
+}
+
+/** POST .../latest/sign-off: records that a person reviewed this version. It is not a decision. */
+export function signOffMock(kind: CopilotKind, caseId: string, note?: string, now: number = Date.now()): SignOffResult {
+  return signOff(copilotRun(kind, caseId), note, now);
 }
