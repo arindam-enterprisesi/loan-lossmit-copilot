@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { PageHeader } from "@/components/layout/page-header";
-import { listCases } from "@/lib/api";
 import { findNavItem, pillarFromSlug } from "@/lib/nav";
+import { loadCases } from "@/lib/server-api";
 import { DocumentsWorkspace } from "./documents-workspace";
 import { ReviewWorkspace } from "./review-workspace";
 
@@ -17,7 +17,7 @@ export async function DocumentsScreen({ params, section }: { params: Params; sec
   const item = pillar ? findNavItem(pillar, section) : undefined;
   if (!pillar || !item) notFound();
 
-  const cases = await listCases(pillar);
+  const cases = await loadCases(pillar);
   return (
     <>
       <PageHeader

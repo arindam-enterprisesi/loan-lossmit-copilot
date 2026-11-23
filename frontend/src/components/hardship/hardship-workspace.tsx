@@ -102,7 +102,7 @@ export function HardshipWorkspace({ cases, pillarSlug }: HardshipWorkspaceProps)
     if (!caseId) return;
     setAssessment(await confirmProfileItem(caseId, { key, action: "correct", value, reason }));
   };
-  const onAdjust = async (itemId: string, amount: string, reason: string) => {
+  const onAdjust = async (itemId: string, amount: string | null, reason: string) => {
     if (!caseId) return;
     setAssessment(await adjustBudgetItem(caseId, itemId, { amount, reason }));
   };
@@ -200,6 +200,9 @@ export function HardshipWorkspace({ cases, pillarSlug }: HardshipWorkspaceProps)
             </TabsContent>
 
             <TabsContent value="budget" className="space-y-6 pt-4">
+              {assessment.budget_note ? (
+                <EmptyState title="Budget not worked out yet">{assessment.budget_note}</EmptyState>
+              ) : null}
               <section aria-labelledby="measures-heading" className="space-y-3">
                 <h3 id="measures-heading" className="text-base text-navy">
                   Measures

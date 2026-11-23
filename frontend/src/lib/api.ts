@@ -8,21 +8,49 @@ import {
   getJobMock,
   getLatestCompletenessMock,
   getLatestHardshipMock,
+  askGuidelineMock,
+  getGuidelinePassageMock,
+  getLatestAssetsMock,
   getLatestIncomeMock,
+  getLoanScenarioMock,
   listDocumentsMock,
+  listGuidelineSourcesMock,
   overrideCompletenessItemMock,
   pageImageUrlMock,
+  putLoanScenarioMock,
   reviewFieldMock,
+  reviewObligationMock,
+  reviewTransactionMock,
+  runAssetsMock,
   runCompletenessMock,
   runHardshipMock,
   runIncomeMock,
+  sendGuidelineFeedbackMock,
   setDocumentTypeMock,
   setIncomeComponentMock,
   uploadMock,
 } from "@/mocks/store";
 import { ApiError } from "./api-error";
+import {
+  obligationRequest,
+  scenarioRequest,
+  toAssetAnalysis,
+  toLoanScenario,
+  transactionRequest,
+  type RealAssetAnalysis,
+  type RealLoanScenario,
+} from "./assets-real";
+import type {
+  AssetAnalysis,
+  LoanScenario,
+  LoanScenarioInput,
+  ObligationReview,
+  TransactionReview,
+} from "./assets-types";
 import type { ChecklistResult } from "./completeness";
 import { cleanReason } from "./documents";
+import { toGuidelinePassage, toGuidelineSource, type RealPassage, type RealSource } from "./guidelines-real";
+import type { FeedbackRating, GuidelineAnswer, GuidelinePassage, GuidelineSource, SourceSet } from "./guidelines-types";
 import type { BudgetAdjustmentRequest, HardshipAssessment, ProfileConfirmation } from "./hardship-types";
 import {
   adjustmentRequest,
@@ -45,9 +73,23 @@ import type {
 export const USE_MOCKS = process.env.NEXT_PUBLIC_USE_MOCKS !== "false";
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
 
+/**
+ * Where a call goes. In the browser it goes to this app's own `/api/proxy`, which adds the access token
+ * from an httpOnly cookie and forwards it to the backend (see lib/proxy.ts), so no token is ever in a
+ * script and no cross-site call is made. On the Next server it goes straight to the backend.
+ */
+const baseUrl = () => (typeof window === "undefined" ? API_URL : "/api/proxy");
+
+/** What happens when the backend refuses the token. A separate object so a test can replace it. */
+export const sessionEnded = {
+  redirect: () => window.location.assign("/login?expired=1"),
+};
+
 async function rawRequest(path: string, init?: RequestInit): Promise<Response> {
-  const res = await fetch(`${API_URL}${path}`, { cache: "no-store", ...init });
+  const res = await fetch(`${baseUrl()}${path}`, { cache: "no-store", ...init });
   if (!res.ok) {
+    // The token ended or was refused: go to the sign-in page, which says the session ended.
+    if (res.status === 401 && typeof window !== "undefined") sessionEnded.redirect();
     let message = `API ${res.status} on ${path}`;
     try {
       const body = (await res.json()) as { message?: string };
@@ -280,7 +322,8 @@ export async function confirmProfileItem(
 
 /**
  * PATCH /cases/{id}/hardship-assessment/latest/budget/{line_id}: set how much of an expense counts
- * each month, with a required reason (ApiError 422 without one). Never calls the AI. Returns the whole
+ * each month, with a required reason (ApiError 422 without one), or clears an earlier adjustment when the
+ * amount is null. Never calls the AI. Returns the whole
  * recalculated assessment, so every measure updates at once. The mock keeps the earlier proposed path
  * (`budget-items`); the real backend's path and body (`adjusted_amount`) are used in real mode.
  */
@@ -289,7 +332,7 @@ export async function adjustBudgetItem(
   itemId: string,
   adjustment: BudgetAdjustmentRequest,
 ): Promise<HardshipAssessment> {
-  const clean = { amount: adjustment.amount.trim(), reason: adjustment.reason.trim() };
+  const clean = { amount: adjustment.amount === null ? null : adjustment.amount.trim(), reason: adjustment.reason.trim() };
   if (USE_MOCKS) return adjustBudgetItemMock(caseId, itemId, clean);
   return toHardshipAssessment(
     await request<RealHardshipAssessment>(`/cases/${caseId}/hardship-assessment/latest/budget/${itemId}`, {
@@ -298,6 +341,134 @@ export async function adjustBudgetItem(
     }),
     caseId,
   );
+}
+
+/**
+ * GET /cases/{id}/loan-scenario: the sample loan entered for a case. Throws ApiError 404 when none has
+ * been entered. Not in contracts/openapi.yaml yet (Feature Design 3.7); the real answer is translated.
+ */
+export async function getLoanScenario(caseId: string): Promise<LoanScenario> {
+  if (USE_MOCKS) return getLoanScenarioMock(caseId);
+  return toLoanScenario(await request<RealLoanScenario>(`/cases/${caseId}/loan-scenario`));
+}
+
+/**
+ * PUT /cases/{id}/loan-scenario: enter the sample loan by hand, or replace it. Amounts are text. Throws
+ * ApiError 422 when a value is not acceptable (a property value of zero, an amount with three decimals).
+ */
+export async function putLoanScenario(caseId: string, input: LoanScenarioInput): Promise<LoanScenario> {
+  const clean = scenarioRequest({
+    purpose: input.purpose.trim(),
+    occupancy: input.occupancy.trim(),
+    property_value: input.property_value.trim(),
+    loan_amount: input.loan_amount.trim(),
+    proposed_housing_payment: input.proposed_housing_payment.trim(),
+    funds_to_close: input.funds_to_close.trim(),
+  });
+  if (USE_MOCKS) return putLoanScenarioMock(caseId, clean);
+  return toLoanScenario(
+    await request<RealLoanScenario>(`/cases/${caseId}/loan-scenario`, { method: "PUT", body: JSON.stringify(clean) }),
+  );
+}
+
+/**
+ * POST /cases/{id}/asset-liability: queues a run and returns its job to poll with getJob. The real
+ * backend answers `{ job, analysis_id }`, so the job is taken out of it. Needs the loan scenario first.
+ */
+export async function runAssetAnalysis(caseId: string): Promise<Job> {
+  if (USE_MOCKS) return runAssetsMock(caseId);
+  return (await request<{ job: Job }>(`/cases/${caseId}/asset-liability`, { method: "POST" })).job;
+}
+
+/** GET /cases/{id}/asset-liability/latest. Throws ApiError 404 before the first run. */
+export async function getLatestAssetAnalysis(caseId: string): Promise<AssetAnalysis> {
+  if (USE_MOCKS) return getLatestAssetsMock(caseId);
+  return toAssetAnalysis(await request<RealAssetAnalysis>(`/cases/${caseId}/asset-liability/latest`), caseId);
+}
+
+/**
+ * PATCH /cases/{id}/asset-liability/latest/transactions/{id}: give a line another category, or mark a
+ * deposit as sourced, with a required reason (ApiError 422 without one). Returns the whole recalculated
+ * analysis, so every figure updates at once. What the system chose is kept beside the change.
+ */
+export async function reviewTransaction(
+  caseId: string,
+  transactionId: string,
+  review: TransactionReview,
+): Promise<AssetAnalysis> {
+  const clean: TransactionReview = { ...review, reason: review.reason.trim() };
+  if (USE_MOCKS) return reviewTransactionMock(caseId, transactionId, clean);
+  return toAssetAnalysis(
+    await request<RealAssetAnalysis>(`/cases/${caseId}/asset-liability/latest/transactions/${transactionId}`, {
+      method: "PATCH",
+      body: JSON.stringify(transactionRequest(clean)),
+    }),
+    caseId,
+  );
+}
+
+/**
+ * PATCH /cases/{id}/asset-liability/latest/obligations/{id}: count a debt toward the DTI or leave it
+ * out, with a required reason. Returns the whole recalculated analysis; the ratios update at once.
+ */
+export async function reviewObligation(
+  caseId: string,
+  obligationId: string,
+  review: ObligationReview,
+): Promise<AssetAnalysis> {
+  const clean = obligationRequest({ counts_toward_dti: review.counts_toward_dti, reason: review.reason.trim() });
+  if (USE_MOCKS) return reviewObligationMock(caseId, obligationId, clean);
+  return toAssetAnalysis(
+    await request<RealAssetAnalysis>(`/cases/${caseId}/asset-liability/latest/obligations/${obligationId}`, {
+      method: "PATCH",
+      body: JSON.stringify(clean),
+    }),
+    caseId,
+  );
+}
+
+/** GET /guidelines/sources: the loaded sources with their labels. On `main` (read only). */
+export async function listGuidelineSources(): Promise<GuidelineSource[]> {
+  if (USE_MOCKS) return listGuidelineSourcesMock();
+  return (await request<{ items: RealSource[] }>("/guidelines/sources")).items.map(toGuidelineSource);
+}
+
+/** GET /guidelines/passages/{id}: one passage by the ID an answer or a finding cites. Throws ApiError 404 for an unknown ID. */
+export async function getGuidelinePassage(passageId: string): Promise<GuidelinePassage> {
+  if (USE_MOCKS) return getGuidelinePassageMock(passageId);
+  return toGuidelinePassage(await request<RealPassage>(`/guidelines/passages/${encodeURIComponent(passageId)}`));
+}
+
+/**
+ * POST /guidelines/ask: a question, the source set and, optionally, a case whose facts are attached.
+ * Answers with the cited answer at once (no job). The endpoint is Arindam's and is not on `main` yet,
+ * so the answer's shape is our proposal (see guidelines-types.ts), and a real backend without it
+ * answers 404 or 405, which is turned into a plain message.
+ */
+export async function askGuideline(question: string, sourceSet: SourceSet, caseId: string | null): Promise<GuidelineAnswer> {
+  const clean = { question: question.trim(), source_set: sourceSet, case_id: caseId };
+  if (USE_MOCKS) return askGuidelineMock(clean);
+  try {
+    return await request<GuidelineAnswer>("/guidelines/ask", { method: "POST", body: JSON.stringify(clean) });
+  } catch (e) {
+    if (e instanceof ApiError && (e.status === 404 || e.status === 405)) {
+      throw new ApiError(e.status, "The guideline assistant is not available on this backend yet: the question endpoint is still to come.");
+    }
+    throw e;
+  }
+}
+
+/**
+ * POST /guidelines/answers/{id}/feedback: helpful, not helpful or wrongly cited, with an optional note.
+ * Proposal, not on `main`. Throws ApiError 404 for an unknown answer.
+ */
+export async function sendGuidelineFeedback(answerId: string, rating: FeedbackRating, note?: string): Promise<void> {
+  const body = { rating, ...(note?.trim() ? { note: note.trim() } : {}) };
+  if (USE_MOCKS) {
+    sendGuidelineFeedbackMock(answerId, body);
+    return;
+  }
+  await request<unknown>(`/guidelines/answers/${encodeURIComponent(answerId)}/feedback`, { method: "POST", body: JSON.stringify(body) });
 }
 
 /** A page picture link. Real links are presigned and expire after a few minutes. */

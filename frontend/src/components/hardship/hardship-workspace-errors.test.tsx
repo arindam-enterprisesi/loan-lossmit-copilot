@@ -48,6 +48,27 @@ describe("HardshipWorkspace while loading", () => {
   });
 });
 
+describe("HardshipWorkspace when the budget has not been worked out yet (real backend)", () => {
+  it("says so on the Budget tab, in the backend's words, instead of showing empty tables as if they were results", async () => {
+    const note = "The budget has not been computed for this reading yet.";
+    latest.mockResolvedValue({ ...buildAngelaHardship("2026-11-20T09:00:00.000Z"), budget_note: note });
+    renderScreen();
+    await screen.findByRole("heading", { name: "Hardship profile" });
+    fireEvent.click(screen.getByRole("tab", { name: "Budget" }));
+    expect(await screen.findByText("Budget not worked out yet")).toBeInTheDocument();
+    expect(screen.getByText(note)).toBeInTheDocument();
+  });
+
+  it("shows no such note when there is none", async () => {
+    latest.mockResolvedValue(buildAngelaHardship("2026-11-20T09:00:00.000Z"));
+    renderScreen();
+    await screen.findByRole("heading", { name: "Hardship profile" });
+    fireEvent.click(screen.getByRole("tab", { name: "Budget" }));
+    await screen.findByRole("heading", { name: "Measures" });
+    expect(screen.queryByText("Budget not worked out yet")).not.toBeInTheDocument();
+  });
+});
+
 describe("HardshipWorkspace when something goes wrong", () => {
   it("treats a 404 before the first run as normal, not as an error", async () => {
     latest.mockRejectedValue(new ApiError(404, "No assessment yet"));

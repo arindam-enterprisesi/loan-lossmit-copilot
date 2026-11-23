@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { PageHeader } from "@/components/layout/page-header";
-import { listCases } from "@/lib/api";
 import { findNavItem, pillarFromSlug } from "@/lib/nav";
+import { loadCases } from "@/lib/server-api";
 import { HardshipWorkspace } from "./hardship-workspace";
 
 /** Server shell for the "Hardship and budget" menu item. Only the Loss Mitigation pillar has it. */
@@ -11,7 +11,7 @@ export async function HardshipScreen({ params }: { params: Promise<{ pillar: str
   const item = pillar ? findNavItem(pillar, "hardship-budget") : undefined;
   if (!pillar || !item) notFound();
 
-  const cases = await listCases(pillar);
+  const cases = await loadCases(pillar);
   return (
     <>
       <PageHeader

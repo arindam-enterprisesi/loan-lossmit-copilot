@@ -396,21 +396,146 @@ Open:
 - Real mode still needs a login screen and CORS before anything can run against the real backend. The hardship translation is tested on a sample written from the schema, not on a real answer.
 - Only the Hardship tab's letter is partial in real mode, until the backend can return the letter's text.
 
+## Real mode groundwork: sign-in (Mon 23 Nov 2026, after Day 5)
+In one line: the app can now sign in to the real backend and talk to it safely, and nothing changes while the demo data is on.
+
+Why now: PRs #11 and #12 merged, so the backend has CORS, the hardship endpoints and the page-image endpoint. The one thing left that was mine was sign-in. Before building it I found a problem: five of the pages load cases on the server, and the server cannot see a token that lives in the browser. So the sign-in had to be designed, not just drawn.
+
+How it works (only when `NEXT_PUBLIC_USE_MOCKS=false`):
+1. **Sign-in page** at `/login`: username and password. Three buttons fill in the demo usernames (`underwriter`, `lm_specialist`, `admin`). The password is never filled in and never kept in the code: for the demo users it is the `DEMO_PASSWORD` in the backend's `.env`.
+2. **The token never reaches the browser's scripts.** Signing in goes through this app (`/api/session/login`), which calls the backend, then keeps the token in an **httpOnly cookie**. A second, readable cookie holds only the name and role, so the screens can say who is signed in. It grants nothing: the backend checks the token on every call.
+3. **A proxy** (`/api/proxy/...`) takes every call from the browser, adds the token and forwards it to the backend. So the browser only talks to this app. That also means no CORS is needed at all, and the port the frontend runs on (3000 or 3100) does not matter.
+4. **Server pages** read the cookie themselves (`lib/server-api.ts`) and send the token. A page with no token goes to sign-in; a refused token goes to sign-in with "Your session ended".
+5. **Middleware** (`src/middleware.ts`): with no token, a page redirects to `/login` (remembering where you were going) and an API call answers 401.
+6. **Roles.** The backend shows an underwriter only Loan Processing cases and a loss mitigation specialist only Loss Mitigation cases (an administrator sees both, but cannot confirm or adjust hardship items). So the sidebar shows only the copilots your role can use, hides the switcher when there is nothing to switch to, shows your name and role, and has **Sign out**. Opening the other pillar's address sends you back to your own.
+7. If the backend is not running: sign-in says "The server could not be reached. Is the backend running?", and a page shows a "This page could not load" panel with Try again.
+
+Safety choices:
+- The proxy forwards only to the configured backend address, and only for paths made of plain pieces (no `..`, no slashes). A call that changes something must come from this app's own address, so another site cannot use someone's cookie.
+- The `next` address on the sign-in page must start with a single `/`, so the page cannot send anyone to another site.
+- The password is passed straight on. It is not stored, logged, or put in any answer or cookie (a test checks this).
+- Cookies end when the token does, and are `Secure` when the app is served over https.
+
+Other changes:
+- The case reference (LP-0001, LM-0001) now comes from the backend (`case_ref`); the mock's is the fallback. I regenerated the API types from the contract, which already had `case_ref`.
+- `.env.example`: new `API_URL` (server only). `NEXT_PUBLIC_API_URL` still works.
+
+Tests: 538 to 630. New tests cover the role and `next` rules, sign-in and sign-out (cookie flags, errors, nothing leaking), the proxy (token added, no browser cookies forwarded, bodies and uploads unchanged, cross-site blocked, bad paths refused, 401 clears the session, backend down), the middleware, the server loaders, the sign-in form, the sidebar and Sign out, the page error screen, and the browser going through the proxy.
+
+Checked: type check, lint, 630 tests, the production build, and the wording scan all pass. I also ran the whole flow in a running app against a small fake backend: signed out is redirected, wrong password refused, sign-in sets the cookies (the token one is HttpOnly), the dashboard shows the real case reference and the name, an underwriter is sent out of Loss Mitigation, the proxy adds the token, a cross-site call is refused, sign-out works, and a dead backend gives the clear message. I have not run it against the real backend yet (that needs Docker).
+
+How to run it against the real backend (when ready):
+1. In the repo root: `cp .env.example .env`, add the keys, `docker compose up`, then `docker compose exec api alembic upgrade head` and `docker compose exec api python -m app.db.seed`.
+2. In `frontend/`, make `.env.local` with `NEXT_PUBLIC_USE_MOCKS=false` (the backend address defaults to `http://localhost:8000/api/v1`). Restart `npm run dev`: this setting is read when the app starts.
+3. Open the app, sign in as `underwriter` (Daniel) or `lm_specialist` (Angela).
+
+Open:
+- Income and completeness still read my mock shapes, so they will not show real data until the translation files are written. That is next.
+- Page images are not connected: the review viewer shows a blank page in real mode.
+- The Budget tab does not show the backend's "budget not computed yet" note.
+- A refused token on a server page sends the person to sign-in, but cannot clear the old cookie (a page cannot change cookies while rendering). The sign-in page therefore does not bounce back when it is told the session ended, so there is no loop.
+
+## Day 6 (Mon 23 Nov 2026 in the team plan): assets and liabilities, the Budget tab, guideline assistant design
+Goal from the brief: build Assets and liabilities (loan scenario form, summary strip with working, per-account transactions with reclassify and mark-sourced, obligations with include or exclude and a reason, ratios that update at once) and finish the Budget tab of Hardship and budget against the real endpoints. Done when: Daniel's DTI shows 44.70% with working in the browser.
+
+Two notes up front:
+- The **Claude Design prompt for the guideline assistant** is mine to handle, as agreed on Day 4: I design the screen and build it in code (Group 3). I skipped it at first by mistake, because I took it for something to hand to a design tool, and fixed that the same day.
+- The **sign-in work** from earlier today (see "Real mode groundwork" above) is in the same PR as this day.
+
+### Group 1: the Assets and liabilities screen
+In one line: a new screen under Loan Processing, "Assets and liabilities", live in the menu. Daniel's DTI shows **44.70%** with its working.
+
+What it shows, top to bottom:
+1. **Case picker and Run analysis** (it becomes Run again), with the same progress bar as the other analyses (stages: reading, labelling the bank transactions, calculating, checks).
+2. **Loan scenario form**: loan purpose, occupancy, property value, loan amount, proposed monthly housing payment, funds needed to close. Save scenario. Daniel's sample loan from the scenario file is already saved, as the demo seed would leave it. The same rules the backend applies are checked as you type (a property value above zero, amounts with up to two decimals), and the backend still has the last word.
+3. **Summary strip**: Documented assets **9,226.32**; Funds to close **36,500.00** with the **27,273.68** shortfall under it; Front-end ratio **33.11%**; DTI **44.70%** (with an "Above the review level" chip); LTV **90.00%**. Every one says "candidate - for underwriter review" and has **Show working** with links to where each input came from. Under the strip, "Other figures, to test": **DTI if overtime were counted 41.61%**, marked as a decision for a person.
+4. **Flags**: the large 2,000.00 deposit from Patricia Owens, the 27,273.68 shortfall, and DTI above the 43% review level, each with the backend's sentence and a link to the statement line.
+5. **Obligations**: six debts with payment, balance and where each was found (bank, credit report or both). The five that count add up to **693.00**. The rent is left out (current rent on a purchase of a primary residence). Each has **Include** or **Exclude**, with a required reason.
+6. **Transactions**: the 30 lines of the September statement on the account ending 6032, each with a category chip and flags ("Matches pay stub" on both 2,033.61 paychecks, "Large deposit" on the 2,000.00 transfer). **Reclassify** any line (14 categories) or **Mark sourced** on a deposit, each with a required reason. A filter shows only lines that need a look.
+
+How the changes behave:
+- **Exclude the student loan** (110.00) and everything updates at once: obligations 583.00, DTI **42.86%**, the "above the review level" chip and flag go away. Include the rent and DTI becomes 68.53% and the flag returns. Both can be reversed.
+- **Mark the deposit as sourced** and its flag shows "Resolved" with the note on the line. No ratio changes: the underwriter still decides.
+- A reclassified line keeps what the system chose ("The system said: Other"), and who changed it, when and why (rule 6).
+- If the loan scenario is saved after a run, a note says the figures use the earlier one: press Run again.
+
+Decisions:
+- **The screen never calculates.** Money and ratios are shown by adding separators to the backend's text. The mock stands in for the backend and does what it does after a change: re-adds the counted obligations and works the ratios out again, in whole cents, no AI (Feature Design 3.4 step 9). Daniel's numbers are the ones in the scenario file and Feature Design 3.8.
+- **A percentage comes from the backend's own working text** ("... = 44.70%"). The real backend sends ratios as six-place decimals ("0.446990"), and the screen never multiplies them.
+- The mock reads Daniel's candidate income (5,980.00) from his income analysis if one has been run, and uses the figure in the scenario file if not, so the demo works in any order. The real backend may leave the ratios empty without an income analysis.
+- Wording: every figure is a "candidate - for underwriter review", and nothing says approve, deny, offer or eligible.
+
+What I did:
+1. `lib/assets-types.ts` and `lib/assets.ts` (the shapes and display helpers).
+2. `mocks/assets.ts` and the store (a new job kind, the saved scenario, the latest analysis, and the review actions).
+3. `lib/assets-real.ts` translates **Abhay's real answer** (`backend/app/api/schemas/assets.py`, on `main` since #12) into those shapes, and `api.ts` has the real paths and bodies (PUT and GET `.../loan-scenario`, POST `.../asset-liability`, GET `.../latest`, PATCH `.../latest/transactions/{id}` with a category or `sourced`, PATCH `.../latest/obligations/{id}`). The helpers shared with the hardship translation moved to `lib/calc-real.ts`.
+4. `components/assets/`: `assets-workspace.tsx`, `loan-scenario-form.tsx`, `asset-summary.tsx`, `asset-flags.tsx`, `transactions-table.tsx`, `obligations-table.tsx`, `assets-screen.tsx`, and the route `src/app/[pillar]/assets-liabilities/page.tsx`. Menu item turned on; Loss Mitigation has no such screen (404).
+
+Real-answer notes (what the translation does about differences):
+- A debit comes without a sign: the screen shows money out with a minus sign, as a bank statement does. Only a sign is added.
+- Flags are attached to the line their evidence points at.
+- Only the "DTI with <component> counted" figures are shown beside the headline ones.
+- The reviewer shows as the backend's user id until it sends a name.
+
+### Group 2: the Budget tab of Hardship and budget
+In one line: the Budget tab already existed (Days 4 and 5, with adjust-item-with-reason on the real paths). Two real-backend gaps are now closed.
+- **Clear adjustment.** An adjusted line has a **Clear adjustment** button, with a required reason. The amount the documents showed counts again and the surplus, the flags and the spending check follow. The real backend does this with `adjusted_amount: null`.
+- **"Budget not worked out yet".** The real backend can answer with an empty budget and a note ("The budget has not been computed for this reading yet."). The Budget tab now shows that note in a panel instead of empty tables.
+
+### Group 3: the Guideline assistant (design and build)
+In one line: a chat-style screen, "Guideline assistant", that answers only from the loaded guides and regulation, with a numbered citation on every sentence. It is in the menu of both pillars.
+
+What I designed, from the Claude Design brief and Feature Design 5.2:
+1. **Source-set picker**: Guidelines, Regulation X or All, as a segmented control (arrow keys move between them). One is always chosen. Loss Mitigation starts on Regulation X, Loan Processing on All.
+2. **Attach case** switch, off by default. On, it shows a case picker and sends the case with the question.
+3. **Chat panel**: your question as a bubble, then an answer card. The answer is short sentences, each ending in numbered markers (1, 2). A marker opens a **side panel** with the passage, its **document, section, page, version**, and an **Authoritative** or **Illustrative** label.
+4. **Sources differ, side by side**: where an agency guide and a lender overlay say different things (for example, how long the overtime history must be: two years at Fannie Mae, one year at Freddie Mac, two years plus an employer letter at the overlay), the passages sit in columns, each with its marker and label. Nothing says which one wins.
+5. **"No supporting passage found"**: a clear state with no sentences and no guess, when no loaded source answers the question or the chosen source set does not include it.
+6. **Regulation X notice**: "Not legal advice; confirm with your compliance team." on every Regulation X answer, including one that finds nothing.
+7. **Feedback** on each answer: Helpful, Not helpful, Wrongly cited. The latest choice stands and is shown as chosen.
+8. **Facts to check**: with a case attached, the answer lists facts to look at (for Angela: the date the application was received, the missing August bank statement, whether the acknowledgement was sent). It says plainly that these are not a conclusion about the borrower or the servicer.
+9. A note when the engine **removed a sentence** because its citation did not check out, and a guard: an answer whose citations do not check out is not shown at all.
+10. Example questions before the first one, Enter to send and Shift+Enter for a new line, a "Looking for passages" placeholder while waiting, and **Try again** if a question or a rating fails.
+
+Decisions:
+- **There is no real engine to ask yet.** The backend on `main` has only the read side (`GET /guidelines/sources` and `GET /guidelines/passages/{id}`). The ask endpoint is Arindam's. So the answer's shape and the feedback call are my proposal to him (`src/lib/guidelines-types.ts`), and a real backend without the ask endpoint gets a plain message ("not available on this backend yet") instead of a raw 404.
+- **The mock stands in for the engine** (`mocks/guidelines.ts`). It matches a question to four topics by keywords (overtime, the lender overlay, large deposits, and the Regulation X acknowledgement) and builds each answer from seven passages I wrote for the demo. **Each passage says so in a notice** ("Mock excerpt written for the demo, not the publisher's text"), even where its source is labelled authoritative, which is how the real, loaded sources will be labelled. It does no retrieval and no reasoning. Anything else gets "No supporting passage found".
+- The real passage has no page or version yet, so the panel shows them as "Not given" until it does.
+- **Loss Mitigation's menu now has a Guideline assistant item**, which the PRD menu did not. Feature Design 5.1 lists the loss mitigation specialist as a user and the Regulation X example is Angela's case. It is one line in `lib/nav.ts` if you would rather not have it.
+- Wording: nothing says a borrower meets a requirement or a servicer complied; the screen lists provisions and facts to check.
+
+What I did: `lib/guidelines-types.ts`, `lib/guidelines.ts` (labels, the checks on an answer, the Regulation X notice), `lib/guidelines-real.ts` (reads the real sources and passages), the four calls in `lib/api.ts`, `mocks/guidelines.ts` and the store, and `components/guidelines/` (`guideline-workspace.tsx`, `source-set-picker.tsx`, `attach-case.tsx`, `answer-card.tsx`, `citation-marker.tsx`, `source-comparison.tsx`, `passage-panel.tsx`, `feedback-bar.tsx`, `guideline-screen.tsx`), and the route `src/app/[pillar]/guideline-assistant/page.tsx`.
+
+### Group 4: tests and checks
+Tests: 630 to 917. New tests cover: Daniel's mock figures against the spec (9,226.32, 27,273.68, 693.00, 33.11%, 44.70%, 90.00%, 41.61%); the obligation and transaction changes and their rules (reasons, the 422 and 404 answers, only a deposit can be sourced); the scenario rules; the translation of the real answer from a sample written from the schema; the real paths and bodies; the form, the strip, the flags and both tables; the whole screen on the mock (including Daniel's DTI of 44.70% with working, excluding the student loan, a full run on the real clock) and every failure (a 404 is normal, a load error, a start error, a failed job, a refused save, a refused decision) with Try again; and clearing a budget adjustment and the budget note. While writing the form tests I found that an error message inside a label changed the box's accessible name, so the messages now sit beside the label and are linked to the box.
+
+The guideline assistant's tests cover: the mock engine (each topic and its citations, side by side, the removed sentence, Regulation X and its notice, facts to check for each case, "no supporting passage", the source set limiting an answer, the 422 answers, feedback); the checks on an answer; the translation of the real sources and passages and the real paths; the picker, the switch, the answer card, the side-by-side columns, the passage panel (carried, read by ID, loading, failing and retrying) and the feedback bar; and the whole chat (asking, Enter and Shift+Enter, attaching a case, opening a citation, feedback, waiting, a failed question and a failed rating with Try again).
+
+Checked: type check, lint and all 917 tests pass; the production build passes (dev server stopped first, then restarted clean); the banned-wording scan is clean; `/underwriting/assets-liabilities` loads and `/loss-mitigation/assets-liabilities` is a 404; `/underwriting/guideline-assistant` and `/loss-mitigation/guideline-assistant` load. I have not looked at either screen in a browser: please open http://localhost:3100/underwriting/assets-liabilities (Run analysis, then Show working on DTI) and http://localhost:3100/underwriting/guideline-assistant (click an example question, then a numbered citation).
+
+Open:
+- Real answer not yet tried against a running backend. Accounts: the real answer has no account balances list, so the transactions are grouped by the last four digits and the balances are only in the documented-assets working.
+- Whether the real run needs an income analysis first (the backend flags AL-I101 and leaves the ratios empty without one) is not tested.
+- The assistant is not tried against a real engine: the ask endpoint does not exist yet.
+- Income and completeness still read my mock shapes (next).
+
 ## Going live checklist (real backend instead of mocks)
 Everything runs on mocks today. Flipping `NEXT_PUBLIC_USE_MOCKS=false` needs the items below. I update this list after every group or day, and tick items when the other side delivers them.
 
 Needed before real mode works at all:
-- [ ] Login screen and token handling. The backend has `/auth/login` (seeded users `underwriter` and `lm_specialist`), but the frontend has no sign-in page, so no request carries a token yet. Mine to build next.
-- [x] CORS on the backend, so the browser on port 3000 may call the API on port 8000. On `main` since #12 (23 Nov). It reads its allowed origins from the backend settings, so the frontend's address (port 3000) has to be in that list when the backend runs.
+- [x] Login screen and token handling: built (23 Nov), with the token in an httpOnly cookie and a same-origin proxy. Tested against a fake backend; not yet against the real one, which needs Docker (see the entry above for the steps).
+- [ ] Run the backend locally with Docker, with the keys: S3 bucket and AWS credentials for uploads, and an LLM provider key for reading documents, the hardship letter and income explanations. Ask Abhay for the quickest keyless path. He is on leave 25 and 26 Nov, so ask before then.
+- [x] CORS on the backend: on `main` since #12 (23 Nov). Not needed by the frontend any more, because the browser calls this app's own proxy, not the backend. (Its default allowed address is port 3000, which would matter only for a direct call.)
 - [x] Document, income and completeness endpoints on `main`: merged in #10 on 23 Nov. Still to do on my side: check my Day 2 and 3 screens against the real document answers once login and CORS exist.
 - [x] Hardship endpoints on `main`: merged in #12 (23 Nov). The frontend reads them through `hardship-real.ts`; not yet tried against a running backend.
 
 Real shapes on `main` that my screens do not read yet (from Abhay's #10, found 23 Nov). Each needs a translation file like `hardship-real.ts`:
+- [x] Asset and liability analysis: translated (`assets-real.ts`, Day 6) from the real shapes on `main`, with the real paths. Tested on a sample written from the schema, not on a real answer.
 - [ ] Income analysis. Paths: `POST /cases/{id}/income-analysis` (answers `{ job, analysis_id }`), `GET .../latest`, `PATCH .../latest/components/{component_id}` with `{ included, reason }` (component ids are UUIDs). Mine are `/income/analysis...`. The answer differs: `ytd` and `monthly` are plain text, each component's working is one text string inside `calculation`, an override is `{ included, reason, by, at }` beside `system_included`, flags carry `refs`, and there is a `candidate_label`. The AI explanations are empty ("explanations not generated") until `income-explain@1` is wired in, so the flag cards need an honest empty state for them. (Day 4, Groups 1 to 3)
 - [ ] Completeness override. The real one is `PATCH /cases/{id}/completeness/latest/items/{item_id}` with `{ action: "override" | "clear", reason }`. Mine is `.../items/{item_id}` with `{ reason }`. An overridden item comes as status `overridden` with `override_reason`, but with no who and when, which the project's rule on corrections needs. "Needs review" arrives as `partial` with a "Needs review:" prefix. The Loss Mitigation checklist id is `pillar2-hardship@1` (done). (Day 4, Group 4)
 
 Contract gaps (Arindam owns `contracts/`; I only ask):
-- [ ] Income, completeness override and hardship endpoints are in Abhay's code and in `docs/contract-proposal-d4.md`, but not in `contracts/openapi.yaml`. Ask Arindam to add them, so the contract and not only the code says what they are. (Day 4)
+- [ ] Income, completeness override, hardship and asset and liability endpoints are in Abhay's code and in `docs/contract-proposal-d4.md`, but not in `contracts/openapi.yaml`. Ask Arindam to add them, so the contract and not only the code says what they are. (Day 4)
 - [ ] Page image endpoint: now on `main` (#12) as `GET /documents/{id}/pages/{page}` (`getPageImage`). I have not connected it yet: `getPageImage` in `api.ts` still answers "none" in real mode. (Day 3)
 
 Questions for Abhay and Arindam:
@@ -427,9 +552,13 @@ Questions for Abhay and Arindam:
 - [x] Hardship: the stated-against-observed tolerance. It is in `thresholds.yaml` (`stated_vs_observed_tolerance`) and the backend sets the flags. (Day 5)
 - [x] Completeness: the Loss Mitigation checklist id is `pillar2-hardship@1`. (Day 5)
 
+- [ ] Asset and liability answer: does a run need an income analysis first (the screen's mock does not), and can the answer list each account with its documented balance? Today the transactions are grouped by the last four digits and the balances are only in the working. And can `change.by` be a name and not a user id? (Day 6)
+- [ ] Guideline assistant: built on a mock (Day 6). The backend has the read side on `main` (sources, passages), which the screen reads. Ask Arindam for `POST /guidelines/ask` (question, source set, optional case) and `POST /guidelines/answers/{id}/feedback`; the answer shape I propose is in `src/lib/guidelines-types.ts` (sentences with citation markers, the retrieved passages, a side-by-side comparison, facts to check for an attached case, the Regulation X notice, how many sentences were removed). Ask also that the passage carries its page and version, and the document name. (Day 6)
+
 Housekeeping:
 - [ ] Add `npm test` to the CI frontend job (it runs typecheck, lint and build today).
 - [ ] Evidence links on the Income screen open the document's review screen. Make the review screen open on a given page and line (mine, small). (Day 4, Group 2)
 - [ ] The Hardship and budget screen is built on the mock and on a sample of the real answer. Once the endpoints, login and CORS exist, flip `NEXT_PUBLIC_USE_MOCKS=false`, run Angela's case, and check the profile (reduction in income, July 2026, unknown, keep), the 40 to 30 hours against a 25.00% pay drop, surplus -70.00 stated and -280.00 observed, housing ratio 40.95% from 30.71%, arrears 5,160.00 and liquid assets 640.25 = 12.41%. (Day 4 and 5)
 - [ ] The Completeness panel is built on the mock. After it reads the real answer, run Daniel's case and check it shows Incomplete with pay stubs 14 of 30 days and the 2024 W-2 and tax return missing, then Angela's with the August bank statement missing. (Day 4, Group 4)
+- [ ] The Assets and liabilities screen is built on the mock and on a sample of the real answer. Once real mode works, run Daniel's case and check documented assets 9,226.32, shortfall 27,273.68, obligations 693.00, front-end ratio 33.11%, DTI 44.70%, LTV 90.00%, and DTI 41.61% if overtime were counted. (Day 6)
 - [ ] The income screen is built on the mock. After it reads the real answer, run Daniel's case and check it shows 5,980.00 with the backend's working. That is the Day 4 "done when", met on the mock (the end-to-end test `income-flow.test.tsx` walks it). (Day 4, Group 6)

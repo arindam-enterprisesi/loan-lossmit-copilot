@@ -149,6 +149,11 @@ export interface HardshipAssessment {
   checks: ConsistencyCheck[];
   budget: Budget;
   measures: Measure[];
+  /**
+   * Set by the real backend when the budget has not been worked out for this reading yet, e.g. "The
+   * budget has not been computed for this reading yet." The budget and measures are empty then.
+   */
+  budget_note?: string | null;
 }
 
 /**
@@ -167,6 +172,7 @@ export interface ProfileConfirmation {
  * expense counts each month (for example, marking a one-off spend). The reason is required.
  */
 export interface BudgetAdjustmentRequest {
-  amount: string;
+  /** The amount to count each month, or null to clear an earlier adjustment (the documents' amount counts again). */
+  amount: string | null;
   reason: string;
 }

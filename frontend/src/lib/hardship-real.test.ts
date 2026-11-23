@@ -291,6 +291,22 @@ describe("what a person sends to the real backend", () => {
     });
   });
 
+  it("passes the backend's note that the budget is not worked out yet", () => {
+    const real = realAngelaHardship();
+    real.budget = [];
+    real.measures = [];
+    real.budget_note = "The budget has not been computed for this reading yet.";
+    const a = toHardshipAssessment(real, ANGELA_CASE_ID);
+    expect(a.budget_note).toBe("The budget has not been computed for this reading yet.");
+    expect(a.budget.lines).toEqual([]);
+    expect(a.measures).toEqual([]);
+    expect(translated().budget_note).toBeNull();
+  });
+
+  it("a null amount clears an adjustment", () => {
+    expect(adjustmentRequest({ amount: null, reason: "Not a one-off" })).toEqual({ adjusted_amount: null, reason: "Not a one-off" });
+  });
+
   it("sends the adjusted amount as text, so nothing is rounded", () => {
     expect(adjustmentRequest({ amount: "200.00", reason: "One-off" })).toEqual({ adjusted_amount: "200.00", reason: "One-off" });
   });

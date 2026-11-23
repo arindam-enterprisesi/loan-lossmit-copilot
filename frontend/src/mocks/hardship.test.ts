@@ -78,6 +78,40 @@ describe("Angela's mock hardship assessment: the letter and the profile", () => 
   });
 });
 
+describe("clearing a budget adjustment", () => {
+  const adjusted = () => adjust(assessment(), "200.00");
+
+  it("puts the documents' amount back, and the surplus and the flags with it", () => {
+    const cleared = applyBudgetAdjustment(adjusted(), "other", { amount: null, reason: "Not a one-off after all" }, "demo.reviewer", AT);
+    const other = cleared.budget.lines.find((l) => l.id === "other")!;
+    expect(other).toMatchObject({ observed: "410.00", adjustment: null, flagged: true, difference: "210.00" });
+    expect(cleared.measures.find((m) => m.id === "surplus")).toMatchObject({ value: "-280.00", flagged: true });
+    expect(cleared.budget.observed_total).toBe("3630.00");
+    expect(cleared.checks.find((c) => c.id === "spending")?.status).toBe("flagged");
+  });
+
+  it("can be adjusted again afterwards, and keeps the documents' amount as the one to restore", () => {
+    const cleared = applyBudgetAdjustment(adjusted(), "other", { amount: null, reason: "r" }, "u", AT);
+    const again = applyBudgetAdjustment(cleared, "other", { amount: "300.00", reason: "r2" }, "u", AT);
+    expect(again.budget.lines.find((l) => l.id === "other")?.adjustment?.original_observed).toBe("410.00");
+  });
+
+  it("refuses to clear nothing (422), a missing or blank reason (422), and an unknown item (404)", () => {
+    const refused = (a: ReturnType<typeof assessment>, id: string, reason: string) =>
+      expect(() => applyBudgetAdjustment(a, id, { amount: null, reason }, "u", AT));
+    refused(assessment(), "other", "r").toThrow(expect.objectContaining({ status: 422, message: "There is no adjustment to clear" }));
+    refused(adjusted(), "other", "").toThrow(expect.objectContaining({ status: 422 }));
+    refused(adjusted(), "other", "   ").toThrow(expect.objectContaining({ status: 422 }));
+    refused(adjusted(), "nope", "r").toThrow(expect.objectContaining({ status: 404 }));
+  });
+
+  it("does not change the assessment it was given", () => {
+    const before = adjusted();
+    applyBudgetAdjustment(before, "other", { amount: null, reason: "r" }, "u", AT);
+    expect(before.budget.lines.find((l) => l.id === "other")?.observed).toBe("200.00");
+  });
+});
+
 describe("Angela's mock hardship assessment: the consistency checks", () => {
   it("has six checks: five agree and the spending check is flagged", () => {
     const a = assessment();

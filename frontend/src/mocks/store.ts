@@ -19,9 +19,29 @@ import type {
   HardshipAssessment,
   ProfileConfirmation,
 } from "@/lib/hardship-types";
+import type {
+  AssetAnalysis,
+  LoanScenario,
+  LoanScenarioInput,
+  ObligationReview,
+  TransactionReview,
+} from "@/lib/assets-types";
+import type { FeedbackRating, GuidelineAnswer, GuidelineFeedback, GuidelinePassage, GuidelineSource } from "@/lib/guidelines-types";
 import type { IncomeAnalysis, IncomeDecision } from "@/lib/income-types";
+import {
+  applyObligationReview,
+  applyTransactionReview,
+  buildDanielAssets,
+  checkScenario,
+  DEFAULT_CANDIDATE,
+  DEFAULT_OVERTIME,
+  hasAssetSeed,
+  seededScenario,
+  type AssetRun,
+} from "./assets";
 import { applyOverride, buildCompleteness } from "./completeness";
-import { mockDocuments } from "./data";
+import { buildGuidelineAnswer, getMockPassage, mockSources, type AskInput } from "./guidelines";
+import { DANIEL_CASE_ID, mockDocuments } from "./data";
 import { applyBudgetAdjustment, applyConfirmation, buildAngelaHardship, hasHardshipSeed } from "./hardship";
 import { MOCK_PAGE_IMAGES, PAYSTUB_DOC_ID, seedExtractions } from "./extraction";
 import { applyIncomeDecision, buildDanielIncome, hasIncomeSeed } from "./income";
@@ -30,7 +50,7 @@ import { applyIncomeDecision, buildDanielIncome, hasIncomeSeed } from "./income"
 export const JOB_QUEUE_MS = 600;
 export const JOB_RUN_MS = 3000;
 
-type JobKind = "document_processing" | "income_analysis" | "hardship_assessment";
+type JobKind = "document_processing" | "income_analysis" | "hardship_assessment" | "asset_analysis";
 
 interface MockJob {
   id: string;
@@ -38,8 +58,10 @@ interface MockJob {
   createdAtMs: number;
   /** Documents being read (document jobs). Empty for an income or hardship run. */
   documentIds: string[];
-  /** The case an income or hardship run belongs to. */
+  /** The case an income, hardship or asset run belongs to. */
   caseId?: string;
+  /** What an asset run read when it started: the loan scenario and the candidate income. */
+  assetRun?: AssetRun;
   finalized: boolean;
 }
 
@@ -63,6 +85,13 @@ interface StoreState {
   completeness: Map<string, ChecklistResult>;
   /** Latest hardship assessment per case, set when a run's job finishes. */
   hardship: Map<string, HardshipAssessment>;
+  /** The sample loan entered for a case. Daniel's is there from the start, as the demo seed would leave it. */
+  scenarios: Map<string, LoanScenario>;
+  /** Latest asset and liability analysis per case, with what the run read, set when a run's job finishes. */
+  assets: Map<string, { analysis: AssetAnalysis; run: AssetRun }>;
+  /** Every answer the guideline assistant gave, and the feedback on each. */
+  guidelineAnswers: Map<string, GuidelineAnswer>;
+  guidelineFeedback: Map<string, GuidelineFeedback>;
   counter: number;
 }
 
@@ -75,6 +104,15 @@ function createState(): StoreState {
     incomes: new Map(),
     completeness: new Map(),
     hardship: new Map(),
+    scenarios: new Map(
+      [DANIEL_CASE_ID].flatMap((id) => {
+        const seeded = seededScenario(id);
+        return seeded ? [[id, seeded] as [string, LoanScenario]] : [];
+      }),
+    ),
+    assets: new Map(),
+    guidelineAnswers: new Map(),
+    guidelineFeedback: new Map(),
     counter: 0,
   };
 }
@@ -185,6 +223,12 @@ function finalizeJob(job: MockJob): void {
     job.finalized = true;
     return;
   }
+  if (job.kind === "asset_analysis" && job.caseId && job.assetRun) {
+    const at = iso(job.createdAtMs + JOB_QUEUE_MS + JOB_RUN_MS);
+    state.assets.set(job.caseId, { analysis: buildDanielAssets(job.assetRun, at, newId("a")), run: job.assetRun });
+    job.finalized = true;
+    return;
+  }
   if (job.kind === "hardship_assessment" && job.caseId) {
     state.hardship.set(job.caseId, buildAngelaHardship(iso(job.createdAtMs + JOB_QUEUE_MS + JOB_RUN_MS)));
     job.finalized = true;
@@ -209,8 +253,14 @@ function finalizeJob(job: MockJob): void {
   job.finalized = true;
 }
 
-function createJob(documentIds: string[], now: number, kind: JobKind = "document_processing", caseId?: string): Job {
-  const job: MockJob = { id: newId("b"), kind, createdAtMs: now, documentIds, caseId, finalized: false };
+function createJob(
+  documentIds: string[],
+  now: number,
+  kind: JobKind = "document_processing",
+  caseId?: string,
+  assetRun?: AssetRun,
+): Job {
+  const job: MockJob = { id: newId("b"), kind, createdAtMs: now, documentIds, caseId, assetRun, finalized: false };
   state.jobs.set(job.id, job);
   return jobView(job, now);
 }
@@ -219,6 +269,7 @@ const STAGES: Record<JobKind, readonly string[]> = {
   document_processing: ["ocr", "classify", "extract", "checks"],
   income_analysis: ["gather", "calculate", "explain", "checks"],
   hardship_assessment: ["read", "compare", "budget", "checks"],
+  asset_analysis: ["read", "label", "compute", "checks"],
 };
 
 function jobView(job: MockJob, now: number): Job {
@@ -393,6 +444,105 @@ export function setIncomeComponentMock(
   const updated = applyIncomeDecision(latest, componentId, decision, "demo.reviewer", iso(now));
   state.incomes.set(caseId, updated);
   return structuredClone(updated);
+}
+
+/** GET /guidelines/sources. */
+export const listGuidelineSourcesMock = (): GuidelineSource[] => mockSources();
+
+/** GET /guidelines/passages/{id}: 404 for an ID that names no passage. */
+export const getGuidelinePassageMock = (id: string): GuidelinePassage => getMockPassage(id);
+
+/**
+ * POST /guidelines/ask: answers from the loaded sources, or says no supporting passage was found.
+ * Refuses a blank question, one that is too long, or an unknown source set (422).
+ */
+export function askGuidelineMock(input: AskInput, now: number = Date.now()): GuidelineAnswer {
+  const answer = buildGuidelineAnswer(input, newId("9"), iso(now));
+  state.guidelineAnswers.set(answer.id, answer);
+  return structuredClone(answer);
+}
+
+/** POST /guidelines/answers/{id}/feedback: helpful, not helpful or wrongly cited. The latest rating on an answer stands. */
+export function sendGuidelineFeedbackMock(answerId: string, feedback: GuidelineFeedback): { answer_id: string; rating: FeedbackRating } {
+  if (!state.guidelineAnswers.has(answerId)) throw new ApiError(404, "Answer not found");
+  if (!["helpful", "not_helpful", "wrongly_cited"].includes(feedback.rating)) throw new ApiError(422, "Unknown rating");
+  state.guidelineFeedback.set(answerId, { rating: feedback.rating, ...(feedback.note?.trim() ? { note: feedback.note.trim() } : {}) });
+  return { answer_id: answerId, rating: feedback.rating };
+}
+
+/** What feedback has been recorded for an answer. Used by tests; the screens never read it. */
+export const guidelineFeedbackMock = (answerId: string): GuidelineFeedback | undefined =>
+  state.guidelineFeedback.get(answerId) ? structuredClone(state.guidelineFeedback.get(answerId)) : undefined;
+
+/** GET .../loan-scenario: 404 until one has been entered for the case. */
+export function getLoanScenarioMock(caseId: string): LoanScenario {
+  const scenario = state.scenarios.get(caseId);
+  if (!scenario) throw new ApiError(404, "No loan scenario has been entered for this case");
+  return structuredClone(scenario);
+}
+
+/** PUT .../loan-scenario: enter the sample loan by hand, or replace it. Refused with 422 if a value is not acceptable. */
+export function putLoanScenarioMock(caseId: string, input: LoanScenarioInput, now: number = Date.now()): LoanScenario {
+  if (!hasAssetSeed(caseId)) throw new ApiError(404, "Case not found");
+  const saved: LoanScenario = { ...checkScenario(input), updated_at: iso(now) };
+  state.scenarios.set(caseId, saved);
+  return structuredClone(saved);
+}
+
+/**
+ * POST .../asset-liability: queues a run. It needs the loan scenario (422 without) and bank statements
+ * (only Daniel's case has them). It reads the candidate income from the income analysis if one has been
+ * run; if not, it uses the figure in the scenario file, so the demo works in any order.
+ */
+export function runAssetsMock(caseId: string, now: number = Date.now()): Job {
+  if (!hasAssetSeed(caseId)) throw new ApiError(422, "This case has no bank statements to analyse");
+  const scenario = state.scenarios.get(caseId);
+  if (!scenario) throw new ApiError(422, "Enter the loan scenario first.");
+  const income = state.incomes.get(caseId);
+  const left = income?.components.find((c) => c.kind === "overtime" && !c.included);
+  const { updated_at: _savedAt, ...input } = scenario;
+  void _savedAt;
+  const run: AssetRun = {
+    scenario: input,
+    candidate_monthly: income?.candidate_monthly.value ?? DEFAULT_CANDIDATE,
+    overtime_monthly: income ? (left?.monthly.value ?? null) : DEFAULT_OVERTIME,
+  };
+  return createJob([], now, "asset_analysis", caseId, run);
+}
+
+/** GET .../asset-liability/latest: 404 until a run has finished. */
+export function getLatestAssetsMock(caseId: string): AssetAnalysis {
+  const latest = state.assets.get(caseId);
+  if (!latest) throw new ApiError(404, "No asset analysis yet. Run it first.");
+  return structuredClone(latest.analysis);
+}
+
+/** PATCH .../transactions/{id}: reclassify a line or mark a deposit as sourced, reason required (422). */
+export function reviewTransactionMock(
+  caseId: string,
+  transactionId: string,
+  review: TransactionReview,
+  now: number = Date.now(),
+): AssetAnalysis {
+  const latest = state.assets.get(caseId);
+  if (!latest) throw new ApiError(404, "No asset analysis yet. Run it first.");
+  const analysis = applyTransactionReview(latest.analysis, latest.run, transactionId, review, "demo.reviewer", iso(now));
+  state.assets.set(caseId, { analysis, run: latest.run });
+  return structuredClone(analysis);
+}
+
+/** PATCH .../obligations/{id}: count a debt toward the DTI or leave it out, reason required (422). The ratios follow at once. */
+export function reviewObligationMock(
+  caseId: string,
+  obligationId: string,
+  review: ObligationReview,
+  now: number = Date.now(),
+): AssetAnalysis {
+  const latest = state.assets.get(caseId);
+  if (!latest) throw new ApiError(404, "No asset analysis yet. Run it first.");
+  const analysis = applyObligationReview(latest.analysis, latest.run, obligationId, review, "demo.reviewer", iso(now));
+  state.assets.set(caseId, { analysis, run: latest.run });
+  return structuredClone(analysis);
 }
 
 /** POST .../hardship-assessment: queues a run. Only a case with a hardship letter can be run (422 otherwise). */

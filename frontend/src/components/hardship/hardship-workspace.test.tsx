@@ -165,6 +165,24 @@ describe("HardshipWorkspace with an earlier result: the Budget tab", () => {
     expect(spending.getByText("Stated and observed spending agree within the tolerance.")).toBeInTheDocument();
   });
 
+  it("clearing an adjustment puts the surplus back at -280.00 and the flag back", async () => {
+    await openBudget();
+    fireEvent.click(screen.getByRole("button", { name: "Adjust Other" }));
+    fireEvent.change(screen.getByLabelText("Amount counted each month"), { target: { value: "200.00" } });
+    fireEvent.change(screen.getByLabelText("Reason (required)"), { target: { value: "One-off car repair in July" } });
+    fireEvent.click(screen.getByRole("button", { name: "Adjust item" }));
+    await waitFor(() => expect(within(screen.getByTestId("measure-surplus")).getByText("-70.00", { selector: "div.text-2xl" })).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole("button", { name: "Clear the adjustment to Other" }));
+    fireEvent.change(screen.getByLabelText("Reason (required)"), { target: { value: "Not a one-off after all" } });
+    fireEvent.click(screen.getByRole("button", { name: "Clear adjustment" }));
+
+    await waitFor(() => expect(within(screen.getByTestId("measure-surplus")).getByText("-280.00", { selector: "div.text-2xl" })).toBeInTheDocument());
+    expect(within(screen.getByTestId("budget-other")).getByText("410.00", { selector: "td.font-semibold" })).toBeInTheDocument();
+    expect(within(screen.getByTestId("budget-other")).queryByText(/Adjusted by/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Clear the adjustment to Other" })).not.toBeInTheDocument();
+  });
+
   it("does not let an adjustment through without a reason", async () => {
     await openBudget();
     fireEvent.click(screen.getByRole("button", { name: "Adjust Other" }));

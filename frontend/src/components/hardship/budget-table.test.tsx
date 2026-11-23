@@ -8,7 +8,7 @@ const row = (id: string) => within(screen.getByTestId(`budget-${id}`));
 
 const setup = (
   budget = base().budget,
-  onAdjust: ((id: string, amount: string, reason: string) => Promise<void>) | null = vi.fn().mockResolvedValue(undefined),
+  onAdjust: ((id: string, amount: string | null, reason: string) => Promise<void>) | null = vi.fn().mockResolvedValue(undefined),
 ) => {
   render(<BudgetTable budget={budget} onAdjust={onAdjust ?? undefined} />);
   return { onAdjust };
@@ -54,6 +54,39 @@ describe("BudgetTable", () => {
     setup(budget);
     expect(row("other").getByText("210.00")).toBeInTheDocument();
     expect(row("other").queryByText("+210.00")).not.toBeInTheDocument();
+  });
+
+  it("offers Clear adjustment only on a line that has been adjusted", () => {
+    setup();
+    expect(screen.queryByRole("button", { name: /^Clear the adjustment/ })).not.toBeInTheDocument();
+    const adjusted = applyBudgetAdjustment(base(), "other", { amount: "200.00", reason: "One-off" }, "demo.reviewer", "2026-11-20T10:00:00.000Z").budget;
+    document.body.innerHTML = "";
+    setup(adjusted);
+    expect(screen.getAllByRole("button", { name: /^Clear the adjustment/ })).toHaveLength(1);
+    expect(screen.getByRole("button", { name: "Clear the adjustment to Other" })).toBeInTheDocument();
+  });
+
+  it("clearing asks for a reason, says what counts now and what the documents showed, then sends a null amount", async () => {
+    const adjusted = applyBudgetAdjustment(base(), "other", { amount: "200.00", reason: "One-off" }, "demo.reviewer", "2026-11-20T10:00:00.000Z").budget;
+    const { onAdjust } = setup(adjusted);
+    fireEvent.click(screen.getByRole("button", { name: "Clear the adjustment to Other" }));
+    expect(screen.getByText("Clear the adjustment to Other")).toBeInTheDocument();
+    expect(screen.getByText("Counted now: 200.00. The documents showed 410.00.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Clear adjustment" })).toBeDisabled(); // no reason yet
+    fireEvent.change(screen.getByLabelText("Reason (required)"), { target: { value: "Not a one-off after all" } });
+    fireEvent.click(screen.getByRole("button", { name: "Clear adjustment" }));
+    await waitFor(() => expect(onAdjust).toHaveBeenCalledWith("other", null, "Not a one-off after all"));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  });
+
+  it("keeps the clearing window open with the message when it is refused", async () => {
+    const adjusted = applyBudgetAdjustment(base(), "other", { amount: "200.00", reason: "One-off" }, "u", "2026-11-20T10:00:00.000Z").budget;
+    setup(adjusted, vi.fn().mockRejectedValue(new Error("There is no adjustment to clear")));
+    fireEvent.click(screen.getByRole("button", { name: "Clear the adjustment to Other" }));
+    fireEvent.change(screen.getByLabelText("Reason (required)"), { target: { value: "r" } });
+    fireEvent.click(screen.getByRole("button", { name: "Clear adjustment" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("There is no adjustment to clear");
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
   });
 
   it("has no Adjust buttons when no one can adjust", () => {

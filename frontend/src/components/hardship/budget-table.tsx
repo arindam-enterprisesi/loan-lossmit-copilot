@@ -22,15 +22,16 @@ import { cn } from "@/lib/utils";
 interface BudgetTableProps {
   budget: Budget;
   /**
-   * Sends an adjustment. Without it the table is read-only (no buttons). If it throws, the window
-   * stays open and shows the message.
+   * Sends an adjustment, or clears one when the amount is null. Without it the table is read-only (no
+   * buttons). If it throws, the window stays open and shows the message.
    */
-  onAdjust?: (itemId: string, amount: string, reason: string) => Promise<void>;
+  onAdjust?: (itemId: string, amount: string | null, reason: string) => Promise<void>;
 }
 
 /** Stated figures beside observed ones by category, with differences highlighted. */
 export function BudgetTable({ budget, onAdjust }: BudgetTableProps) {
   const [adjusting, setAdjusting] = useState<BudgetLine | null>(null);
+  const [clearing, setClearing] = useState<BudgetLine | null>(null);
 
   return (
     <div className="space-y-2">
@@ -72,14 +73,26 @@ export function BudgetTable({ budget, onAdjust }: BudgetTableProps) {
                 </TableCell>
                 {onAdjust ? (
                   <TableCell className="align-top">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setAdjusting(l)}
-                      aria-label={`Adjust ${l.category}`}
-                    >
-                      Adjust
-                    </Button>
+                    <div className="flex flex-wrap justify-end gap-1.5">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setAdjusting(l)}
+                        aria-label={`Adjust ${l.category}`}
+                      >
+                        Adjust
+                      </Button>
+                      {l.adjustment ? (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setClearing(l)}
+                          aria-label={`Clear the adjustment to ${l.category}`}
+                        >
+                          Clear adjustment
+                        </Button>
+                      ) : null}
+                    </div>
                   </TableCell>
                 ) : null}
               </TableRow>
@@ -125,6 +138,25 @@ export function BudgetTable({ budget, onAdjust }: BudgetTableProps) {
               : undefined
           }
           onConfirm={(reason, amount) => onAdjust(adjusting!.id, amount, reason)}
+        />
+      ) : null}
+
+      {onAdjust ? (
+        <ReasonDialog
+          open={clearing !== null}
+          onOpenChange={(open) => {
+            if (!open) setClearing(null);
+          }}
+          title={clearing ? `Clear the adjustment to ${clearing.category}` : ""}
+          description="The amount the documents showed counts again, and the measures update at once. Say why the adjustment is being taken away; the reason is kept in the audit record."
+          note={
+            clearing?.adjustment
+              ? `Counted now: ${formatMoney(clearing.observed)}. The documents showed ${formatMoney(clearing.adjustment.original_observed)}.`
+              : undefined
+          }
+          confirmLabel="Clear adjustment"
+          maxLength={HARDSHIP_REASON_MAX}
+          onConfirm={(reason) => onAdjust(clearing!.id, null, reason)}
         />
       ) : null}
     </div>

@@ -14,6 +14,9 @@ const STAGE_LABEL: Record<string, string> = {
   read: "Reading the hardship letter",
   compare: "Comparing the letter with the documents",
   budget: "Building the budget",
+  // Asset and liability analysis stages
+  label: "Labelling the bank transactions",
+  compute: "Calculating the figures",
 };
 
 /** Plain-language status for a processing job. */

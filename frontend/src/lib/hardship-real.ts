@@ -7,7 +7,7 @@
 // ("... = 40.95%"), because the backend sends ratios as six-place decimals ("0.409524").
 //
 // If the backend's shapes change, this is the only file that changes.
-import type { WorkingStep } from "@/components/shared/show-working-drawer";
+import { evidenceOf, percentFromWorking, shownValue, stepOf, type RealCalc, type RealRef } from "./calc-real";
 import { humanize } from "./format";
 import { monthLabel } from "./hardship";
 import type {
@@ -18,13 +18,13 @@ import type {
   HardshipAssessment,
   HardshipLetter,
   Measure,
-  MeasureUnit,
   ProfileConfirmation,
   ProfileItem,
   ProfileKey,
   ProfileOption,
 } from "./hardship-types";
-import type { EvidenceLink } from "./income-types";
+
+export type { RealCalc, RealRef } from "./calc-real";
 
 // --- what the backend sends ----------------------------------------------------------------
 
@@ -48,25 +48,6 @@ interface RealConfirmation {
 
 interface RealWithConfirmation {
   confirmation?: RealConfirmation | null;
-}
-
-export interface RealRef {
-  document_id: string;
-  field: string;
-  line_ids: string[];
-}
-
-export interface RealCalc {
-  id: string;
-  name: string;
-  value: string;
-  unit: string;
-  formula: string;
-  inputs: Record<string, string>;
-  /** One line of text, ending in "= result", e.g. "1,720.00 / 4,200.00 = 40.95%". */
-  working: string;
-  config_version: string;
-  evidence: RealRef[];
 }
 
 export interface RealBudgetLine {
@@ -245,33 +226,6 @@ function letterFrom(items: ProfileItem[], documentId: string | null): HardshipLe
 
 // --- evidence and working -------------------------------------------------------------------
 
-const evidenceOf = (refs: RealRef[]): EvidenceLink[] =>
-  refs.map((r) => ({ label: humanize(r.field), document_id: r.document_id, line_ids: r.line_ids }));
-
-/** The percentage the backend wrote at the end of its working ("... = 40.95%"), without the sign of %. */
-function percentFromWorking(working: string): string | null {
-  const m = /=\s*(-?\d[\d,]*(?:\.\d+)?)%\s*$/.exec(working);
-  return m ? m[1] : null;
-}
-
-/** "a + b = c" -> one step: the sentence for the formula, the part before the last " = ", and the result. */
-function stepOf(calc: RealCalc): WorkingStep {
-  const at = calc.working.lastIndexOf(" = ");
-  const sentence = calc.formula.charAt(0).toUpperCase() + calc.formula.slice(1);
-  return at >= 0
-    ? { label: sentence, formula: calc.working.slice(0, at), result: calc.working.slice(at + 3) }
-    : { label: sentence, formula: calc.working, result: calc.value };
-}
-
-function shownValue(calc: RealCalc): { value: string; unit: MeasureUnit } {
-  if (calc.unit === "ratio") {
-    const percent = percentFromWorking(calc.working);
-    // Without the backend's own percentage text the ratio is shown as it came, not multiplied here.
-    return percent ? { value: percent, unit: "percent" } : { value: calc.value, unit: "money" };
-  }
-  return { value: calc.value, unit: "money" };
-}
-
 // --- the measures ---------------------------------------------------------------------------
 
 interface MeasureSpec {
@@ -419,6 +373,7 @@ export function toHardshipAssessment(real: RealHardshipAssessment, caseId: strin
     checks: real.checks.map(checkFrom),
     budget: budgetFrom(real),
     measures: measuresFrom(real.measures),
+    budget_note: real.budget_note,
   };
 }
 
@@ -430,7 +385,7 @@ export function confirmationRequest(c: ProfileConfirmation): Partial<Record<Prof
   return { [c.key]: { value: c.value, reason: c.reason } };
 }
 
-/** PATCH .../latest/budget/{line_id}: the amount stays text, so nothing is rounded on the way. */
-export function adjustmentRequest(a: BudgetAdjustmentRequest): { adjusted_amount: string; reason: string } {
+/** PATCH .../latest/budget/{line_id}: the amount stays text, so nothing is rounded on the way. Null clears an adjustment. */
+export function adjustmentRequest(a: BudgetAdjustmentRequest): { adjusted_amount: string | null; reason: string } {
   return { adjusted_amount: a.amount, reason: a.reason };
 }

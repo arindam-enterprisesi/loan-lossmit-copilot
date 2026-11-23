@@ -3,9 +3,9 @@ import { PageHeader } from "@/components/layout/page-header";
 import { DocStatusChip } from "@/components/shared/doc-status-chip";
 import { FlagChip, severityTone } from "@/components/shared/flag-chip";
 import { StatCard } from "@/components/shared/stat-card";
-import { listCases, listDocuments } from "@/lib/api";
 import { humanize } from "@/lib/format";
 import { PILLARS, pillarFromSlug } from "@/lib/nav";
+import { loadCases, loadDocuments } from "@/lib/server-api";
 import { MOCK_CASE_REFS } from "@/mocks/data";
 
 export default async function DashboardPage({ params }: { params: Promise<{ pillar: string }> }) {
@@ -13,8 +13,8 @@ export default async function DashboardPage({ params }: { params: Promise<{ pill
   const pillar = pillarFromSlug(slug);
   if (!pillar) notFound();
 
-  const cases = await listCases(pillar);
-  const docsByCase = await Promise.all(cases.map((c) => listDocuments(c.id)));
+  const cases = await loadCases(pillar);
+  const docsByCase = await Promise.all(cases.map((c) => loadDocuments(c.id)));
   const docs = docsByCase.flat();
   const caseTitle = new Map(cases.map((c) => [c.id, c.title]));
 
@@ -74,7 +74,7 @@ export default async function DashboardPage({ params }: { params: Promise<{ pill
           {cases.map((c) => (
             <li key={c.id} className="rounded-xl border bg-card p-4">
               <div className="text-xs font-semibold uppercase tracking-wide text-gold">
-                {MOCK_CASE_REFS[c.id] ?? c.id.slice(0, 8)}
+                {c.case_ref ?? MOCK_CASE_REFS[c.id] ?? c.id.slice(0, 8)}
               </div>
               <div className="mt-1 font-heading text-base font-bold text-navy">{c.title}</div>
               <div className="mt-1 text-xs text-muted-foreground">

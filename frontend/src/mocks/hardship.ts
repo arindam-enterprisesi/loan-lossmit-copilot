@@ -464,9 +464,24 @@ export function applyBudgetAdjustment(
   if (reason.length > HARDSHIP_REASON_MAX) {
     throw new ApiError(422, `The reason can be at most ${HARDSHIP_REASON_MAX} characters`);
   }
+  const target = assessment.budget.lines.find((l) => l.id === itemId);
+  if (request.amount === null) {
+    // Clearing: the amount the documents showed counts again. There must be an adjustment to clear.
+    if (!target) throw new ApiError(404, "Budget item not found");
+    if (!target.adjustment) throw new ApiError(422, "There is no adjustment to clear");
+    const restored = assessment.budget.lines.map((l) =>
+      l.id === itemId ? lineFrom({ ...l, observed: l.adjustment!.original_observed, adjustment: null }) : l,
+    );
+    const budget = budgetFrom(restored);
+    return {
+      ...assessment,
+      budget,
+      checks: assessment.checks.map((c) => (c.id === "spending" ? spendingCheck(budget) : c)),
+      measures: assessment.measures.map((m) => (m.id === "surplus" ? surplusMeasure(budget) : m)),
+    };
+  }
   const amount = request.amount?.trim();
   if (!amount || !AMOUNT_PATTERN.test(amount)) throw new ApiError(422, "Enter an amount such as 200.00");
-  const target = assessment.budget.lines.find((l) => l.id === itemId);
   if (!target) throw new ApiError(404, "Budget item not found");
 
   const lines = assessment.budget.lines.map((l) =>
