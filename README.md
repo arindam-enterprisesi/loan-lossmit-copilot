@@ -19,6 +19,7 @@ API on :8000 (`/health`), web placeholder on :3000. Optional `make` shortcuts (o
 | `make migrate` | `alembic upgrade head` inside the api container |
 | `make seed` | seed script (a stub until the synthetic data task lands) |
 | `make test` | `cd backend && uv run pytest` |
+| `make reset-demo` | empties the local database and stored files, then rebuilds the demo (see *Demo reset*) |
 
 First run: `docker compose exec api alembic upgrade head` then `docker compose exec api python -m app.db.seed` (`make migrate`, `make seed`). The seed creates three demo users, all with the password from `DEMO_PASSWORD` (default `demo`), and two empty cases:
 
@@ -69,6 +70,18 @@ The worker takes each uploaded document through five stages, each safe to run tw
 **Income** (Feature 2): `POST /api/v1/cases/{id}/income-analysis` queues a run (poll `GET /jobs/{id}`), `GET .../income-analysis/latest` reads it, and `PATCH .../income-analysis/latest/components/{component}` includes or excludes a component with a reason. Plain code in `app/services/income.py` and `calculations.py` (all `Decimal`): earnings lines are grouped into base, overtime, bonus and commission; base pay is rate x regular hours x pay periods per year / 12; overtime and bonus are the year-to-date average a month and count only with 24 months of history (otherwise excluded, with the reason); W-2 Box 5, 1040 wages, employer, Box 12 deferrals, the trend, year-to-date pay and the pay frequency are cross-checked. Every figure is a row in `calculations` with its formula, inputs, working and the document fields it came from; a check that cannot run says so (an info flag) and never guesses. Including or excluding recalculates the candidate at once, with no model call, keeps what the system decided beside the person's change, and writes an audit event. Settings: `backend/config/income_method.yaml` and `thresholds.yaml` (every setting carries `value`, `label` and `source`; each run records the version and hash of the files it used in `config_versions`). The one AI call of this feature (possible explanations of the flags) is not wired yet: the result says "explanations not generated".
 
 **Completeness** (Feature 1): `POST /api/v1/cases/{id}/completeness` with `{"checklist_id": "pillar1-wage-earner@1"}` (the case profile must have borrower names and a reference date), `GET .../completeness/latest`, and `PATCH .../completeness/latest/items/{item_id}` to override an item with a written reason (or clear it). Code decides every status (`app/services/completeness.py`, FSD section 7): documents are matched to the borrower by name, date ranges are merged (adjacent days are one span), coverage, recency and missing tax years are measured, and messages are templates such as "14 of 30 days of pay stubs found". An override counts as satisfied and never replaces the computed status. Checklists: `backend/config/checklists.yaml`, illustrative.
+
+## Browser access, page images and the hardship profile
+
+**CORS.** The frontend (http://localhost:3000) and the API (:8000) are different origins to a browser, so the API answers their preflight requests. `CORS_ORIGINS` (comma-separated, default `http://localhost:3000`, no wildcards) lists the allowed origins; the methods are GET, POST, PUT, PATCH, DELETE and OPTIONS, the headers `Authorization` and `Content-Type`, and cookies stay off because the token is a bearer header.
+
+**Page images.** `GET /api/v1/cases/{id}/documents/{doc}/pages/{n}` returns `{page, url, expires_at, width, height}`: a 5-minute link to the stored page image and its size in pixels. Evidence boxes are fractions of that image (0 to 1, origin top left), so a viewer multiplies by `width` and `height`. A hidden case, unknown document or page that is not there is a 404; storage down is a 503. If the frontend reads the image with `fetch` or a canvas instead of an `<img>` tag, the S3 bucket needs its own CORS rule in AWS.
+
+**Hardship profile (read side).** `GET /api/v1/cases/{id}/hardship-assessment/latest` returns the borrower's letter read into a profile: primary and other reasons, onset, duration, intent, a timeline and the enclosed documents, each with its quote, the line IDs it came from and `verified` (code found the quote in those lines). A quote that fails the check also raises a flag. Until a model provider is used for it, the profile is a seeded sample (`source: seeded_sample`, the Feature Design 7.8 reading in `app/db/demo/angela_hardship_profile.json`), checked in code against the letter's lines; running a reading, confirming values and the budget come later. The table is `hardship_profiles` (migration 0006).
+
+## Demo reset
+
+`make reset-demo` (`cd backend && uv run python -m app.db.reset_demo --yes --upload`) puts the demo back to a clean state: it undoes and redoes the migrations (which also clears the append-only audit history), removes the stored files, seeds the three users, both cases with their profiles and Angela's hardship profile, then uploads and reads every demo document in the same process, with no worker. Run `make data` first and have S3 set up in `.env`. `--fake-reader` reads with the rule-based reader when no model provider works; leave `--upload` off to skip the documents. It needs `--yes` and refuses any database that is not local, because it empties the database it is pointed at.
 
 ## Layout
 

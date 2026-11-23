@@ -8,7 +8,10 @@ them (pages, lines, type, fields, checks) happens in the background, in
 
 from __future__ import annotations
 
+import asyncio
+import logging
 import uuid
+from datetime import UTC, datetime, timedelta
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, File, Form, Path, UploadFile
@@ -20,6 +23,7 @@ from app.api.errors import ApiError
 from app.api.schemas.documents import (
     DocumentList,
     DocumentSummaryOut,
+    PageImageOut,
     UploadResult,
     flag_from_row,
     summary_from_view,
@@ -45,7 +49,12 @@ from app.services.flags import load_line_meta, open_flags
 from app.services.ingestion_config import IngestionConfig, get_ingestion_config
 from app.services.queue import JobQueue, get_queue
 from app.services.security import CurrentUser
-from app.storage import Storage
+from app.storage import PRESIGN_SECONDS, Storage, StorageError
+
+logger = logging.getLogger(__name__)
+
+# pages.page_no is a 32-bit integer, so a larger number cannot name a page.
+MAX_PAGE_NUMBER = 2**31 - 1
 
 router = APIRouter(
     prefix="/cases/{case_id}/documents",
@@ -161,6 +170,40 @@ async def get_extraction(
         prompt_id=run.prompt_id,
         provider=run.provider,
         model=run.model,
+    )
+
+
+@router.get("/{document_id}/pages/{page}", response_model=PageImageOut, operation_id="getPageImage")
+async def get_page_image(
+    case_id: CaseIdPath, document_id: str, page: str, user: User, session: Session, storage: Files
+) -> PageImageOut:
+    """A 5-minute link to the stored image of one page, and the image's width and height."""
+    document = await _visible_document(session, user, case_id, document_id)
+    try:
+        page_no = int(page)
+    except ValueError:
+        raise ApiError(404, "not_found", "Page not found") from None
+    row = (
+        await document_service.get_page(session, document.id, page_no)
+        if 1 <= page_no <= MAX_PAGE_NUMBER
+        else None
+    )
+    if row is None:
+        raise ApiError(404, "not_found", "Page not found")
+    issued = datetime.now(UTC)
+    try:
+        url = await asyncio.to_thread(storage.presigned_get, row.image_s3_key)
+    except StorageError as exc:
+        logger.warning("page link failed document=%s page=%d: %s", document.id, page_no, exc)
+        raise ApiError(
+            503, "storage_unavailable", "The page image is unavailable. Please try again."
+        ) from None
+    return PageImageOut(
+        page=row.page_no,
+        url=url,
+        expires_at=issued + timedelta(seconds=PRESIGN_SECONDS),
+        width=row.width,
+        height=row.height,
     )
 
 

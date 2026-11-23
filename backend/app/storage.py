@@ -108,11 +108,15 @@ class Storage:
     def presigned_get(self, key: str, expires: int = PRESIGN_SECONDS) -> str:
         """A one-time-style link to read one object, valid for 5 minutes by default."""
         full = self.full_key(key)
-        return self._get_client().generate_presigned_url(
-            "get_object",
-            Params={"Bucket": self.bucket, "Key": full},
-            ExpiresIn=expires,
-        )
+        try:
+            return self._get_client().generate_presigned_url(
+                "get_object",
+                Params={"Bucket": self.bucket, "Key": full},
+                ExpiresIn=expires,
+            )
+        except (ClientError, BotoCoreError) as exc:
+            # Signing is local, so this is usually missing or expired credentials.
+            raise StorageError(f"presign failed: {_code(exc)}") from exc
 
 
 def drop_blank_aws_env() -> None:

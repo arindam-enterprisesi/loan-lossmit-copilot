@@ -23,7 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
 from app.db.enums import DocumentStatus, DocumentType, JobStatus
-from app.db.models import Document, Flag, Job
+from app.db.models import Document, Flag, Job, Page
 from app.services import audit
 from app.services import flags as flag_service
 from app.services.queue import PROCESS_FUNCTION, JobQueue
@@ -260,6 +260,13 @@ async def get_document(
     """The document, if it is in this case (the caller has already checked the case is visible)."""
     return await session.scalar(
         sa.select(Document).where(Document.id == document_id, Document.case_id == case_id)
+    )
+
+
+async def get_page(session: AsyncSession, document_id: uuid.UUID, page_no: int) -> Page | None:
+    """One page of a document (the caller has already checked the document is visible)."""
+    return await session.scalar(
+        sa.select(Page).where(Page.document_id == document_id, Page.page_no == page_no)
     )
 
 

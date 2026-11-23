@@ -4,7 +4,7 @@ from urllib.parse import parse_qs, urlparse
 
 import boto3
 import pytest
-from botocore.exceptions import EndpointConnectionError
+from botocore.exceptions import EndpointConnectionError, NoCredentialsError
 from moto import mock_aws
 
 from app.settings import Settings
@@ -91,6 +91,16 @@ class _Unreachable:
 
     def delete_object(self, **_: Any) -> Any:
         raise EndpointConnectionError(endpoint_url="https://s3.example.invalid/secret-key")
+
+    def generate_presigned_url(self, *_: Any, **__: Any) -> Any:
+        # Signing is local, so what fails here is the credentials, not the network.
+        raise NoCredentialsError()
+
+
+def test_presigning_without_credentials_is_a_storage_error() -> None:
+    store = Storage(Settings(_env_file=None, s3_bucket=BUCKET), client=_Unreachable())  # type: ignore[arg-type]
+    with pytest.raises(StorageError, match="NoCredentialsError"):
+        store.presigned_get("cases/1/page-1.png")
 
 
 def test_a_connection_error_is_a_storage_error_that_names_no_url() -> None:
