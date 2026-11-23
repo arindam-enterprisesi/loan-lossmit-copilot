@@ -3,13 +3,13 @@
     uv run python -m app.db.reset_demo --yes --upload [--fake-reader]
 
 It empties the database, removes the files stored in S3, and rebuilds the demo: the three users, the
-two cases with their profiles (Daniel Reyes, Pillar 1, and Angela Whitfield, Pillar 2), and Angela's
-hardship profile, plus the sample reports to review (Daniel's draft underwriting report with its
-six suggested conditions, Angela's waterfall, lender view and draft report: all labelled
-``seeded_sample``). With ``--upload`` it also uploads each borrower's generated documents and reads
-them straight away, in this process, with no Redis and no worker (``--fake-reader`` uses the
-rule-based reader, for when no model provider works). Run ``make data`` first to generate the
-documents.
+two cases with their profiles (Daniel Reyes, Pillar 1, and Angela Whitfield, Pillar 2), Angela's
+simulated loan record and hardship profile, plus the sample reports to review (Daniel's draft
+underwriting report with its six suggested conditions, Angela's waterfall, lender view and draft
+report: all labelled ``seeded_sample``). With ``--upload`` it also uploads each borrower's
+generated documents and reads them straight away, in this process, with no Redis and no worker
+(``--fake-reader`` uses the rule-based reader, for when no model provider works). Run
+``make data`` first to generate the documents.
 
 The database is emptied by undoing and redoing the migrations: the audit table refuses DELETE and
 TRUNCATE on purpose, so this is also the only way to clear its history. That makes this script
@@ -41,6 +41,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from sqlalchemy.pool import NullPool
 
 from app.db.demo.hardship import seed_hardship_profile
+from app.db.demo.loan_record import seed_loan_record
 from app.db.demo.reports import seed_lm_recommendation, seed_underwriting_report
 from app.db.enums import EmploymentType, Pillar
 from app.db.seed import DEMO_CASES, DEMO_USERS, case_id, seed, user_id
@@ -289,6 +290,10 @@ async def _populate(
         async with factory() as session:
             for scenario in scenarios:
                 if scenario.pillar is Pillar.LOSS_MITIGATION:
+                    record = json.loads(
+                        (SCENARIOS_DIR / f"{scenario.folder}.json").read_text(encoding="utf-8")
+                    )["loan_record"]
+                    await seed_loan_record(session, scenario.case_id, record)
                     await seed_hardship_profile(session, scenario.case_id)
                     await seed_lm_recommendation(session, scenario.case_id)
                     hardship_seeded = True

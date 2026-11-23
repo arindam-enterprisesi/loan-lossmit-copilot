@@ -22,7 +22,8 @@ Status: **Open** (still a stand-in), **Planned** (will be a stand-in when the ta
 | A3 | Income analysis explanations (D4) | `income-explain@1` and `check_figures` (merged, #9) **and a working provider**. | Not wired. The result carries `explanations: []` and `explanations_note: "explanations not generated"` (`backend/app/api/schemas/income.py`). The flags themselves are computed in code and shown. | Call the explanation after the flags are stored, check it with `check_figures`, fill `explanations`. Needs A1. | Open |
 | A4 | Contract entries for the endpoints we built (D4 and D5) | The contract has only TODO comments for income, the page image and hardship, and nothing for the completeness override or the `needs_review` values. | We built to the Feature Design paths and wrote the YAML for Arindam to paste into his own contract PR: `docs/contract-proposal-d4.md` (sections 1 and 2 from D4, 3 and 4 from D5). `contracts/` is not touched. Until it lands, Amogh's types for these cannot be generated from the contract. | Arindam merges the YAML; then compare the shapes with a contract-alignment test as done for completeness. The hardship POST, confirmations and budget YAML follow on D6. | Open |
 | A5 | D6 assets analysis (Feature 3) | `label_transactions` (merged, #7) **and a working provider**. | **Built (D6, C4):** `backend/app/services/transaction_labels.py` has a `TransactionLabeller` protocol. `LlmLabeller` wraps `label_transactions` (a line still unlabelled after one retry becomes "other, needs review", as the Feature Design says). With `PIPELINE_LLM=fake`, `FakeLabeller` uses keyword rules instead: it reproduces every label in both generated scenarios (a test checks that) but has no judgement, so an unknown payee is just "other" and is never marked for review. | Same as A1: set `PIPELINE_LLM=auto` once a provider works and the run uses `LlmLabeller`. | Open (real labelling needs A1) |
-| A6 | D6 HITL endpoints, read-side routers (reports, findings, agent runs) | The report, finding, condition and agent-run shapes in the contract (his D5 contract PR) and the agents themselves (D7 and D8). | **Built (D6, C6 and C7):** the endpoints and `services/report_writer.py` (the way his graph writes a report). A **seeded sample** fills them: Daniel's draft underwriting report with eight findings and six conditions (`app/db/demo/daniel_underwriting_report.json`), and Angela's waterfall, lender view and draft report (`angela_lm_recommendation.json`). Every response says `seeded_sample`, and so does the report, its agent runs and the run. The agent run log is hand-written, not an agent's. | D7 and D8: the same tables get real output through `report_writer`; the endpoints are unchanged. The waterfall and lender view come from the rules engine on D7 (C10). | Open (D7, D8) |
+| A6 | D6 HITL endpoints, read-side routers (reports, findings, agent runs) | The report, finding, condition and agent-run shapes in the contract (his D5 contract PR) and the agents themselves (D7 and D8). | **Built (D6, C6 and C7):** the endpoints and `services/report_writer.py` (the way his graph writes a report). A **seeded sample** fills them: Daniel's draft underwriting report with eight findings and six conditions (`app/db/demo/daniel_underwriting_report.json`), and Angela's waterfall, lender view and draft report (`angela_lm_recommendation.json`). Every response says `seeded_sample`, and so does the report, its agent runs and the run. The agent run log is hand-written, not an agent's. | D7 and D8: the same tables get real output through `report_writer`; the endpoints are unchanged. The waterfall and lender view now come from the rules engine (D7, C10, below); the seeded waterfall stays as history. | Open (D8: the agents' report) |
+| A7 | D7 rules engine (Feature 8): "hardship resolved" and months delinquent | `hardship@1` has no `resolved` duration, and no document field carries months delinquent. | **Built (D7, C10):** "hardship resolved (confirmed)" is `not_met` once the duration is confirmed (it is `temporary`, `long_term` or `unknown`), with a note that a reviewer can override it with a reason. Months delinquent is read from `loan_records`, the simulated servicing record (`source: synthetic`, seeded from the scenario by `app/db/demo/loan_record.py` and `make reset-demo`). | Arindam adds `resolved` to the duration categories if he wants the rule to be able to meet; the statement's `payments_past_due` joins the mortgage statement schema if months should come from the document. | Open (decision) |
 
 ### Decisions and problems in Arindam's area (not stand-ins; we did not edit his folders)
 
@@ -159,3 +160,24 @@ Nothing has been changed in Amogh's `frontend/`; main's version of it was merged
   Bedrock itself refuses invocation (X1).
 - Not run through the screens: the demo flow was checked through the real API in a scratch walkthrough
   with the fake reader and in-memory S3, because the frontend is still on mocks (M1).
+
+### 2026-11-24, D7 C10: rules engine, lender view, recommendation endpoints
+
+- Built `config/rule_sets/sample_investor_a_v1.yaml` (version 1, `illustrative`, every setting labelled
+  with its source, numbers as quoted strings so they stay exact), `services/rules_config.py`,
+  `services/rules_engine.py` (pure) and `services/recommendation_runs.py`. `POST
+  /cases/{id}/lm-recommendation` queues a job; the worker applies the rules (no model) and stores a
+  new `lm_recommendation` run: the waterfall, the lender view and every figure with its working.
+  `run_recommendation_rules(session, case_id)` is the function for Arindam's graph step 4.
+- Golden (`tests/golden/test_rules_golden.py`, from the scenario `expected` block): repayment plan,
+  forbearance and deferral not met, modification met (target payment 1,470.00 below 1,720.00), short
+  sale and deed-in-lieu not reached; claim 217,560.00, net recovery 201,250.00, loss 16,310.00,
+  modification cost 13,893.00, advantage 2,417.00. Changing a setting changes the result (a test).
+- Rules read the hardship duration and intent only once a person confirmed them; otherwise the
+  condition is `needs_confirmation`. The "no earlier option met" condition now waits (needs
+  confirmation or not evaluable) while an earlier option is undecided, instead of reading as met.
+- Overrides carry to a new run by condition id with the rules' status beside them; one the rules have
+  caught up with is dropped. Sign-off of the recommendation needs a report on the newest run (409
+  `no_report`), because the rules alone write none and an older run's report would not describe the
+  waterfall on screen. A rules-only report would need a new `reports.source` value (a migration).
+- Stand-ins: see A7. Angela's simulated loan record is new demo data (`loan_records`, synthetic).

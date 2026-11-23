@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 from datetime import date
+from decimal import Decimal
 from typing import Any
 
 import pytest
@@ -52,6 +53,11 @@ def state(url: str) -> dict[str, Any]:
         ),
         "documents": query(url, "SELECT count(*) FROM documents"),
         "profiles": query(url, "SELECT case_id, source FROM hardship_profiles"),
+        "loan_records": query(
+            url,
+            "SELECT case_id, source, months_delinquent, unpaid_balance, arrears_amount "
+            "FROM loan_records",
+        ),
         "reports": query(
             url, "SELECT case_id, kind, source, status FROM reports ORDER BY kind, case_id"
         ),
@@ -133,6 +139,10 @@ def test_a_reset_leaves_users_cases_profiles_and_angelas_hardship_profile(
         date(2026, 10, 12),
     )
     assert after["documents"][0][0] == 0  # nothing is uploaded unless asked
+    # Angela's simulated servicing record: the rules read months delinquent from it.
+    assert [tuple(r) for r in after["loan_records"]] == [
+        (ANGELA, "synthetic", 3, Decimal("212400.00"), Decimal("5160.00"))
+    ]
     assert [(p.case_id, p.source) for p in after["profiles"]] == [(ANGELA, "seeded_sample")]
     # The sample reports to review: Daniel's draft underwriting report and Angela's recommendation.
     assert sorted((r.case_id, r.kind, r.source, r.status) for r in after["reports"]) == sorted(

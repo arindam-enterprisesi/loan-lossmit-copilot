@@ -22,6 +22,7 @@ from app.services.income_runs import run_income_job
 from app.services.ingestion_config import get_ingestion_config
 from app.services.ocr import default_ocr
 from app.services.pipeline import Readers, run_pipeline_job
+from app.services.recommendation_runs import run_recommendation_job
 from app.settings import get_settings
 from app.storage import Storage, drop_blank_aws_env
 
@@ -101,6 +102,16 @@ async def run_hardship_reading(ctx: dict[str, Any], job_id: str, user_id: str) -
     )
 
 
+async def run_recommendation_rules(ctx: dict[str, Any], job_id: str, user_id: str) -> None:
+    """Apply the investor's rule set to a case and store the waterfall and lender view."""
+    await run_recommendation_job(
+        ctx.get("session_factory") or get_sessionmaker(),
+        uuid.UUID(job_id),
+        uuid.UUID(user_id),
+        rule_set=ctx.get("rule_set"),
+    )
+
+
 class WorkerSettings:
     functions: ClassVar[list[Any]] = [
         ping,
@@ -108,6 +119,7 @@ class WorkerSettings:
         run_income_analysis,
         run_asset_analysis,
         run_hardship_reading,
+        run_recommendation_rules,
     ]
     on_startup = startup
     redis_settings = RedisSettings.from_dsn(get_settings().redis_url)

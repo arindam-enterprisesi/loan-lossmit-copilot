@@ -298,7 +298,7 @@ class ChecklistsConfig(_Strict):
 class ConfigUse:
     """One settings file as a run used it: recorded in ``config_versions`` and on the run."""
 
-    kind: Literal["income_method", "thresholds", "checklist"]
+    kind: Literal["income_method", "thresholds", "checklist", "rule_set"]
     name: str
     version: str
     label: str

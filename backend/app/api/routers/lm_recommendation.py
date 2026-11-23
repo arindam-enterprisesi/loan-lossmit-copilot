@@ -1,9 +1,10 @@
 """The loss mitigation recommendation: read the waterfall, override a condition, sign off (FD 8.7).
 
-Reading needs a logged-in user and a case that user may see (otherwise 404). Overriding and signing
-off are for the loss mitigation specialist only: the underwriter cannot see a Pillar 2 case (404)
-and the administrator, who maintains the rule set and makes no case decisions, gets 403. Starting
-the evaluation (``POST``), the rules engine and the agents come with D7 and D8.
+Reading needs a logged-in user and a case that user may see (otherwise 404). Starting the rules,
+overriding a condition and signing off are for the loss mitigation specialist only: the underwriter
+cannot see a Pillar 2 case (404) and the administrator, who maintains the rule set and makes no case
+decisions, gets 403. ``POST`` applies the rule set in code and calls no model; the agents that
+write the report come with D8 and fill ``report`` on the same run.
 
 The contract has no entries for these yet; ``docs/contract-proposal-d4.md`` has the YAML.
 """
@@ -18,9 +19,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import CaseIdPath, case_not_found, get_current_user, require_roles
 from app.api.errors import ApiError
+from app.api.schemas.jobs import JobOut
 from app.api.schemas.reports import (
     LmRecommendationOut,
     OverrideIn,
+    RecommendationRunAccepted,
     SignOffIn,
     SignOffResult,
     recommendation_from_view,
@@ -29,7 +32,9 @@ from app.api.schemas.reports import (
 from app.db.enums import ReportKind, Role, WaterfallStatus
 from app.db.session import get_session
 from app.services import cases as case_service
-from app.services import reports, review_conditions
+from app.services import recommendation_runs, reports, review_conditions
+from app.services.documents import UploadFailedError
+from app.services.queue import JobQueue, get_queue
 from app.services.security import CurrentUser
 
 router = APIRouter(prefix="/cases/{case_id}/lm-recommendation", tags=["lm-recommendation"])
@@ -38,11 +43,34 @@ User = Annotated[CurrentUser, Depends(get_current_user)]
 Session = Annotated[AsyncSession, Depends(get_session)]
 Reader = Depends(require_roles(Role.UNDERWRITER, Role.LM_SPECIALIST, Role.ADMIN))
 Reviewer = Depends(require_roles(Role.LM_SPECIALIST))
+Queue = Annotated[JobQueue, Depends(get_queue)]
 
 
 async def _visible(session: AsyncSession, user: CurrentUser, case_id: uuid.UUID) -> None:
     if await case_service.get_case(session, user.role, case_id) is None:
         raise case_not_found()
+
+
+@router.post(
+    "",
+    status_code=202,
+    response_model=RecommendationRunAccepted,
+    operation_id="runLmRecommendation",
+    dependencies=[Reviewer],
+)
+async def run_lm_recommendation(
+    case_id: CaseIdPath, user: User, session: Session, queue: Queue
+) -> RecommendationRunAccepted:
+    """Apply the investor's rule set to the case, in code: each option's conditions, the waterfall
+    and the lender view. Poll the job, then read ``/latest``. A judgement nobody has confirmed
+    (hardship duration, intent) is reported as needing confirmation, never assumed. Earlier
+    overrides carry to the new result with the system's own status beside them."""
+    await _visible(session, user, case_id)
+    try:
+        job = await recommendation_runs.start_recommendation(session, queue, user, case_id)
+    except UploadFailedError as exc:
+        raise ApiError(503, exc.kind, exc.message) from None
+    return RecommendationRunAccepted(job=JobOut.model_validate(job))
 
 
 @router.get(
