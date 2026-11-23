@@ -218,3 +218,16 @@ Nothing has been changed in Amogh's `frontend/`; main's version of it was merged
   never guessed), so a demo with `--fake-reader` shows the budget, the credit analysis and DTI 44.70%
   instead of "cannot compute". Still not read: the hardship letter (the hardship task reads it) and
   the W-2/1040 beyond their titles. Every extraction run still records `provider: fake`.
+
+### 2026-11-24, D7 C13: README and hand-over
+
+- README: "Run the demo" is now five steps from the real Makefile targets, measured from a fresh clone
+  (clone 2 s, `uv sync` 13 s warm, `make data` 7 s, `reset-demo` without `--upload` 30 s against a
+  scratch database). `make` is not installed on this Windows machine, so the underlying commands were
+  run; the Docker steps and `reset-demo --upload` (needs S3) were not timed. New sections for Features
+  3, 4, 7 and 8, review and audit, and the API tests.
+- `docs/handover-abhay.md`: how to run and test each module, the stand-ins, the decisions made
+  without asking, how to split the PRs, and the open items written out as GitHub issues to paste (the
+  `gh` command is not installed here, so none were opened).
+- Changes made in other people's folders on D7: none.
+
