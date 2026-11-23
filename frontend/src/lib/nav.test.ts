@@ -52,6 +52,8 @@ describe("nav config", () => {
   it("marks the document screens as live in both pillars", () => {
     expect(findNavItem("underwriting", "document-intelligence")?.status).toBe("live");
     expect(findNavItem("loss_mitigation", "document-intake")?.status).toBe("live");
+    expect(findNavItem("underwriting", "income-analysis")?.status).toBe("live");
+    expect(findNavItem("loss_mitigation", "hardship-budget")?.status).toBe("live");
   });
 
   it("never uses decision wording in menu labels (CLAUDE.md rule 3)", () => {
