@@ -28,6 +28,8 @@ D1_TABLES = {
     "calculations",
     "income_components",
     "completeness_results",
+    # D5 (migration 0006).
+    "hardship_profiles",
 }
 SEQUENCES = {"case_ref_lp_seq", "case_ref_lm_seq"}
 

@@ -12,6 +12,7 @@ from app.db.models.cases import Case
 from app.db.models.documents import Document, Line, Page
 from app.db.models.fields import ExtractionRun, Field
 from app.db.models.flags import Flag
+from app.db.models.hardship import HardshipProfile
 from app.db.models.jobs import Job
 from app.db.models.users import User
 
@@ -27,6 +28,7 @@ __all__ = [
     "ExtractionRun",
     "Field",
     "Flag",
+    "HardshipProfile",
     "IncomeComponent",
     "Job",
     "Line",

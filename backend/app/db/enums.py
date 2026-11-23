@@ -125,6 +125,13 @@ class AnalysisStatus(StrEnum):
     FAILED = "failed"
 
 
+class HardshipSource(StrEnum):
+    """``hardship_profiles.source``: who or what produced the reading."""
+
+    MODEL = "model"  # hardship@1 read the letter
+    SEEDED_SAMPLE = "seeded_sample"  # the Feature Design 7.8 example, stored without a model call
+
+
 class IncomeComponentKind(StrEnum):
     """``income_components.component`` (Feature Design 2.3: earnings are grouped by type)."""
 
