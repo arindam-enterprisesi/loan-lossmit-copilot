@@ -47,9 +47,9 @@ The copilot needs 35 tables in PostgreSQL, in five groups (plus two deferred): t
 | `obligations` | Recurring debts and whether they count toward DTI | id, run_id, case_id, creditor, kind, monthly_payment, balance, source (bank, credit_report, both), counts_toward_dti, reason, original_counts_toward_dti (what the system decided, kept when a person includes or excludes), review_reason, updated_by, updated_at | 3 | Abhay | D6 (built, migration 0007) |
 | `hardship_profiles` | Letter read into reason, onset, duration, intent | id, run_id, case_id, document_id (the letter the line IDs belong to), primary_reason, reasons (the other reasons), onset, duration, intent, timeline, enclosed_documents, each as jsonb with quote, line_refs and verified; source (model, seeded_sample), confirmed_by, confirmed_at (the last confirmation). A specialist's confirmation of reason, onset, duration or intent is stored inside that item's jsonb as `confirmation` ({status, value, original, reason, by, at, label}), beside the reading, so there is no separate table and no migration (D6) | 7 | Abhay (prompt output from Arindam) | D5 (built, migration 0006; the v0.5 demo shows the letter profile) |
 | `budget_lines` | Budget by category on stated and observed bases | id, run_id, category (one line per run and category), stated_amount, observed_amount, adjusted_amount, adjustment_reason (required whenever there is an adjusted amount), flagged, updated_by, updated_at | 7 | Abhay | D6 (built, migration 0007) |
-| `credit_scores` | Bureau scores from the sample report | id, run_id, bureau, score, is_representative | 4 (P1) | Abhay | D7, only if Feature 4 is kept |
-| `tradelines` | Accounts on the sample credit report | id, run_id, document_id, creditor, account_type, ownership, opened_on, status, balance, credit_limit, monthly_payment, past_due, late_30, late_60, late_90, last_late_on, remarks, line_refs | 4 (P1) | Abhay | D7, only if Feature 4 is kept |
-| `credit_inquiries` | Inquiries and their matched new account | id, run_id, creditor, inquired_on, matched_tradeline_id | 4 (P1) | Abhay | D7, only if Feature 4 is kept |
+| `credit_scores` | Bureau scores from the sample report | id, run_id, case_id, document_id, bureau, score, is_representative, line_refs | 4 (P1) | Abhay | D7 (built, migration 0009) |
+| `tradelines` | Accounts on the sample credit report | id, run_id, case_id, document_id, position, creditor, account_type, ownership, opened_on, status, balance, credit_limit, monthly_payment, past_due, late_30, late_60, late_90, last_late_on, remarks, line_refs, utilization_over_review_level, late_in_lookback, derogatory | 4 (P1) | Abhay | D7 (built, migration 0009) |
+| `credit_inquiries` | Inquiries and their matched new account | id, run_id, case_id, document_id, position, creditor, inquired_on, in_window, matched_tradeline_id, line_refs | 4 (P1) | Abhay | D7 (built, migration 0009) |
 
 ## 4. Rules, agents and reports
 
@@ -86,7 +86,7 @@ Each migration is its own small PR, merged before any code uses its tables.
 | D5 (built) | 0006 Hardship profile | `hardship_profiles` | 0005 (`analysis_runs`); the v0.5 demo needs it |
 | D6 (built) | 0008 Shared agent and rules tables | reports, findings, agent_runs, waterfall_results, lender_views, conditions, sign_offs, plus Arindam's guideline_sources, rag_chunks, guideline_questions | The contract PR (report, finding, condition and agent-run shapes) merged first |
 | D6 (built) | 0007 Feature tables | loan_scenarios, loan_records, transactions, obligations, budget_lines | 0005 (`analysis_runs`), 0006 |
-| D7, only if Feature 4 is kept | Credit tables | credit_scores, tradelines, credit_inquiries | The keep-or-cut decision at the end of D6 |
+| D7 (built, migration 0009) | Credit tables | credit_scores, tradelines, credit_inquiries | Feature 4 kept (no decision to cut was recorded) |
 
 ## Open questions
 

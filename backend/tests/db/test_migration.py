@@ -44,6 +44,10 @@ D1_TABLES = {
     "agent_runs",
     "waterfall_results",
     "lender_views",
+    # D7 (migration 0009).
+    "credit_scores",
+    "tradelines",
+    "credit_inquiries",
 }
 # loan_scenarios is keyed by its case, as docs/database-schema.md says, so it has no `id` column.
 NO_ID_COLUMN = {"loan_scenarios"}

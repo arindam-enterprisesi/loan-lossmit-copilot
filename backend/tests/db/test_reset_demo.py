@@ -153,7 +153,7 @@ def test_a_reset_leaves_users_cases_profiles_and_angelas_hardship_profile(
     )
     # findings, conditions, options, lender views, agent runs, budget lines (Angela's, five)
     assert tuple(after["report_parts"][0]) == (8, 6, 6, 1, 6, 5)
-    assert after["revision"][0][0] == "0008"  # at the newest migration
+    assert after["revision"][0][0] == "0009"  # at the newest migration
     assert (summary.users, summary.cases, summary.documents) == (3, 2, 0)
     assert summary.hardship_profile_seeded
     assert summary.reports_seeded == 2 and summary.budget_computed
