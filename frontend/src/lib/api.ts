@@ -2,16 +2,29 @@
 // to the real FastAPI backend (contracts/openapi.yaml) is a flag, not a rewrite.
 import { mockCases } from "@/mocks/data";
 import {
+  adjustBudgetItemMock,
+  confirmProfileItemMock,
   getExtractionMock,
   getJobMock,
+  getLatestCompletenessMock,
+  getLatestHardshipMock,
+  getLatestIncomeMock,
   listDocumentsMock,
+  overrideCompletenessItemMock,
   pageImageUrlMock,
   reviewFieldMock,
+  runCompletenessMock,
+  runHardshipMock,
+  runIncomeMock,
   setDocumentTypeMock,
+  setIncomeComponentMock,
   uploadMock,
 } from "@/mocks/store";
 import { ApiError } from "./api-error";
+import type { ChecklistResult } from "./completeness";
 import { cleanReason } from "./documents";
+import type { BudgetAdjustmentRequest, HardshipAssessment, ProfileConfirmation } from "./hardship-types";
+import type { IncomeAnalysis, IncomeDecision } from "./income-types";
 import type {
   Case,
   DocumentSummary,
@@ -136,6 +149,133 @@ export async function setDocumentType(
   });
   const data = (await res.json()) as DocumentSummary | { document: DocumentSummary; job: Job };
   return "document" in data ? data : { document: data };
+}
+
+/**
+ * POST /cases/{id}/income/analysis: queues a run and returns its job to poll with getJob.
+ * Not in contracts/openapi.yaml yet (TODO F2 Income, D4), so the path and the answer (a Job) are our
+ * proposal to Arindam. Throws ApiError 422 when the case has no income documents.
+ */
+export async function runIncomeAnalysis(caseId: string): Promise<Job> {
+  if (USE_MOCKS) return runIncomeMock(caseId);
+  return request<Job>(`/cases/${caseId}/income/analysis`, { method: "POST" });
+}
+
+/** GET /cases/{id}/income/analysis/latest. Throws ApiError 404 before the first run. Same proposal as above. */
+export async function getLatestIncome(caseId: string): Promise<IncomeAnalysis> {
+  if (USE_MOCKS) return getLatestIncomeMock(caseId);
+  return request<IncomeAnalysis>(`/cases/${caseId}/income/analysis/latest`);
+}
+
+/**
+ * PATCH /cases/{id}/income/analysis/components/{component_id}: include or exclude one component.
+ * Returns the whole recalculated analysis, so the screen replaces what it shows. The reason is
+ * required (ApiError 422 without it). Same proposal to Arindam as the two calls above.
+ */
+export async function setIncomeComponent(
+  caseId: string,
+  componentId: string,
+  decision: IncomeDecision,
+): Promise<IncomeAnalysis> {
+  const clean = { included: decision.included, reason: decision.reason.trim() };
+  if (USE_MOCKS) return setIncomeComponentMock(caseId, componentId, clean);
+  return request<IncomeAnalysis>(`/cases/${caseId}/income/analysis/components/${componentId}`, {
+    method: "PATCH",
+    body: JSON.stringify(clean),
+  });
+}
+
+/**
+ * POST /cases/{id}/completeness: runs the checklist and returns the result at once (no job). In the
+ * contract. Throws ApiError 422 for an unknown checklist.
+ */
+export async function runCompleteness(caseId: string, checklistId: string): Promise<ChecklistResult> {
+  if (USE_MOCKS) return runCompletenessMock(caseId, checklistId);
+  return request<ChecklistResult>(`/cases/${caseId}/completeness`, {
+    method: "POST",
+    body: JSON.stringify({ checklist_id: checklistId }),
+  });
+}
+
+/** GET /cases/{id}/completeness/latest. In the contract. Throws ApiError 404 before the first run. */
+export async function getLatestCompleteness(caseId: string): Promise<ChecklistResult> {
+  if (USE_MOCKS) return getLatestCompletenessMock(caseId);
+  return request<ChecklistResult>(`/cases/${caseId}/completeness/latest`);
+}
+
+/**
+ * PATCH /cases/{id}/completeness/items/{item_id}: override one item with a written reason, which
+ * counts it as satisfied. Returns the whole recalculated result. NOT in the contract yet, so the
+ * path, the body and the extra item fields (see ChecklistItem) are our proposal to Arindam. The
+ * reason is required (ApiError 422 without it).
+ */
+export async function overrideCompletenessItem(
+  caseId: string,
+  itemId: string,
+  reason: string,
+): Promise<ChecklistResult> {
+  const cleaned = reason.trim();
+  if (USE_MOCKS) return overrideCompletenessItemMock(caseId, itemId, cleaned);
+  return request<ChecklistResult>(`/cases/${caseId}/completeness/items/${itemId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ reason: cleaned }),
+  });
+}
+
+/**
+ * POST /cases/{id}/hardship-assessment: queues a run (the letter is read by one AI call) and returns
+ * its job to poll with getJob. Path from Feature Design 7.8; not in contracts/openapi.yaml yet, so the
+ * answer (a Job) is our proposal to Arindam. Throws ApiError 422 when the case has no hardship letter.
+ */
+export async function runHardshipAssessment(caseId: string): Promise<Job> {
+  if (USE_MOCKS) return runHardshipMock(caseId);
+  return request<Job>(`/cases/${caseId}/hardship-assessment`, { method: "POST" });
+}
+
+/** GET /cases/{id}/hardship-assessment/latest: profile, checks, budget and measures. 404 before the first run. */
+export async function getLatestHardship(caseId: string): Promise<HardshipAssessment> {
+  if (USE_MOCKS) return getLatestHardshipMock(caseId);
+  return request<HardshipAssessment>(`/cases/${caseId}/hardship-assessment/latest`);
+}
+
+/**
+ * PUT /cases/{id}/hardship-assessment/latest/confirmations: confirm what the letter reading said for
+ * one profile item, or correct it (a correction needs a value and a reason, ApiError 422 without
+ * them). The original reading is kept. Returns the whole updated assessment. Same proposal as above.
+ */
+export async function confirmProfileItem(
+  caseId: string,
+  confirmation: ProfileConfirmation,
+): Promise<HardshipAssessment> {
+  const clean: ProfileConfirmation = {
+    key: confirmation.key,
+    action: confirmation.action,
+    ...(confirmation.value?.trim() ? { value: confirmation.value.trim() } : {}),
+    ...(confirmation.reason?.trim() ? { reason: confirmation.reason.trim() } : {}),
+  };
+  if (USE_MOCKS) return confirmProfileItemMock(caseId, clean);
+  return request<HardshipAssessment>(`/cases/${caseId}/hardship-assessment/latest/confirmations`, {
+    method: "PUT",
+    body: JSON.stringify(clean),
+  });
+}
+
+/**
+ * PATCH /cases/{id}/hardship-assessment/latest/budget-items/{item}: set how much of an expense counts
+ * each month, with a required reason (ApiError 422 without one). Never calls the AI. Returns the whole
+ * recalculated assessment, so every measure updates at once. Same proposal as above.
+ */
+export async function adjustBudgetItem(
+  caseId: string,
+  itemId: string,
+  adjustment: BudgetAdjustmentRequest,
+): Promise<HardshipAssessment> {
+  const clean = { amount: adjustment.amount.trim(), reason: adjustment.reason.trim() };
+  if (USE_MOCKS) return adjustBudgetItemMock(caseId, itemId, clean);
+  return request<HardshipAssessment>(`/cases/${caseId}/hardship-assessment/latest/budget-items/${itemId}`, {
+    method: "PATCH",
+    body: JSON.stringify(clean),
+  });
 }
 
 /** A page picture link. Real links are presigned and expire after a few minutes. */
