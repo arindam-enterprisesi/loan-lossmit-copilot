@@ -19,6 +19,7 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.services.document_config import get_validation_config
+from app.services.extractor import ExtractionOutcome
 from app.services.fake_reader import FakeClassifier, FakeExtractor
 from app.services.ocr import TesseractOcr
 from app.storage import Storage
@@ -55,6 +56,7 @@ async def read_scan(
     storage: Storage,
     factory: async_sessionmaker[AsyncSession],
     rendered: Rendered,
+    extractor: Any = None,
 ) -> dict[str, Any]:
     """Upload the scan and run every stage, reading pages with the real Tesseract."""
     body = await upload_files(client, rendered, [path])
@@ -65,7 +67,7 @@ async def read_scan(
             "ingestion_config": DPI_200,
             "ocr": TesseractOcr(DPI_200.ocr, DPI_200.ocr_scale),
             "classifier": FakeClassifier(),
-            "extractor": FakeExtractor(),
+            "extractor": extractor or FakeExtractor(),
         },
         body["job"]["id"],
         [d["id"] for d in body["documents"]],
@@ -192,6 +194,18 @@ async def test_a_value_read_from_a_line_ocr_was_unsure_of_is_never_certain(
     assert [f.name for f in unsure if f.certainty == "high"] == []
 
 
+class ReadsNothing:
+    """A reader that gets no field out of the page: what is left when OCR could not read it.
+
+    The rule-based reader now reads a mortgage statement's printed lines, so on this scan it could
+    pick up a stray line from the noise; this test is about what the pipeline says when nothing
+    usable comes out, so the reader is told to find nothing.
+    """
+
+    async def extract(self, doc_type: str, lines: Any) -> ExtractionOutcome:
+        return ExtractionOutcome({}, [], "fake", "reads-nothing", "fake-extract@1")
+
+
 async def test_a_scan_ocr_cannot_read_does_not_look_read(
     docs_client: httpx.AsyncClient,
     session: AsyncSession,
@@ -199,7 +213,9 @@ async def test_a_scan_ocr_cannot_read_does_not_look_read(
     session_factory: async_sessionmaker[AsyncSession],
     rendered: Rendered,
 ) -> None:
-    body = await read_scan(SCAN_JPG, docs_client, s3_storage, session_factory, rendered)
+    body = await read_scan(
+        SCAN_JPG, docs_client, s3_storage, session_factory, rendered, extractor=ReadsNothing()
+    )
     [doc] = body["documents"]
 
     job = await job_row(session, body)
