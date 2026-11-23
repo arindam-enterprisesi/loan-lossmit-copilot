@@ -49,6 +49,7 @@ import type {
 } from "./assets-types";
 import type { ChecklistResult } from "./completeness";
 import { cleanReason } from "./documents";
+import { componentRequest, toIncomeAnalysis, type RealIncomeAnalysis } from "./income-real";
 import { toGuidelinePassage, toGuidelineSource, type RealPassage, type RealSource } from "./guidelines-real";
 import type { FeedbackRating, GuidelineAnswer, GuidelinePassage, GuidelineSource, SourceSet } from "./guidelines-types";
 import type { BudgetAdjustmentRequest, HardshipAssessment, ProfileConfirmation } from "./hardship-types";
@@ -200,25 +201,29 @@ export async function setDocumentType(
 }
 
 /**
- * POST /cases/{id}/income/analysis: queues a run and returns its job to poll with getJob.
- * Not in contracts/openapi.yaml yet (TODO F2 Income, D4), so the path and the answer (a Job) are our
- * proposal to Arindam. Throws ApiError 422 when the case has no income documents.
+ * POST /cases/{id}/income-analysis: queues a run and returns its job to poll with getJob. Not in
+ * contracts/openapi.yaml yet (TODO F2 Income); the backend on `main` serves it, and answers
+ * `{ job, analysis_id }`, so the job is taken out of it. Throws ApiError 422 when the case has no income documents.
  */
 export async function runIncomeAnalysis(caseId: string): Promise<Job> {
   if (USE_MOCKS) return runIncomeMock(caseId);
-  return request<Job>(`/cases/${caseId}/income/analysis`, { method: "POST" });
-}
-
-/** GET /cases/{id}/income/analysis/latest. Throws ApiError 404 before the first run. Same proposal as above. */
-export async function getLatestIncome(caseId: string): Promise<IncomeAnalysis> {
-  if (USE_MOCKS) return getLatestIncomeMock(caseId);
-  return request<IncomeAnalysis>(`/cases/${caseId}/income/analysis/latest`);
+  return (await request<{ job: Job }>(`/cases/${caseId}/income-analysis`, { method: "POST" })).job;
 }
 
 /**
- * PATCH /cases/{id}/income/analysis/components/{component_id}: include or exclude one component.
- * Returns the whole recalculated analysis, so the screen replaces what it shows. The reason is
- * required (ApiError 422 without it). Same proposal to Arindam as the two calls above.
+ * GET /cases/{id}/income-analysis/latest. Throws ApiError 404 before the first run. The real answer has
+ * its own shape (see income-real.ts), which is translated here so the screen sees one shape in both modes.
+ */
+export async function getLatestIncome(caseId: string): Promise<IncomeAnalysis> {
+  if (USE_MOCKS) return getLatestIncomeMock(caseId);
+  return toIncomeAnalysis(await request<RealIncomeAnalysis>(`/cases/${caseId}/income-analysis/latest`), caseId);
+}
+
+/**
+ * PATCH /cases/{id}/income-analysis/latest/components/{component_id}: include or exclude one component.
+ * Returns the whole recalculated analysis, so the screen replaces what it shows. The reason is required
+ * (ApiError 422 without it). Answers 409 with code `stale_analysis` when a newer analysis has replaced
+ * the one on screen.
  */
 export async function setIncomeComponent(
   caseId: string,
@@ -227,10 +232,13 @@ export async function setIncomeComponent(
 ): Promise<IncomeAnalysis> {
   const clean = { included: decision.included, reason: decision.reason.trim() };
   if (USE_MOCKS) return setIncomeComponentMock(caseId, componentId, clean);
-  return request<IncomeAnalysis>(`/cases/${caseId}/income/analysis/components/${componentId}`, {
-    method: "PATCH",
-    body: JSON.stringify(clean),
-  });
+  return toIncomeAnalysis(
+    await request<RealIncomeAnalysis>(`/cases/${caseId}/income-analysis/latest/components/${componentId}`, {
+      method: "PATCH",
+      body: JSON.stringify(componentRequest(clean)),
+    }),
+    caseId,
+  );
 }
 
 /**
@@ -252,10 +260,12 @@ export async function getLatestCompleteness(caseId: string): Promise<ChecklistRe
 }
 
 /**
- * PATCH /cases/{id}/completeness/items/{item_id}: override one item with a written reason, which
- * counts it as satisfied. Returns the whole recalculated result. NOT in the contract yet, so the
- * path, the body and the extra item fields (see ChecklistItem) are our proposal to Arindam. The
- * reason is required (ApiError 422 without it).
+ * PATCH /cases/{id}/completeness/latest/items/{item_id}: override one item with a written reason, which
+ * counts it as satisfied. The body is `{ action: "override", reason }` (the backend also takes
+ * `action: "clear"`, which the screen does not use yet). Returns the whole recalculated result, in the
+ * contract's shape. Not in the contract yet (docs/contract-proposal-d4.md has the YAML). The reason is
+ * required (ApiError 422 without it); 409 with code `already_overridden` or `nothing_to_override`.
+ * The real item carries no `overridden_by`, `overridden_at` or `original_status`, and the screen copes.
  */
 export async function overrideCompletenessItem(
   caseId: string,
@@ -264,9 +274,9 @@ export async function overrideCompletenessItem(
 ): Promise<ChecklistResult> {
   const cleaned = reason.trim();
   if (USE_MOCKS) return overrideCompletenessItemMock(caseId, itemId, cleaned);
-  return request<ChecklistResult>(`/cases/${caseId}/completeness/items/${itemId}`, {
+  return request<ChecklistResult>(`/cases/${caseId}/completeness/latest/items/${itemId}`, {
     method: "PATCH",
-    body: JSON.stringify({ reason: cleaned }),
+    body: JSON.stringify({ action: "override", reason: cleaned }),
   });
 }
 

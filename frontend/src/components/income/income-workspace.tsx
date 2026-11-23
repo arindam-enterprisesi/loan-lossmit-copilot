@@ -174,6 +174,25 @@ export function IncomeWorkspace({ cases, pillarSlug }: IncomeWorkspaceProps) {
                 <IncomeFlagCard key={f.code} flag={f} caseId={analysis.case_id} pillarSlug={pillarSlug} />
               ))
             )}
+            {analysis.explanations && analysis.explanations.length > 0 ? (
+              <section aria-label="Possible explanations" className="rounded-xl border border-dashed px-4 py-3">
+                <div className="flex items-center gap-2">
+                  <FlagChip tone="info">possible — to be confirmed</FlagChip>
+                  <h3 className="text-base text-navy">Possible explanations</h3>
+                </div>
+                <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-navy">
+                  {analysis.explanations.map((e) => (
+                    <li key={e}>{e}</li>
+                  ))}
+                </ul>
+              </section>
+            ) : analysis.explanations_note && analysis.flags.length > 0 ? (
+              <p className="text-xs text-muted-foreground" data-testid="explanations-note">
+                {analysis.explanations_note === "explanations not generated"
+                  ? "Possible explanations have not been generated for these flags yet."
+                  : analysis.explanations_note}
+              </p>
+            ) : null}
           </section>
 
           {analysis.document_requests.length > 0 ? (

@@ -29,7 +29,7 @@ interface IncomeTableProps {
   onDecide?: (componentId: string, included: boolean, reason: string) => Promise<void>;
 }
 
-/** One figure with its own Show working drawer. A missing figure is a dash. */
+/** One figure with its own Show working drawer. A missing figure is a dash; a plain amount with no working has no button. */
 function FigureCell({
   figure,
   title,
@@ -48,13 +48,15 @@ function FigureCell({
     <TableCell className="text-right">
       <div className="flex items-center justify-end gap-2">
         <span className={strong ? "font-semibold text-navy" : undefined}>{formatMoney(figure.value)}</span>
-        <ShowWorkingDrawer
-          title={title}
-          steps={figure.working}
-          evidence={workingEvidence(figure.evidence, pillarSlug, analysis.case_id)}
-          triggerLabel="Working"
-          triggerAriaLabel={`Show working for ${title}`}
-        />
+        {figure.working.length > 0 ? (
+          <ShowWorkingDrawer
+            title={title}
+            steps={figure.working}
+            evidence={workingEvidence(figure.evidence, pillarSlug, analysis.case_id)}
+            triggerLabel="Working"
+            triggerAriaLabel={`Show working for ${title}`}
+          />
+        ) : null}
       </div>
     </TableCell>
   );
@@ -137,7 +139,7 @@ export function IncomeTable({ analysis, pillarSlug, onDecide }: IncomeTableProps
           <TableRow data-testid="candidate-row">
             <TableCell colSpan={3}>
               <div className="font-semibold text-navy">Candidate monthly income</div>
-              <div className="text-xs font-normal text-muted-foreground">{CANDIDATE_LABEL}</div>
+              <div className="text-xs font-normal text-muted-foreground">{analysis.candidate_label ?? CANDIDATE_LABEL}</div>
             </TableCell>
             <FigureCell
               figure={analysis.candidate_monthly}

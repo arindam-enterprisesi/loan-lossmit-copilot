@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { realDanielAssets, realDanielScenario } from "./assets-real-sample";
+import { realDanielIncome } from "./income-real-sample";
 import { realAngelaHardship } from "./hardship-real-sample";
 
 // api.ts reads NEXT_PUBLIC_USE_MOCKS once when it loads, so each test loads a fresh copy.
@@ -48,20 +49,23 @@ describe("real mode: where a call goes, and when the session ends", () => {
 });
 
 describe("income analysis calls", () => {
-  it("real mode: POSTs the run and GETs the latest result from the proposed paths", async () => {
+  it("real mode: POSTs the run (the backend answers { job, analysis_id }) and GETs the latest result, translated", async () => {
     const fetchMock = vi
       .fn()
-      .mockResolvedValueOnce(reply(202, job))
-      .mockResolvedValueOnce(reply(200, { id: "a1", case_id: "c1", components: [] }));
+      .mockResolvedValueOnce(reply(202, { job, analysis_id: "a1" }))
+      .mockResolvedValueOnce(reply(200, realDanielIncome()));
     vi.stubGlobal("fetch", fetchMock);
     const { getLatestIncome, runIncomeAnalysis } = await loadApi("false");
 
     expect((await runIncomeAnalysis("c1")).id).toBe("j1");
-    expect(fetchMock.mock.calls[0][0]).toMatch(/\/cases\/c1\/income\/analysis$/);
+    expect(fetchMock.mock.calls[0][0]).toBe("/api/proxy/cases/c1/income-analysis");
     expect(fetchMock.mock.calls[0][1].method).toBe("POST");
 
-    expect((await getLatestIncome("c1")).id).toBe("a1");
-    expect(fetchMock.mock.calls[1][0]).toMatch(/\/cases\/c1\/income\/analysis\/latest$/);
+    const latest = await getLatestIncome("c1");
+    expect(fetchMock.mock.calls[1][0]).toBe("/api/proxy/cases/c1/income-analysis/latest");
+    expect(latest.case_id).toBe("c1");
+    expect(latest.candidate_monthly.value).toBe("5980.00");
+    expect(latest.components.map((c) => c.kind)).toEqual(["base_pay", "overtime", "bonus"]);
   });
 
   it("real mode: a 404 before the first run becomes an ApiError", async () => {
@@ -81,14 +85,14 @@ describe("income analysis calls", () => {
 });
 
 describe("include or exclude an income component", () => {
-  it("real mode: PATCHes the decision with a trimmed reason and returns the new analysis", async () => {
-    const fetchMock = vi.fn().mockResolvedValue(reply(200, { id: "a1", case_id: "c1", components: [] }));
+  it("real mode: PATCHes the decision with a trimmed reason and returns the new analysis, translated", async () => {
+    const fetchMock = vi.fn().mockImplementation(async () => reply(200, realDanielIncome()));
     vi.stubGlobal("fetch", fetchMock);
     const { setIncomeComponent } = await loadApi("false");
 
-    const a = await setIncomeComponent("c1", "overtime", { included: true, reason: "  Employer letter  " });
-    expect(a.id).toBe("a1");
-    expect(fetchMock.mock.calls[0][0]).toMatch(/\/cases\/c1\/income\/analysis\/components\/overtime$/);
+    const a = await setIncomeComponent("c1", "33333333-3333-4333-8333-000000000002", { included: true, reason: "  Employer letter  " });
+    expect(a.id).toBe("99999999-9999-4999-8999-000000000003");
+    expect(fetchMock.mock.calls[0][0]).toBe("/api/proxy/cases/c1/income-analysis/latest/components/33333333-3333-4333-8333-000000000002");
     expect(fetchMock.mock.calls[0][1].method).toBe("PATCH");
     expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ included: true, reason: "Employer letter" });
   });
@@ -135,15 +139,15 @@ describe("completeness calls", () => {
     await expect(getLatestCompleteness("c1")).rejects.toMatchObject({ status: 404, message: "No result yet" });
   });
 
-  it("real mode: PATCHes the override with a trimmed reason (the proposed path)", async () => {
+  it("real mode: PATCHes the override with an action and a trimmed reason", async () => {
     const fetchMock = vi.fn().mockResolvedValue(reply(200, result));
     vi.stubGlobal("fetch", fetchMock);
     const { overrideCompletenessItem } = await loadApi("false");
 
     expect((await overrideCompletenessItem("c1", "w2_two_years", "  Letter received  ")).id).toBe("r1");
-    expect(fetchMock.mock.calls[0][0]).toMatch(/\/cases\/c1\/completeness\/items\/w2_two_years$/);
+    expect(fetchMock.mock.calls[0][0]).toBe("/api/proxy/cases/c1/completeness/latest/items/w2_two_years");
     expect(fetchMock.mock.calls[0][1].method).toBe("PATCH");
-    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ reason: "Letter received" });
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ action: "override", reason: "Letter received" });
   });
 
   it("mock mode: runs for Angela and does not call the network", async () => {

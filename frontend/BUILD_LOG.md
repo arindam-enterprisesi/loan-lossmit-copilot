@@ -519,6 +519,39 @@ Open:
 - The assistant is not tried against a real engine: the ask endpoint does not exist yet.
 - Income and completeness still read my mock shapes (next).
 
+## Income and completeness: reading the real answers (Mon 23 Nov 2026, after Day 6)
+In one line: the Income screen and the Completeness panel can now read the real backend's answers, the way hardship and assets already could. This was the last piece between us and a first real-mode run. Nothing changes while the demo data is on.
+
+What I found first:
+- **Completeness needed almost nothing.** The real answer already has the contract's shape, and my screen already copes with the extra fields it does not send (`original_status`, `overridden_by`, `overridden_at`). Only the **override call** was different: the real path is `PATCH /cases/{id}/completeness/latest/items/{item_id}` and the body is `{ action: "override", reason }` (it also takes `action: "clear"`, which the screen does not use yet). A "Needs review" item arrives as partial with "Needs review:" in its reason, and shows as it is.
+- **Income needed a translation file.** The real answer differs from my mock in these ways:
+  - Paths: `/cases/{id}/income-analysis`, `.../latest`, and `.../latest/components/{component_id}` (mine were `/income/analysis...`). Running answers `{ job, analysis_id }`.
+  - A component's kind is `base`, `overtime`, `bonus` or `commission`, with the employer and borrower beside it. Only the monthly amount has working (one line of text); the current-period and year-to-date amounts are plain text.
+  - **The checks and the trend arrive as flags.** The cross-document comparisons (Form 1040 against W-2 Box 1, the employer name, Box 5 against Box 1 and the Box 12 deferrals, the year-over-year change) are flags with `INC-CHK-*` codes. An info-level one means "consistent", or, with `:trend`, a sentence about the trend. A warning means the figures differ.
+  - A flag has a sentence, working text and references, but not both sides as a pair (the sentence carries both values).
+  - The AI explanations are a plain list of strings, **empty until the explanation call is wired in**, with a note ("explanations not generated").
+  - A person's decision names the reviewer by user id, and the backend's own candidate label has an em dash.
+
+What I did:
+1. `lib/income-real.ts` translates the answer into the shape the screen uses: components with readable labels and the method's decision and reason kept beside a person's; the candidate with its working; the INC-W flags as flags; the INC-CHK flags as checks (info means consistent) and the trend sentences; the method's name, version and label from the config versions. It calculates nothing.
+2. `lib/api.ts` has the real paths and bodies for income (run, latest, include or exclude, with the job taken out of `{ job, analysis_id }`) and for the completeness override.
+3. Four small changes on the Income screen, all invisible in demo mode:
+   - A plain amount with no working has **no empty Working button**.
+   - The candidate row uses the **backend's own label** when it sends one, and the brief's wording otherwise.
+   - A flag shows the backend's **working text and evidence links**, and a "Resolved" or "Overridden" chip when a person dealt with it.
+   - **Possible explanations**: when the backend sends them they are listed and marked "possible — to be confirmed". When it does not, the screen says "Possible explanations have not been generated for these flags yet." instead of leaving the flags bare.
+
+Not done, on purpose: the backend's other income figures (periods elapsed, the annual history) are in the answer but not shown yet, because the screen has no section for them. "Copy document requests" stays empty in real mode until the explanations arrive (the suggested documents come with them). A "Remove override" button for completeness is not built.
+
+Tests: 917 to 956. New tests cover: the translation of the real answer from a sample written from the schema (the method, the components and their labels, plain and working amounts, what the method decided beside a person's change, the candidate and its working, flags against checks against the trend, unknown severities and codes, explanations and notes), the real paths and bodies (income and the completeness override), and what the screens show for it (no empty Working button, the backend's label, flag details, the explanations note and the explanations themselves, completeness items without the extra fields).
+
+Checked: type check, lint and all 956 tests pass; the production build passes (dev server stopped first, then restarted clean); the banned-wording scan is clean; the screens load. Not tried against a running backend.
+
+Open:
+- The real answer's reviewer is a user id, not a name (income decisions and completeness overrides).
+- Completeness overrides carry no who or when in the real answer, which the project's rule on corrections needs. Ask Abhay to add them.
+- All four analysis screens now read the real shapes. What is left before a first real run is Docker with the keys, and the page images.
+
 ## Going live checklist (real backend instead of mocks)
 Everything runs on mocks today. Flipping `NEXT_PUBLIC_USE_MOCKS=false` needs the items below. I update this list after every group or day, and tick items when the other side delivers them.
 
@@ -529,10 +562,10 @@ Needed before real mode works at all:
 - [x] Document, income and completeness endpoints on `main`: merged in #10 on 23 Nov. Still to do on my side: check my Day 2 and 3 screens against the real document answers once login and CORS exist.
 - [x] Hardship endpoints on `main`: merged in #12 (23 Nov). The frontend reads them through `hardship-real.ts`; not yet tried against a running backend.
 
-Real shapes on `main` that my screens do not read yet (from Abhay's #10, found 23 Nov). Each needs a translation file like `hardship-real.ts`:
+Real shapes on `main` (from Abhay's #10, found 23 Nov). All of them are now translated (`hardship-real.ts`, `assets-real.ts`, `income-real.ts`, and the completeness override call); none is tried against a running backend:
 - [x] Asset and liability analysis: translated (`assets-real.ts`, Day 6) from the real shapes on `main`, with the real paths. Tested on a sample written from the schema, not on a real answer.
-- [ ] Income analysis. Paths: `POST /cases/{id}/income-analysis` (answers `{ job, analysis_id }`), `GET .../latest`, `PATCH .../latest/components/{component_id}` with `{ included, reason }` (component ids are UUIDs). Mine are `/income/analysis...`. The answer differs: `ytd` and `monthly` are plain text, each component's working is one text string inside `calculation`, an override is `{ included, reason, by, at }` beside `system_included`, flags carry `refs`, and there is a `candidate_label`. The AI explanations are empty ("explanations not generated") until `income-explain@1` is wired in, so the flag cards need an honest empty state for them. (Day 4, Groups 1 to 3)
-- [ ] Completeness override. The real one is `PATCH /cases/{id}/completeness/latest/items/{item_id}` with `{ action: "override" | "clear", reason }`. Mine is `.../items/{item_id}` with `{ reason }`. An overridden item comes as status `overridden` with `override_reason`, but with no who and when, which the project's rule on corrections needs. "Needs review" arrives as `partial` with a "Needs review:" prefix. The Loss Mitigation checklist id is `pillar2-hardship@1` (done). (Day 4, Group 4)
+- [x] Income analysis: translated (`income-real.ts`, 23 Nov). Paths: `POST /cases/{id}/income-analysis` (answers `{ job, analysis_id }`), `GET .../latest`, `PATCH .../latest/components/{component_id}` with `{ included, reason }` (component ids are UUIDs). Mine are `/income/analysis...`. The answer differs: `ytd` and `monthly` are plain text, each component's working is one text string inside `calculation`, an override is `{ included, reason, by, at }` beside `system_included`, flags carry `refs`, and there is a `candidate_label`. The AI explanations are empty ("explanations not generated") until `income-explain@1` is wired in, so the flag cards need an honest empty state for them. (Day 4, Groups 1 to 3)
+- [x] Completeness override: the call is fixed (23 Nov). The real one is `PATCH /cases/{id}/completeness/latest/items/{item_id}` with `{ action: "override" | "clear", reason }`. Mine is `.../items/{item_id}` with `{ reason }`. An overridden item comes as status `overridden` with `override_reason`, but with no who and when, which the project's rule on corrections needs. "Needs review" arrives as `partial` with a "Needs review:" prefix. The Loss Mitigation checklist id is `pillar2-hardship@1` (done). (Day 4, Group 4)
 
 Contract gaps (Arindam owns `contracts/`; I only ask):
 - [ ] Income, completeness override, hardship and asset and liability endpoints are in Abhay's code and in `docs/contract-proposal-d4.md`, but not in `contracts/openapi.yaml`. Ask Arindam to add them, so the contract and not only the code says what they are. (Day 4)

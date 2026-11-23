@@ -18,8 +18,28 @@ export function IncomeFlagCard({ flag, caseId, pillarSlug }: IncomeFlagCardProps
     <article className="rounded-xl border bg-card p-4" aria-label={`Flag ${flag.code}`}>
       <div className="flex flex-wrap items-center gap-2">
         <FlagChip tone={severityTone(flag.severity)}>{flag.code}</FlagChip>
+        {flag.status && flag.status !== "open" ? (
+          <FlagChip tone="success">{flag.status === "resolved" ? "Resolved" : "Overridden"}</FlagChip>
+        ) : null}
         <h3 className="text-base text-navy">{flag.message}</h3>
       </div>
+      {flag.working ? <p className="mt-1.5 text-xs text-muted-foreground">{flag.working}</p> : null}
+      {flag.evidence && flag.evidence.length > 0 ? (
+        <ul className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+          {flag.evidence.map((e, i) => (
+            <li key={i}>
+              {e.document_id ? (
+                <Link href={documentHref(pillarSlug, caseId, e.document_id)} className="underline underline-offset-2">
+                  {e.label}
+                </Link>
+              ) : (
+                e.label
+              )}
+              {evidenceDetail(e) ? ` · ${evidenceDetail(e)}` : ""}
+            </li>
+          ))}
+        </ul>
+      ) : null}
 
       <dl className="mt-3 grid gap-3 sm:grid-cols-2">
         {flag.values.map((v) => (
