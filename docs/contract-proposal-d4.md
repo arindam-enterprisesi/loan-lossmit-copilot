@@ -1,8 +1,9 @@
 # Contract proposal for Day 4 (for Arindam's own contract PR)
 
 The backend already serves these endpoints. The contract (`contracts/openapi.yaml`) names the
-completeness `POST` and `GET .../latest` only; the income endpoints are a TODO comment and the
-completeness override has no endpoint. Abhay does not edit `contracts/`, so this is the YAML to add.
+completeness `POST` and `GET .../latest` only; the income, page-image and hardship endpoints are TODO
+comments and the completeness override has no endpoint. Abhay does not edit `contracts/`, so this is
+the YAML to add (sections 1 and 2 from D4, sections 3 and 4 from D5).
 The routes use the Feature Design's paths; if you prefer `/income/analysis` (the TODO's spelling),
 it is a one-line change of the router prefix.
 
@@ -234,7 +235,204 @@ Schemas (amounts are strings, so they stay exact; the client never adds them up)
         explanations_note: {type: string, examples: ["explanations not generated"]}
 ```
 
-## 3. For you, not the contract
+## 3. Page image link (D5; replaces the `TODO(D3+)` comment)
+
+Built and tested on D5: `GET /cases/{case_id}/documents/{document_id}/pages/{page}`. The review screen
+needs the page image beside the fields. The images are private in S3, so the API hands out a presigned
+link that works for 5 minutes (`PRESIGN_SECONDS` in `app/storage.py`). `width` and `height` are the
+stored image's size in pixels; the `BoundingBox` values on evidence are fractions of that image
+(0 to 1, origin top left), so the viewer multiplies by these to draw a box.
+
+The route answers 404 for an unknown or hidden case, an unknown document, a document of another case,
+and a page number that is not there (zero, past the last page, not a number). It answers **503
+`storage_unavailable`** when the link cannot be made, which the contract's other storage-backed
+endpoints already list; `ServiceUnavailable` is reused below.
+
+```yaml
+  /cases/{case_id}/documents/{document_id}/pages/{page}:
+    parameters:
+      - $ref: "#/components/parameters/CaseId"
+      - $ref: "#/components/parameters/DocumentId"
+      - name: page
+        in: path
+        required: true
+        description: Page number, counted from 1.
+        schema: {type: integer, minimum: 1}
+    get:
+      tags: [documents]
+      operationId: getPageImage
+      summary: A 5-minute link to the stored image of one page
+      responses:
+        "200":
+          description: The link and the image size
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PageImage"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+```
+
+```yaml
+    PageImage:
+      type: object
+      required: [page, url, expires_at, width, height]
+      properties:
+        page: {type: integer, minimum: 1}
+        url:
+          type: string
+          description: Presigned link to the PNG. Fetch it with no extra headers; it expires.
+        expires_at: {type: string, format: date-time}
+        width: {type: integer, minimum: 1, description: Pixels of the stored image.}
+        height: {type: integer, minimum: 1, description: Pixels of the stored image.}
+```
+
+If the frontend reads the image with `fetch` or a canvas (not an `<img>` tag), the S3 bucket needs its
+own CORS rule in AWS; that is not in this repository.
+
+## 4. Hardship profile, read side (D5; replaces the `TODO(F7 ...)` comment)
+
+Built and tested on D5: `GET /cases/{case_id}/hardship-assessment/latest`. The path is the Feature
+Design's (section 7.7), not the TODO's `/hardship/profile`. It returns Angela's letter read into a
+profile. On D5 the profile is a **seeded sample** (`source: seeded_sample`, the Feature Design 7.8
+reading stored without a model call, with every quote still checked in code against the letter's
+lines), so the v0.5 screen works before a provider does. The POST that runs your `read_hardship_letter`,
+the confirmations and the budget are D6 and will add to this shape; `budget` and `measures` are
+reserved arrays, empty today.
+
+Each item carries its `quote`, the `lines` it came from (rule 2) and `verified`: code found the quote
+in those lines. `check_flags` holds your check's codes (`unverified_quote`, `quote_too_long`). A failed
+quote also appears in `flags` (the contract's `Flag`), with evidence pointing at the cited lines of the
+letter. Line IDs are only unique within a document, so `letter_document_id` names the letter (null when
+none is on the case). Reason `category_label` and `sensitive` come from `hardship.yaml`.
+
+404 for an unknown or hidden case (a Pillar 1 case is hidden from the loss-mitigation specialist and
+the other way round) and for a case with no profile yet.
+
+```yaml
+  /cases/{case_id}/hardship-assessment/latest:
+    parameters:
+      - $ref: "#/components/parameters/CaseId"
+    get:
+      tags: [hardship]
+      operationId: getLatestHardshipAssessment
+      summary: The latest hardship profile read from the borrower's letter
+      responses:
+        "200":
+          description: The profile, each item with its quote, lines and verified state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HardshipAssessment"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+```
+
+```yaml
+    HardshipQuoted:
+      type: object
+      required: [quote, lines, verified, check_flags]
+      properties:
+        quote:
+          type: [string, "null"]
+          description: A short quote copied exactly from the letter; null when the letter says nothing about it.
+        lines:
+          type: array
+          items: {type: string, examples: ["p1-L6"]}
+        verified: {type: boolean, description: Code found the quote in the cited lines.}
+        check_flags:
+          type: array
+          items: {type: string, examples: [unverified_quote, quote_too_long]}
+    HardshipReason:
+      allOf:
+        - $ref: "#/components/schemas/HardshipQuoted"
+        - type: object
+          required: [category, category_label, sensitive, financial_effect]
+          properties:
+            category: {type: string, examples: [reduction_in_income]}
+            category_label: {type: string, examples: [Reduction in income]}
+            sensitive: {type: boolean}
+            financial_effect: {type: string}
+    HardshipProfile:
+      type: object
+      required: [primary_reason, other_reasons, onset, duration, intent, timeline, enclosed_documents]
+      properties:
+        primary_reason: {$ref: "#/components/schemas/HardshipReason"}
+        other_reasons: {type: array, items: {$ref: "#/components/schemas/HardshipReason"}}
+        onset:
+          allOf:
+            - $ref: "#/components/schemas/HardshipQuoted"
+            - type: object
+              required: [as_stated, month]
+              properties:
+                as_stated: {type: [string, "null"], examples: [July]}
+                month: {type: [string, "null"], pattern: "^[0-9]{4}-[0-9]{2}$", examples: ["2026-07"]}
+        duration:
+          allOf:
+            - $ref: "#/components/schemas/HardshipQuoted"
+            - type: object
+              required: [category]
+              properties:
+                category: {type: string, enum: [temporary, long_term, unknown]}
+        intent:
+          allOf:
+            - $ref: "#/components/schemas/HardshipQuoted"
+            - type: object
+              required: [category]
+              properties:
+                category: {type: string, enum: [keep, sell, unsure]}
+        timeline:
+          type: array
+          items:
+            allOf:
+              - $ref: "#/components/schemas/HardshipQuoted"
+              - type: object
+                required: [when, event]
+                properties:
+                  when: {type: [string, "null"]}
+                  event: {type: string}
+        enclosed_documents:
+          type: array
+          items:
+            allOf:
+              - $ref: "#/components/schemas/HardshipQuoted"
+              - type: object
+                required: [document]
+                properties:
+                  document: {type: string}
+    HardshipAssessment:
+      type: object
+      required:
+        [run_id, source, created_at, letter_document_id, config_version, config_label, profile, flags, budget, measures]
+      properties:
+        run_id: {type: string, format: uuid}
+        source:
+          type: string
+          enum: [model, seeded_sample]
+          description: seeded_sample is the Feature Design 7.8 reading stored without a model call.
+        created_at: {type: string, format: date-time}
+        letter_document_id: {type: [string, "null"], format: uuid}
+        config_version: {type: string, examples: ["2026-11-19.1"]}
+        config_label: {type: string, enum: [illustrative, authoritative]}
+        profile: {$ref: "#/components/schemas/HardshipProfile"}
+        flags: {type: array, items: {$ref: "#/components/schemas/Flag"}}
+        budget:
+          type: array
+          items: {type: object}
+          description: Reserved for the budget on stated and observed bases (D6). Empty today.
+        measures:
+          type: array
+          items: {type: object}
+          description: Reserved for the budget checks (D6). Empty today.
+```
+
+## 5. For you, not the contract
 
 - **Income flag codes are my labels** (the docs define none for Feature 2): `INC-CHK-01` 1040
   wages against W-2 Box 1, `02` employer, `03` Box 5 minus Box 1 against Box 12 deferrals, `04`
