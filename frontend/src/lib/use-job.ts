@@ -1,8 +1,15 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { getJob } from "./api";
+import { getJob, USE_MOCKS } from "./api";
 import type { Job } from "./types";
+
+/** How often to ask the real backend about a job: every 2 seconds, as the Day 3 brief says. */
+export const REAL_POLL_MS = 2000;
+/** The mock finishes in a few seconds, so ask faster to keep the demo lively. */
+export const MOCK_POLL_MS = 700;
+
+export const pollIntervalFor = (useMocks: boolean): number => (useMocks ? MOCK_POLL_MS : REAL_POLL_MS);
 
 export const isJobDone = (job: Pick<Job, "status">): boolean =>
   job.status === "succeeded" || job.status === "failed";
@@ -14,7 +21,7 @@ export const isJobDone = (job: Pick<Job, "status">): boolean =>
 export function useJobPoll(
   jobId: string | null,
   onDone?: (job: Job) => void,
-  intervalMs = 700,
+  intervalMs = pollIntervalFor(USE_MOCKS),
 ): { job: Job | null; error: string | null } {
   const [state, setState] = useState<{ jobId: string | null; job: Job | null; error: string | null }>({
     jobId: null,

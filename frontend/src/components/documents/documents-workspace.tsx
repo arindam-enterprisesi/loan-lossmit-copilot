@@ -45,15 +45,12 @@ export function DocumentsWorkspace({ cases, pillarSlug, section }: DocumentsWork
     load();
   });
 
-  const onSetType = async (documentId: string, type: DocumentType) => {
+  // A failure is thrown on purpose: the type dialog shows the message and stays open for a retry.
+  const onSetType = async (documentId: string, type: DocumentType, reason?: string) => {
     if (!caseId) return;
-    try {
-      const result = await setDocumentType(caseId, documentId, type);
-      if (result.job) setTypeJobId(result.job.id);
-      await load();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not set the type.");
-    }
+    const result = await setDocumentType(caseId, documentId, type, reason);
+    if (result.job) setTypeJobId(result.job.id);
+    await load();
   };
 
   const selectedCase = cases.find((c) => c.id === caseId);

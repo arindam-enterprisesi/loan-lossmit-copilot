@@ -83,9 +83,16 @@ const bankDaniel: Extraction = {
   summary: "Bank statement for September 2026.",
   flags: [],
   fields: [
-    confirmed(field("account_holder", "Daniel Reyes", "high", ev(BANK_DOC_DANIEL_ID, 1, ["p1-L04"]))),
-    confirmed(field("statement_period_end", "2026-09-30", "high", ev(BANK_DOC_DANIEL_ID, 1, ["p1-L07"]))),
-    confirmed(field("ending_balance", "4210.35", "high", ev(BANK_DOC_DANIEL_ID, 3, ["p3-L18"]))),
+    // Boxes match public/mock/bank-p1.svg and bank-p3.svg.
+    confirmed(
+      field("account_holder", "Daniel Reyes", "high", ev(BANK_DOC_DANIEL_ID, 1, ["p1-L04"], box(0.242, 0.146, 0.329, 0.157))),
+    ),
+    confirmed(
+      field("statement_period_end", "2026-09-30", "high", ev(BANK_DOC_DANIEL_ID, 1, ["p1-L07"], box(0.242, 0.185, 0.318, 0.196))),
+    ),
+    confirmed(
+      field("ending_balance", "4210.35", "high", ev(BANK_DOC_DANIEL_ID, 3, ["p3-L18"], box(0.242, 0.574, 0.301, 0.585))),
+    ),
   ],
 };
 
@@ -118,4 +125,5 @@ export const seedExtractions: Extraction[] = [payStub, bankDaniel, bankAngela];
 /** Which mock documents have a page image to show beside the fields. */
 export const MOCK_PAGE_IMAGES: Record<string, Record<number, string>> = {
   [PAYSTUB_DOC_ID]: { 1: "/mock/paystub-p1.svg" },
+  [BANK_DOC_DANIEL_ID]: { 1: "/mock/bank-p1.svg", 2: "/mock/bank-p2.svg", 3: "/mock/bank-p3.svg" },
 };
