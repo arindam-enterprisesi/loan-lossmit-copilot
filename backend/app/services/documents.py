@@ -14,6 +14,7 @@ import logging
 import re
 import uuid
 from dataclasses import dataclass
+from dataclasses import field as dataclass_field
 from datetime import UTC, datetime, timedelta
 from typing import Literal
 
@@ -22,16 +23,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
 from app.db.enums import DocumentStatus, DocumentType, JobStatus
-from app.db.models import Document, Job
+from app.db.models import Document, Flag, Job
 from app.services import audit
-from app.services.queue import INGEST_FUNCTION, JobQueue
+from app.services import flags as flag_service
+from app.services.queue import PROCESS_FUNCTION, JobQueue
 from app.services.security import CurrentUser
 from app.services.storage_keys import original_key
 from app.storage import Storage, StorageError
 
 logger = logging.getLogger(__name__)
 
-INGEST_JOB_KIND = "document_ingest"
+PROCESSING_JOB_KIND = "document_processing"
 MAX_FILE_NAME_LENGTH = 255
 
 # The first bytes of each accepted type (contracts/openapi.yaml: PDF, PNG or JPEG).
@@ -81,6 +83,7 @@ class ValidatedFile:
 class DocumentView:
     document: Document
     duplicate: bool  # an earlier document in the same case has the same SHA-256
+    flags: list[Flag] = dataclass_field(default_factory=list)  # its open flags, own and fields'
 
 
 @dataclass(frozen=True)
@@ -175,7 +178,7 @@ async def upload_documents(
             )
 
         job = Job(
-            kind=INGEST_JOB_KIND,
+            kind=PROCESSING_JOB_KIND,
             case_id=case_id,
             document_id=documents[0].id if len(documents) == 1 else None,
             status=JobStatus.QUEUED,
@@ -207,7 +210,7 @@ async def upload_documents(
 
     try:
         await queue.enqueue(
-            INGEST_FUNCTION, str(job.id), [str(d.id) for d in documents], job_id=str(job.id)
+            PROCESS_FUNCTION, str(job.id), [str(d.id) for d in documents], job_id=str(job.id)
         )
     except Exception as exc:
         logger.warning("queueing job %s failed: %s", job.id, type(exc).__name__)
@@ -244,8 +247,25 @@ async def _views(
         query = query.where(Document.id.in_(only))
     if needs_review:
         query = query.where(Document.status == DocumentStatus.NEEDS_REVIEW)
-    rows = await session.execute(query.order_by(Document.created_at, Document.id))
-    return [DocumentView(document, duplicate) for document, duplicate in rows.all()]
+    rows = (await session.execute(query.order_by(Document.created_at, Document.id))).all()
+    open_flags = await flag_service.open_flags_by_document(
+        session, case_id, [document.id for document, _ in rows]
+    )
+    return [DocumentView(document, dup, open_flags[document.id]) for document, dup in rows]
+
+
+async def get_document(
+    session: AsyncSession, case_id: uuid.UUID, document_id: uuid.UUID
+) -> Document | None:
+    """The document, if it is in this case (the caller has already checked the case is visible)."""
+    return await session.scalar(
+        sa.select(Document).where(Document.id == document_id, Document.case_id == case_id)
+    )
+
+
+async def view_of(session: AsyncSession, document: Document) -> DocumentView:
+    [view] = await _views(session, document.case_id, [document.id])
+    return view
 
 
 async def list_documents(

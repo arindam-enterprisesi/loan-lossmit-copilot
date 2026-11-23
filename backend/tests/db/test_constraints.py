@@ -479,3 +479,18 @@ async def test_deleting_a_case_removes_its_data_but_not_its_audit_history(
         assert remaining == 0, table
     audit = await _scalar(conn, "SELECT count(*) FROM audit_events WHERE case_id = :c", c=case_id)
     assert audit == 1
+
+
+async def test_a_run_keeps_the_readers_signs_of_an_incomplete_document(
+    conn: AsyncConnection, document_id: uuid.UUID
+) -> None:
+    # Migration 0004: so the checks can re-run after a correction without another model call.
+    run = await _run(conn, document_id)
+    default = await _scalar(conn, "SELECT signals FROM extraction_runs WHERE id = :r", r=run)
+    assert default == []
+    await conn.execute(
+        sa.text("UPDATE extraction_runs SET signals = CAST(:s AS jsonb) WHERE id = :r"),
+        {"s": '["a table is cut off at the bottom of page 1"]', "r": run},
+    )
+    stored = await _scalar(conn, "SELECT signals FROM extraction_runs WHERE id = :r", r=run)
+    assert stored == ["a table is cut off at the bottom of page 1"]

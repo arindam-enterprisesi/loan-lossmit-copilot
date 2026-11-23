@@ -40,6 +40,8 @@ class CaseProfile(BaseModel):
 
 class CaseOut(BaseModel):
     id: uuid.UUID
+    # Human reference, LP-0001 or LM-0001 (contracts/openapi.yaml: Case.case_ref).
+    case_ref: str
     title: str
     pillar: Pillar
     profile: CaseProfile | None
@@ -61,6 +63,7 @@ class CaseOut(BaseModel):
         )
         return cls(
             id=case.id,
+            case_ref=case.case_ref,
             title=case.title,
             pillar=case.pillar,
             profile=profile,
