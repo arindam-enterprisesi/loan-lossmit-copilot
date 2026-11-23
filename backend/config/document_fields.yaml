@@ -142,21 +142,47 @@ types:
   # ahead of it under the names that schema must produce, so Feature 3 reads a credit report's debts
   # as soon as one is extracted. None is required, so a reader that cannot read the type raises
   # nothing new. See docs/build-log.md.
+  #
+  # Feature 4 (the credit report analysis) reads the rest: the bureau scores (`score_NNN_bureau`,
+  # `score_NNN_value`), more of each tradeline (ownership, open date, status, past due, the 30, 60
+  # and 90-day late counts, the most recent late date, remarks), the inquiries
+  # (`inquiry_NNN_creditor`, `inquiry_NNN_date`) and the alerts (fraud alert, freeze, consumer
+  # statement) as one text field.
   credit_report:
     label: credit report
     borrower_field: consumer_name
     fields:
       - {name: consumer_name, label: Consumer, kind: text}
       - {name: report_date, label: Report date, kind: date}
+      - {name: alerts, label: "Alerts (fraud alert, freeze, consumer statement)", kind: text}
     rows:
+      - source: scores
+        prefix: score_
+        parts:
+          bureau: text
+          value: number
       - source: tradelines
         prefix: tradeline_
         parts:
           creditor: text
           account_type: text
+          ownership: text
+          open_date: date
+          status: text
           balance: amount
           credit_limit: amount
           monthly_payment: amount
+          past_due: amount
+          late_30: number
+          late_60: number
+          late_90: number
+          most_recent_late: date
+          remarks: text
+      - source: inquiries
+        prefix: inquiry_
+        parts:
+          creditor: text
+          date: date
 
   # The stated side of the hardship budget (Feature 7): income, expenses and assets as the borrower
   # wrote them, and the reasons ticked. Names follow Arindam's MortgageAssistanceApplicationFields.

@@ -15,6 +15,7 @@ from arq.connections import RedisSettings
 from app.db.session import get_sessionmaker
 from app.services.asset_runs import run_asset_job
 from app.services.classification import get_classifier
+from app.services.credit_runs import run_credit_job
 from app.services.document_config import get_document_fields, get_validation_config
 from app.services.extractor import get_extractor
 from app.services.hardship import run_hardship_job
@@ -102,6 +103,13 @@ async def run_hardship_reading(ctx: dict[str, Any], job_id: str, user_id: str) -
     )
 
 
+async def run_credit_analysis(ctx: dict[str, Any], job_id: str, run_id: str) -> None:
+    """Analyse a case's credit report and store the result (plain code, no model)."""
+    await run_credit_job(
+        ctx.get("session_factory") or get_sessionmaker(), uuid.UUID(job_id), uuid.UUID(run_id)
+    )
+
+
 async def run_recommendation_rules(ctx: dict[str, Any], job_id: str, user_id: str) -> None:
     """Apply the investor's rule set to a case and store the waterfall and lender view."""
     await run_recommendation_job(
@@ -120,6 +128,7 @@ class WorkerSettings:
         run_asset_analysis,
         run_hardship_reading,
         run_recommendation_rules,
+        run_credit_analysis,
     ]
     on_startup = startup
     redis_settings = RedisSettings.from_dsn(get_settings().redis_url)

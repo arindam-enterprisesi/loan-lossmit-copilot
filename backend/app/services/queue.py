@@ -17,6 +17,7 @@ INCOME_FUNCTION = "run_income_analysis"
 ASSET_FUNCTION = "run_asset_analysis"
 HARDSHIP_FUNCTION = "run_hardship_reading"
 RECOMMENDATION_FUNCTION = "run_recommendation_rules"
+CREDIT_FUNCTION = "run_credit_analysis"
 
 
 class JobQueue(Protocol):

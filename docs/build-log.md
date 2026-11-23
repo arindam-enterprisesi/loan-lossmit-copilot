@@ -24,6 +24,7 @@ Status: **Open** (still a stand-in), **Planned** (will be a stand-in when the ta
 | A5 | D6 assets analysis (Feature 3) | `label_transactions` (merged, #7) **and a working provider**. | **Built (D6, C4):** `backend/app/services/transaction_labels.py` has a `TransactionLabeller` protocol. `LlmLabeller` wraps `label_transactions` (a line still unlabelled after one retry becomes "other, needs review", as the Feature Design says). With `PIPELINE_LLM=fake`, `FakeLabeller` uses keyword rules instead: it reproduces every label in both generated scenarios (a test checks that) but has no judgement, so an unknown payee is just "other" and is never marked for review. | Same as A1: set `PIPELINE_LLM=auto` once a provider works and the run uses `LlmLabeller`. | Open (real labelling needs A1) |
 | A6 | D6 HITL endpoints, read-side routers (reports, findings, agent runs) | The report, finding, condition and agent-run shapes in the contract (his D5 contract PR) and the agents themselves (D7 and D8). | **Built (D6, C6 and C7):** the endpoints and `services/report_writer.py` (the way his graph writes a report). A **seeded sample** fills them: Daniel's draft underwriting report with eight findings and six conditions (`app/db/demo/daniel_underwriting_report.json`), and Angela's waterfall, lender view and draft report (`angela_lm_recommendation.json`). Every response says `seeded_sample`, and so does the report, its agent runs and the run. The agent run log is hand-written, not an agent's. | D7 and D8: the same tables get real output through `report_writer`; the endpoints are unchanged. The waterfall and lender view now come from the rules engine (D7, C10, below); the seeded waterfall stays as history. | Open (D8: the agents' report) |
 | A7 | D7 rules engine (Feature 8): "hardship resolved" and months delinquent | `hardship@1` has no `resolved` duration, and no document field carries months delinquent. | **Built (D7, C10):** "hardship resolved (confirmed)" is `not_met` once the duration is confirmed (it is `temporary`, `long_term` or `unknown`), with a note that a reviewer can override it with a reason. Months delinquent is read from `loan_records`, the simulated servicing record (`source: synthetic`, seeded from the scenario by `app/db/demo/loan_record.py` and `make reset-demo`). | Arindam adds `resolved` to the duration categories if he wants the rule to be able to meet; the statement's `payments_past_due` joins the mortgage statement schema if months should come from the document. | Open (decision) |
+| A8 | D7 credit report analysis (Feature 4) | A `credit_report` extraction schema that emits the field names in `backend/config/document_fields.yaml` (scores, the full tradeline rows, inquiries, alerts). | **Built (D7, C11):** `services/credit.py` (pure), `credit_runs.py`, tables (migration 0009), `POST/GET /cases/{id}/credit-analysis`. It reads whatever fields the pipeline stored for the newest credit report; the golden and API tests seed Daniel's report as the reader would leave it. With `PIPELINE_LLM=fake` the rule-based reader does not read a credit report, so a live demo shows "Cannot compute" (`CR-I101`) and Feature 3 keeps the bank-only 658.00 and DTI 44.11%. | Arindam's `credit_report` schema emits the field names; re-read the report with `make reset-demo`. The annotation endpoint (`PATCH .../items/{item}`) is not built. | Open |
 
 ### Decisions and problems in Arindam's area (not stand-ins; we did not edit his folders)
 
@@ -103,7 +104,7 @@ Nothing has been changed in Amogh's `frontend/`; main's version of it was merged
 - **Needs from others:** the application's expense, income and ticked-reason rows and the mortgage
   statement's `regular_monthly_payment` and `past_due_amount` must be emitted by Arindam's reader
   (field names in `docs/contract-proposal-d4.md` section 7). Until then the demo with the rule-based
-  reader shows the budget as "cannot compute". The `thresholds.yaml` version is now 2026-11-24.1.
+  reader shows the budget as "cannot compute". The `thresholds.yaml` version was 2026-11-24.1 then (2026-11-24.2 after the credit settings).
 - Contract YAML for all of it: `docs/contract-proposal-d4.md` sections 6 and 7. `contracts/` untouched.
 
 ### 2026-11-23, D6 C5: asset and liability run and API
@@ -181,3 +182,20 @@ Nothing has been changed in Amogh's `frontend/`; main's version of it was merged
   `no_report`), because the rules alone write none and an older run's report would not describe the
   waterfall on screen. A rules-only report would need a new `reports.source` value (a migration).
 - Stand-ins: see A7. Angela's simulated loan record is new demo data (`loan_records`, synthetic).
+
+### 2026-11-24, D7 C11: credit report analysis (Feature 4 kept)
+
+- No decision to cut Feature 4 was recorded, and cutting it costs Daniel's 44.70% demo, so it is
+  built (the schema doc and the plan call it P1). Say if it should be cut instead; the code is
+  self-contained (migration 0009, `credit.py`, `credit_runs.py`, one router).
+- Built `services/credit.py` (representative score, utilization per account and in total, late
+  payments by severity and the months since the last, inquiry matching, derogatory list, payments by
+  account type, flags and a template summary), migration 0009 (`credit_scores`, `tradelines`,
+  `credit_inquiries`), `credit_runs.py`, `POST/GET /cases/{id}/credit-analysis`, and the settings in
+  `thresholds.yaml` (version 2026-11-24.2: lookback 24 months, inquiry window 120 days, match within
+  30 days, utilization review level 30%).
+- Golden (`tests/golden/test_credit_golden.py`, from the scenario `expected` block): representative
+  score 705, Northgate 36.75%, total revolving 28.00%, one 30-day late payment 19 months before the
+  report, payments 693.00, Harbor Retail matched and Orion Mortgage unmatched.
+- Stand-in: see A8. The credit report's fields beyond the tradeline creditor, type, balance, limit and
+  payment are new names that Arindam's schema must emit.

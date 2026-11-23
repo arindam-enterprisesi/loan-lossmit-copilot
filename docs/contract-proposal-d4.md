@@ -948,7 +948,39 @@ endpoint that makes the waterfall, and two fields on each condition.
 - **Overrides carry to a new run** by condition id, with the rules' own status beside them. An
   override the rules have since caught up with is dropped.
 
-## 9. For you, not the contract
+## 9. Credit report analysis (Feature Design 4.7; D7)
+
+Same pattern as income and assets: a background job, then a read. No model is called (the only AI
+use is the extraction that reads the report). The report is simulated and every response says so.
+
+```yaml
+  /cases/{case_id}/credit-analysis:
+    post:      # runCreditAnalysis; 202 {job, analysis_id}; 404, 503
+  /cases/{case_id}/credit-analysis/latest:
+    get:       # getLatestCreditAnalysis; 200 CreditAnalysis; 401, 404
+```
+
+`CreditAnalysis` (the field lists are in `backend/app/api/schemas/credit.py`):
+
+- `tag` ("Sample credit report (simulated)...") and `note` (it flags and decides nothing), `status`,
+  `config_versions`.
+- `alerts` first (fraud alert, freeze, consumer statement), then `scores` (each with `bureau`,
+  `score`, `is_representative`, `line_ids`) and `representative {score, bureau, method,
+  calculation}`.
+- `tradelines`: the report's fields plus `utilization` (a figure with its working, revolving
+  accounts only), `utilization_over_review_level`, `months_since_last_late`, `late_in_lookback`,
+  `derogatory` and `line_ids`.
+- `total_revolving_utilization`, `monthly_payments` (total and by account type; Feature 3 reads the
+  tradelines directly), `inquiries` (`matched_account` is null for "no new account found"),
+  `derogatory`, `flags` and `summary` (a template filled from the stored results), and every
+  `calculations` entry with its working and evidence.
+- **Flag codes** (labels of mine, in `backend/config/thresholds.yaml`): `CR-W101` utilization above
+  the review level, `W102` late payment within the lookback, `W103` inquiry with no matching account,
+  `W104` past due, `W105` alerts, `CR-I101` cannot compute, `CR-I102` inquiry matched to a new
+  account.
+- **Not built:** `PATCH .../latest/items/{item}` (annotations), listed in Feature Design 4.7.
+
+## 10. For you, not the contract
 
 - **Income flag codes are my labels** (the docs define none for Feature 2): `INC-CHK-01` 1040
   wages against W-2 Box 1, `02` employer, `03` Box 5 minus Box 1 against Box 12 deferrals, `04`
@@ -971,3 +1003,10 @@ endpoint that makes the waterfall, and two fields on each condition.
 - **Rule set citations:** every condition cites a passage id in `sample-investor-a-v1.<topic>.<n>`
   form (my provisional scheme). The seeded guide has all ten; a test checks that each cited id
   resolves.
+- **Credit report fields your schema must emit** (the names are in `backend/config/document_fields.yaml`,
+  under `credit_report`): `consumer_name`, `report_date`, `alerts` (one text), `score_NNN_{bureau,
+  value}`, `tradeline_NNN_{creditor, account_type, ownership, open_date, status, balance,
+  credit_limit, monthly_payment, past_due, late_30, late_60, late_90, most_recent_late, remarks}` and
+  `inquiry_NNN_{creditor, date}`. Feature 3 already reads the creditor, type, balance and payment.
+  Until your `credit_report` schema lands, the analysis runs on seeded fields in tests, and a live demo
+  without them says "Cannot compute" (`CR-I101`).

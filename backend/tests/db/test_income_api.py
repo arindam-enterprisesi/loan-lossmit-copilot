@@ -194,7 +194,7 @@ async def test_the_settings_a_run_used_are_recorded_once(
     )
     assert [tuple(v) for v in versions] == [
         ("income_method", "income_method", "2026-11-19.1", "illustrative", True),
-        ("thresholds", "thresholds", "2026-11-24.1", "illustrative", True),
+        ("thresholds", "thresholds", "2026-11-24.2", "illustrative", True),
     ]
 
 
@@ -261,7 +261,7 @@ async def test_every_figure_shows_its_working_and_where_it_was_read(
     calc = part(analysis, "base")["calculation"]
     assert calc["working"] == "34.50 x 80.00 x 26 / 12 = 5,980.00"
     assert calc["formula"] == "rate x regular hours x periods per year / 12"
-    assert calc["config_version"] == "income_method@2026-11-19.1, thresholds@2026-11-24.1"
+    assert calc["config_version"] == "income_method@2026-11-19.1, thresholds@2026-11-24.2"
     assert calc["inputs"] == {"rate": "34.50", "hours": "80.00", "periods_per_year": "26"}
     assert {e["document_id"] for e in calc["evidence"]} == {str(ids["stub"])}
     assert {"earnings_001_hours", "earnings_001_rate"} <= {e["field"] for e in calc["evidence"]}

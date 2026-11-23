@@ -1,12 +1,12 @@
-# Thresholds for the analyses (Feature Design 2.3, 3.3, 7.3 and 7.5). Read by
+# Thresholds for the analyses (Feature Design 2.3, 3.3, 4.3, 7.3 and 7.5). Read by
 # app/services/analysis_config.py.
 #
 # Every setting carries its value, its label (illustrative or authoritative) and its source
 # (CLAUDE.md rule 4). Illustrative samples: real values must come from the lender or program.
 # Change `version` when a value changes. Amounts are strings so they stay exact (Decimal).
-version: "2026-11-24.1"
+version: "2026-11-24.2"
 label: illustrative
-source: "Feature Design 2.3, 3.3, 7.3 and 7.5, illustrative sample settings"
+source: "Feature Design 2.3, 3.3, 4.3, 7.3 and 7.5, illustrative sample settings"
 
 # --- Income (Feature Design 2.3) -----------------------------------------------------------------
 
@@ -119,6 +119,36 @@ budget_category_map:
   label: illustrative
   source: "Abhay's reading of the transaction categories (Feature Design 3.5) against the budget lines"
 
+# --- The credit report (Feature Design 4.3 and 4.5) ---------------------------------------------
+
+# How the representative score is chosen from the bureau scores. The only method the code knows:
+# the middle of three scores, the lower of two, the score itself when there is one.
+credit_score_method:
+  value: middle_of_three_lower_of_two
+  label: illustrative
+  source: "Feature Design 4.3: representative score, middle of three, lower of two"
+# A late payment is flagged when the most recent one is this many whole months or fewer before the
+# report date.
+credit_late_lookback_months:
+  value: 24
+  label: illustrative
+  source: "Feature Design 4.5: late-payment lookback 24 months"
+# An inquiry is checked when it is this many days or fewer before the report date.
+credit_inquiry_window_days:
+  value: 120
+  label: illustrative
+  source: "Feature Design 4.5: inquiry window 120 days"
+# An inquiry matches an account of the same creditor opened this many days or fewer from it.
+credit_inquiry_match_days:
+  value: 30
+  label: illustrative
+  source: "Feature Design 4.5: inquiry to new-account match, account opened within 30 days"
+# A revolving account whose balance is above this share of its limit is flagged.
+credit_utilization_review_level:
+  value: "0.30"
+  label: illustrative
+  source: "Feature Design 4.5: utilization review level 30% per account"
+
 # --- Flag messages for the asset and budget checks ---------------------------------------------
 # Templates filled in by code. They say what was found and never decide anything.
 flags:
@@ -169,3 +199,26 @@ flags:
   HB-I101:
     severity: info
     message: "Cannot compute {what}: {missing} not found."
+
+  # The credit report analysis (Feature Design 4.7). They say what the report shows, and decide nothing.
+  CR-W101:
+    severity: warning
+    message: "{creditor} utilization is {utilization}, above the review level of {level}."
+  CR-W102:
+    severity: warning
+    message: "A {severity} late payment on {creditor}, {months} months before the report date (lookback {lookback} months)."
+  CR-W103:
+    severity: warning
+    message: "The {creditor} inquiry of {date} has no account opened within {days} days of it."
+  CR-W104:
+    severity: warning
+    message: "{creditor} shows {past_due} past due."
+  CR-W105:
+    severity: warning
+    message: "Alerts on the credit report: {alerts}."
+  CR-I101:
+    severity: info
+    message: "Cannot compute {what}: {missing} not found."
+  CR-I102:
+    severity: info
+    message: "The {creditor} inquiry of {date} matches the new account {account}, opened {opened}."
