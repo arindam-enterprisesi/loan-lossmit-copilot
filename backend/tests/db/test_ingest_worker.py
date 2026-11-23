@@ -21,7 +21,7 @@ from app.db.seed import case_id, seed
 from app.services.document_config import get_document_fields, get_validation_config
 from app.services.fake_reader import FakeClassifier, FakeExtractor
 from app.services.ingestion import BBox, NotImplementedOcr, OcrLine
-from app.services.ingestion_config import IngestionConfig
+from app.services.ingestion_config import IngestionConfig, get_ingestion_config
 from app.services.pipeline import Readers, run_pipeline_job
 from app.storage import Storage, StorageError
 from app.worker import process_documents
@@ -36,8 +36,8 @@ CORRUPT = "broken/corrupt_bank_statement.pdf"
 PHOTO = "broken/scan_pay_stub_photo.pdf"
 SCAN_JPG = "broken/scan_mortgage_statement.jpg"
 # Full resolution where the size matters; a small one for the tests that read every file.
-DPI_200 = IngestionConfig(version="t", label="illustrative", max_file_mb=25, render_dpi=200)
-DPI_50 = IngestionConfig(version="t", label="illustrative", max_file_mb=25, render_dpi=50)
+DPI_200 = get_ingestion_config().model_copy(update={"render_dpi": 200})
+DPI_50 = get_ingestion_config().model_copy(update={"render_dpi": 50})
 NO_OCR = "no readable text and OCR is not available yet"
 
 
@@ -449,3 +449,115 @@ async def test_an_ocr_engine_that_finds_no_text_fails_the_page(
     )
     [event] = await audit_of(session, "document.ingest_failed")
     assert event.after["reason_code"] == "no_text"
+
+
+# --- a thin text layer, and recording which engine read a page ------------------------------------
+
+
+def thin_pdf(text: str = "Hi") -> bytes:
+    """A one-page PDF whose whole text layer is a couple of characters (a scan with a stamp)."""
+    from reportlab.pdfgen import canvas
+
+    buffer = io.BytesIO()
+    sheet = canvas.Canvas(buffer, pagesize=(612, 792))
+    sheet.drawString(72, 700, text)
+    sheet.save()
+    return buffer.getvalue()
+
+
+class VersionedOcr(FakeOcr):
+    version = "5.3.0"
+
+
+async def upload_thin(client: httpx.AsyncClient) -> dict[str, Any]:
+    response = await upload(client, DANIEL, [("thin.pdf", thin_pdf())])
+    assert response.status_code == 202, response.text
+    return response.json()
+
+
+async def test_a_page_with_only_a_few_characters_of_text_goes_to_ocr(
+    docs_client: httpx.AsyncClient,
+    session: AsyncSession,
+    s3_storage: Storage,
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    body = await upload_thin(docs_client)
+    [doc] = body["documents"]
+    ocr = FakeOcr()
+
+    await run_job(body, s3_storage, session_factory, ocr=ocr)
+
+    assert len(ocr.calls) == 1  # "Hi" is below the configured minimum of characters
+    assert [text for _, text in await lines_of(session, doc["id"])] == [
+        "Net pay 2,033.61",
+        "Gross 3,070.50",
+    ]
+    read_by = await rows(session, "SELECT read_by FROM pages WHERE document_id = :d", d=doc["id"])
+    assert [r.read_by for r in read_by] == ["tesseract"]
+
+
+async def test_the_minimum_comes_from_the_configuration(
+    docs_client: httpx.AsyncClient,
+    session: AsyncSession,
+    s3_storage: Storage,
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    body = await upload_thin(docs_client)
+    [doc] = body["documents"]
+    ocr = FakeOcr()
+    config = DPI_50.model_copy(update={"ocr": DPI_50.ocr.model_copy(update={"min_text_chars": 2})})
+
+    await run_job(body, s3_storage, session_factory, config=config, ocr=ocr)
+
+    assert ocr.calls == []  # two characters now count as a text layer
+    assert await lines_of(session, doc["id"]) == [("p1-L1", "Hi")]
+
+
+@pytest.mark.parametrize("ocr", [NotImplementedOcr(), FakeOcr(lines=[])], ids=["no-ocr", "no-text"])
+async def test_a_thin_text_layer_is_kept_when_ocr_cannot_improve_on_it(
+    docs_client: httpx.AsyncClient,
+    session: AsyncSession,
+    s3_storage: Storage,
+    session_factory: async_sessionmaker[AsyncSession],
+    ocr: Any,
+) -> None:
+    body = await upload_thin(docs_client)
+    [doc] = body["documents"]
+
+    await run_job(body, s3_storage, session_factory, ocr=ocr)
+
+    assert (await job_row(session, body)).status == "succeeded"
+    assert (await document_row(session, doc["id"])).status == "processing"  # not failed
+    assert await lines_of(session, doc["id"]) == [("p1-L1", "Hi")]
+    read_by = await rows(session, "SELECT read_by FROM pages WHERE document_id = :d", d=doc["id"])
+    assert [r.read_by for r in read_by] == ["text_layer"]
+
+
+async def test_the_engine_and_version_are_recorded_for_pages_that_ocr_read(
+    docs_client: httpx.AsyncClient,
+    session: AsyncSession,
+    s3_storage: Storage,
+    session_factory: async_sessionmaker[AsyncSession],
+    rendered: Rendered,
+) -> None:
+    body = await upload_files(docs_client, rendered, [PHOTO])
+
+    await run_job(body, s3_storage, session_factory, config=DPI_200, ocr=VersionedOcr())
+
+    [event] = await audit_of(session, "document.ingested")
+    assert event.after["ocr"] == {"engine": "tesseract", "version": "5.3.0", "pages": [1, 2]}
+
+
+async def test_nothing_is_recorded_about_ocr_for_a_document_read_from_its_text_layer(
+    docs_client: httpx.AsyncClient,
+    session: AsyncSession,
+    s3_storage: Storage,
+    session_factory: async_sessionmaker[AsyncSession],
+    rendered: Rendered,
+) -> None:
+    body = await upload_files(docs_client, rendered, [STUB])
+
+    await run_job(body, s3_storage, session_factory, ocr=VersionedOcr())
+
+    [event] = await audit_of(session, "document.ingested")
+    assert "ocr" not in event.after

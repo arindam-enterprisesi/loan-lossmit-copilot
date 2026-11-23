@@ -127,6 +127,7 @@ def _write(tmp_path: Path, **overrides: Any) -> Path:
         "label": "illustrative",
         "max_file_mb": 25,
         "render_dpi": 200,
+        "ocr": get_ingestion_config().ocr.model_dump(),
     }
     values.update(overrides)
     path = tmp_path / "ingestion.yaml"
@@ -146,6 +147,9 @@ def test_settings_are_loaded_from_a_file(tmp_path: Path) -> None:
         {"max_file_mb": 0},
         {"render_dpi": -1},
         {"surprise": True},  # unknown settings are rejected, not ignored
+        {"ocr": {"surprise": True}},
+        {"ocr": {**get_ingestion_config().ocr.model_dump(), "denoise_kernel": 4}},  # must be odd
+        {"ocr": {**get_ingestion_config().ocr.model_dump(), "min_text_chars": 0}},
     ],
 )
 def test_bad_settings_are_rejected(tmp_path: Path, bad: dict[str, Any]) -> None:
@@ -153,10 +157,11 @@ def test_bad_settings_are_rejected(tmp_path: Path, bad: dict[str, Any]) -> None:
         load_ingestion_config(_write(tmp_path, **bad))
 
 
-def test_a_setting_cannot_be_left_out(tmp_path: Path) -> None:
+@pytest.mark.parametrize("name", ["version", "label", "max_file_mb", "render_dpi", "ocr"])
+def test_a_setting_cannot_be_left_out(tmp_path: Path, name: str) -> None:
     path = _write(tmp_path)
     data = yaml.safe_load(path.read_text(encoding="utf-8"))
-    del data["version"]
+    del data[name]
     path.write_text(yaml.safe_dump(data), encoding="utf-8")
     with pytest.raises(ValidationError):
         load_ingestion_config(path)

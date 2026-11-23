@@ -101,6 +101,7 @@ class Readers:
     dpi: int
     rules: ValidationConfig
     cfg: DocumentFieldsConfig
+    min_text_chars: int = 1  # pages with a shorter text layer are read by OCR
 
 
 @dataclass(frozen=True)
@@ -142,7 +143,12 @@ async def ingest_stage(
     session: AsyncSession, readers: Readers, document_id: uuid.UUID
 ) -> StageOutcome:
     result = await ingest_document(
-        session, readers.storage, readers.ocr, document_id, dpi=readers.dpi
+        session,
+        readers.storage,
+        readers.ocr,
+        document_id,
+        dpi=readers.dpi,
+        min_text_chars=readers.min_text_chars,
     )
     return StageOutcome(proceed=True) if result.ok else StageOutcome(False, result.reason)
 

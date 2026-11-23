@@ -25,6 +25,8 @@ dependencies = [
     "python-jose[cryptography]>=3.3",
     "python-multipart>=0.0.34",
     "pillow>=13.0.0",
+    "pytesseract>=0.3.13",
+    "opencv-python-headless>=5.1.0.95",
 ]
 
 [dependency-groups]
@@ -64,5 +66,13 @@ plugins = ["pydantic.mypy"]
 packages = ["app"]
 
 [[tool.mypy.overrides]]
-module = ["pdfplumber", "pdfplumber.*", "pypdfium2", "pypdfium2.*", "moto", "moto.*"]
+module = [
+    "pdfplumber",
+    "pdfplumber.*",
+    "pypdfium2",
+    "pypdfium2.*",
+    "pytesseract",
+    "moto",
+    "moto.*",
+]
 ignore_missing_imports = true

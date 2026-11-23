@@ -192,7 +192,7 @@ def test_a_truncated_jpeg_is_unreadable(rendered: Rendered) -> None:
 # --- the OCR seam ---------------------------------------------------------------------------
 
 
-def test_the_default_ocr_adapter_is_a_not_implemented_stub() -> None:
-    with pytest.raises(NotImplementedError, match="OCR is not implemented"):
+def test_the_stub_adapter_says_ocr_is_not_available() -> None:
+    with pytest.raises(NotImplementedError, match="OCR is not available"):
         NotImplementedOcr().read_page(b"png", 10, 10)
     assert NotImplementedOcr().read_by.value == "tesseract"

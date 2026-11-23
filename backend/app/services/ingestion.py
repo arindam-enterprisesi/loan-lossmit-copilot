@@ -106,7 +106,10 @@ class OcrLine:
 
 
 class OcrAdapter(Protocol):
-    """Reads a page image that has no text layer. Real OCR is plugged in here later."""
+    """Reads a page image that has no text layer (Tesseract, in ``app.services.ocr``).
+
+    An adapter may also have a ``version`` string; ingestion records it with the pages it read.
+    """
 
     @property
     def read_by(self) -> ReadBy:
@@ -119,12 +122,12 @@ class OcrAdapter(Protocol):
 
 
 class NotImplementedOcr:
-    """The default until OCR exists: every image-only page stays unread."""
+    """OCR switched off or not installed: every image-only page stays unread."""
 
     read_by = ReadBy.TESSERACT
 
     def read_page(self, png: bytes, width: int, height: int) -> list[OcrLine]:
-        raise NotImplementedError("OCR is not implemented yet")
+        raise NotImplementedError("OCR is not available")
 
 
 # --- parsers --------------------------------------------------------------------------------
@@ -287,8 +290,13 @@ async def ingest_document(
     document_id: uuid.UUID,
     *,
     dpi: int,
+    min_text_chars: int = 1,
 ) -> IngestResult:
     """Read one document into ``pages`` and ``lines``. Flushes; the caller commits.
+
+    A page whose text layer holds fewer than ``min_text_chars`` characters is sent to OCR. If OCR
+    is unavailable or finds nothing, whatever text layer the page has is kept; only a page with no
+    text at all fails (DI-E301).
 
     Safe to run again: the document's earlier pages and lines are replaced.
     """
@@ -306,22 +314,26 @@ async def ingest_document(
     except IngestionError as exc:
         return await _fail(session, document, exc.code, exc.reason)
 
-    # Pages with no text layer go to OCR. With the default adapter they stay unread.
+    # Pages with no (or hardly any) text layer go to OCR. With the default adapter they stay unread.
     unavailable: list[int] = []
     empty: list[int] = []
+    ocr_pages: list[int] = []
     for page in parsed.pages:
-        if page.lines:
+        if sum(len(line.text) for line in page.lines) >= min_text_chars:
             continue
         try:
             ocr_lines = await asyncio.to_thread(ocr.read_page, page.png, page.width, page.height)
         except NotImplementedError:
-            unavailable.append(page.page_no)
-            continue
+            if not page.lines:
+                unavailable.append(page.page_no)
+            continue  # a thin text layer is better than none
         if not ocr_lines:
-            empty.append(page.page_no)
+            if not page.lines:
+                empty.append(page.page_no)
             continue
         page.lines = [ParsedLine(o.text, o.bbox, o.confidence) for o in ocr_lines]
         page.read_by = ocr.read_by
+        ocr_pages.append(page.page_no)
 
     # Replace what an earlier run stored (lines go with their pages).
     await session.execute(
@@ -388,10 +400,29 @@ async def ingest_document(
         entity_type="document",
         entity_id=document.id,
         case_id=document.case_id,
-        after={"page_count": len(parsed.pages), "line_count": line_count},
+        after={
+            "page_count": len(parsed.pages),
+            "line_count": line_count,
+            # Which engine read which pages, so a figure read by OCR can be traced to its engine.
+            **(
+                {
+                    "ocr": {
+                        "engine": ocr.read_by.value,
+                        "version": getattr(ocr, "version", None),
+                        "pages": ocr_pages,
+                    }
+                }
+                if ocr_pages
+                else {}
+            ),
+        },
     )
     logger.info(
-        "ingested document=%s pages=%d lines=%d", document.id, len(parsed.pages), line_count
+        "ingested document=%s pages=%d lines=%d ocr_pages=%d",
+        document.id,
+        len(parsed.pages),
+        line_count,
+        len(ocr_pages),
     )
     return IngestResult(
         document.id, document.file_name, True, page_count=len(parsed.pages), line_count=line_count
