@@ -188,10 +188,11 @@ async def test_the_documents_with_no_planted_defect_raise_no_flag(
 
 
 async def test_a_type_with_no_reader_gives_no_fields_and_says_so(rendered: Rendered) -> None:
-    lines, _ = lines_of(rendered, "daniel_reyes/credit_report_2026-10-12.pdf")
-    outcome = await FakeExtractor().extract("credit_report", lines)
+    path = "angela_whitfield/hardship_letter.pdf"  # its facts are read by the hardship task
+    lines, _ = lines_of(rendered, path)
+    outcome = await FakeExtractor().extract("hardship_letter", lines)
     assert outcome.fields == {} and outcome.signals == []
-    _, report = await check(rendered, "daniel_reyes/credit_report_2026-10-12.pdf")
+    _, report = await check(rendered, path)
     assert [f.message for f in report.findings] == ["No fields were extracted from this document."]
 
 
@@ -323,3 +324,159 @@ def test_a_task_module_that_is_broken_is_never_hidden_behind_the_fake(
     monkeypatch.setattr(classification, "llm_tasks", broken)
     with pytest.raises(ImportError, match="langchain_core"):
         get_classifier("auto")
+
+
+# --- the credit report, the mortgage statement and the application ----------------------------
+
+CREDIT_REPORT = "daniel_reyes/credit_report_2026-10-12.pdf"
+MORTGAGE_STATEMENT = "angela_whitfield/mortgage_statement_2026-10.pdf"
+APPLICATION = "angela_whitfield/mortgage_assistance_application.pdf"
+
+
+def values(outcome: Any) -> dict[str, str]:
+    return {name: field.value for name, field in outcome.fields.items()}
+
+
+async def test_the_credit_report_is_read_into_scores_tradelines_inquiries_and_alerts(
+    rendered: Rendered,
+) -> None:
+    outcome, report = await check(rendered, CREDIT_REPORT)
+
+    got = values(outcome)
+    assert got["report_date"] == "2026-10-12" and got["consumer_name"] == "Daniel Reyes"
+    assert got["alerts"] == "none"
+    assert [got[f"score_{n:03d}_value"] for n in (1, 2, 3)] == ["712", "698", "705"]
+    assert got["score_003_bureau"] == "Bureau C"
+    assert {k: v for k, v in got.items() if k.startswith("tradeline_001_")} == {
+        "tradeline_001_creditor": "Northgate Card",
+        "tradeline_001_account_type": "revolving",
+        "tradeline_001_ownership": "individual",
+        "tradeline_001_open_date": "2019-06-14",
+        "tradeline_001_status": "open",
+        "tradeline_001_balance": "2,940.00",
+        "tradeline_001_credit_limit": "8,000.00",
+        "tradeline_001_monthly_payment": "88.00",
+        "tradeline_001_past_due": "0.00",
+        "tradeline_001_late_30": "1",
+        "tradeline_001_late_60": "0",
+        "tradeline_001_late_90": "0",
+        "tradeline_001_most_recent_late": "2025-03-05",
+    }
+    assert "tradeline_004_credit_limit" not in got  # "Limit n/a" is no value, never a guess
+    assert "tradeline_002_most_recent_late" not in got and "tradeline_002_remarks" not in got
+    assert got["tradeline_003_remarks"] == "new account"
+    assert (got["inquiry_002_creditor"], got["inquiry_002_date"]) == (
+        "Orion Mortgage",
+        "2026-07-08",
+    )
+    assert sum(1 for k in got if k.endswith("_creditor") and k.startswith("tradeline_")) == 5
+    # each value names the line it was read from
+    assert outcome.fields["tradeline_001_balance"].lines == ["p1-L12"]
+    assert outcome.fields["inquiry_001_date"].lines == ["p1-L32"]
+    assert review_codes(report) == set()
+
+
+async def test_the_credit_report_gives_the_scenarios_figures_through_the_analysis(
+    rendered: Rendered,
+) -> None:
+    """The reader's output, stored and analysed, gives Feature 4's numbers to the cent."""
+    from datetime import date, datetime
+    from uuid import uuid4
+
+    from app.services.analysis_config import get_analysis_config
+    from app.services.case_facts import DocFacts, FieldFact
+    from app.services.credit_runs import read_report
+
+    outcome, _ = await check(rendered, CREDIT_REPORT)
+    prepared = prepare_fields("credit_report", outcome, CFG)
+    facts = {
+        f.name: FieldFact(f.name, f.value, f.normalized, tuple(f.lines), "unreviewed", f.certainty)
+        for f in prepared
+    }
+    doc = DocFacts(
+        id=uuid4(),
+        file_name="c.pdf",
+        doc_type="credit_report",
+        status="needs_review",
+        borrower="Daniel Reyes",
+        period_start=None,
+        period_end=None,
+        created_at=datetime(2026, 11, 24),
+        fields=facts,
+    )
+
+    inputs = read_report([doc])
+
+    assert inputs.report_date == date(2026, 10, 12)
+    assert [s.value for s in inputs.scores] == [712, 698, 705]
+    assert [t.creditor for t in inputs.tradelines][:2] == [
+        "Northgate Card",
+        "Cardinal Rewards Visa",
+    ]
+    from app.services.credit import analyze
+
+    result = analyze(inputs, get_analysis_config())
+    assert result.representative is not None and result.representative.value == 705
+    by_name = {c.name: c.value for c in result.calcs}
+    assert str(by_name["monthly_payments_total"]) == "693.00"
+    assert str(by_name["total_revolving_utilization"]) == "0.280000"
+
+
+async def test_the_mortgage_statement_is_read_into_the_loan_and_arrears_figures(
+    rendered: Rendered,
+) -> None:
+    outcome, report = await check(rendered, MORTGAGE_STATEMENT)
+
+    assert values(outcome) == {
+        "servicer": "Pinebrook Mortgage Servicing",
+        "statement_date": "2026-10-16",
+        "loan_number": "8800412271",
+        "borrower_names": "Angela Whitfield",
+        "unpaid_principal_balance": "212,400.00",
+        "interest_rate": "6.250%",
+        "payment_due_date": "2026-10-01",
+        "principal_and_interest": "1,298.40",
+        "escrow": "421.60",
+        "regular_monthly_payment": "1,720.00",
+        "past_due_amount": "5,160.00",
+        "fees": "0.00",
+        "total_amount_due": "5,160.00",
+    }
+    assert outcome.fields["regular_monthly_payment"].lines == ["p1-L13"]
+    assert outcome.fields["past_due_amount"].lines == ["p1-L14"]
+    assert review_codes(report) == set()
+
+
+async def test_the_application_is_read_into_reasons_intent_and_the_stated_budget(
+    rendered: Rendered,
+) -> None:
+    outcome, report = await check(rendered, APPLICATION)
+
+    got = values(outcome)
+    assert got["borrower_names"] == "Angela Whitfield" and got["intent"] == "Keep the home"
+    assert got["occupancy"] == "Owner-occupied primary residence"
+    assert got["signed_date"] == "2026-10-14" and got["total_monthly_expenses"] == "3,420.00"
+    assert {k: v for k, v in got.items() if k.startswith("hardship_reasons_")} == {
+        "hardship_reasons_001_reason": "Reduction in income"  # only the ticked reason
+    }
+    assert (got["monthly_income_001_description"], got["monthly_income_001_amount"]) == (
+        "Gross monthly income",
+        "4,200.00",
+    )
+    expenses = [
+        (got[f"monthly_expenses_{n:03d}_description"], got[f"monthly_expenses_{n:03d}_amount"])
+        for n in range(1, 6)
+    ]
+    assert expenses == [
+        ("Housing (mortgage)", "1,720.00"),
+        ("Utilities", "310.00"),
+        ("Food and everyday", "780.00"),
+        ("Loan payments", "410.00"),
+        ("Other", "200.00"),
+    ]
+    assert "monthly_expenses_006_description" not in got  # the total line is not an expense
+    assert (got["assets_001_description"], got["assets_001_amount"]) == (
+        "Checking account",
+        "640.25",
+    )
+    assert review_codes(report) == set()

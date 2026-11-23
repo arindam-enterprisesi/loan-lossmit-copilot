@@ -2,9 +2,10 @@
 
 It reads only the numbered lines it is given, and reads what is PRINTED: Daniel's pay stub gives net
 pay ``2,083.61`` on ``p1-L31``, which is what lets the arithmetic check catch it. It understands the
-synthetic documents this project generates (``data/synthetic``): a pay stub and a bank statement in
-full, and the title lines of every other type. Anything else comes back unrecognised or empty, never
-guessed. Every result is stamped provider ``fake`` so it can never be mistaken for a model's.
+synthetic documents this project generates (``data/synthetic``): a pay stub, a bank statement, a
+credit report, a mortgage statement and a mortgage assistance application in full, and the title
+lines of every other type. Anything else comes back unrecognised or empty, never guessed. Every
+result is stamped provider ``fake`` so it can never be mistaken for a model's.
 """
 
 from __future__ import annotations
@@ -89,6 +90,7 @@ def _read_pay_stub(lines: Sequence[DocLine]) -> ExtractionOutcome:
         r.put("pay_period_start", period[1].group(1), period[0].ref)
         r.put("pay_period_end", period[1].group(2), period[0].ref)
     r.take("pay_date", r"^Pay date:\s*(\S+)\s*$")
+    r.take("pay_frequency", r"^Pay frequency:\s*(.+?)\s*$")
     r.take("account_last4", r"[Aa]ccount ending\s+(\d{4})\b")
 
     in_earnings = False  # the EARNINGS block: one row per earnings kind, until "Gross Pay"
@@ -150,10 +152,172 @@ def _read_bank_statement(lines: Sequence[DocLine]) -> ExtractionOutcome:
     return ExtractionOutcome(r.fields, [], PROVIDER, MODEL, "fake-extract@1")
 
 
+_DATE = r"\d{4}-\d{2}-\d{2}"
+_NOTHING = {"none", "n/a", ""}  # what a report prints for "no value"
+_TRADELINE = re.compile(
+    rf"^(?P<creditor>.+?) \| (?P<kind>\w+) \| (?P<owner>\w+) \| opened (?P<opened>{_DATE}) "
+    r"\| status (?P<status>.+)$"
+)
+_TRADELINE_AMOUNTS = re.compile(
+    rf"^Balance ({_AMOUNT}) Limit ({_AMOUNT}|n/a) Monthly payment ({_AMOUNT}) Past due ({_AMOUNT})$"
+)
+_TRADELINE_LATE = re.compile(
+    rf"^Late payments: 30-day (\d+), 60-day (\d+), 90-day (\d+) Most recent late: ({_DATE}|none)$"
+)
+
+
+def _read_credit_report(lines: Sequence[DocLine]) -> ExtractionOutcome:
+    """Scores, tradelines, inquiries and alerts of the generated sample credit report."""
+    r = _Reader(lines)
+    r.take("report_date", rf"^Report date:\s*({_DATE})\s*$")
+    consumer = r.match(r"^Consumer:\s*(.+?)(?:\s+SSN\b.*)?$")
+    if consumer:
+        r.put("consumer_name", consumer[1].group(1).strip(), consumer[0].ref)
+    r.take("alerts", r"^Alerts:\s*(.+)$")
+    scores = tradelines = inquiries = 0
+    section = ""
+    current: int | None = None
+    for ln in r.lines:
+        text = ln.text.strip()
+        if text in {"SCORES", "TRADELINES", "INQUIRIES"}:
+            section = text
+            continue
+        if text.startswith(("Collections:", "Public records:")):
+            section = ""
+        if section == "SCORES":
+            found = re.match(r"^(Bureau \w+) score (\d{3})$", text)
+            if found:
+                scores += 1
+                r.put(f"score_{scores:03d}_bureau", found.group(1), ln.ref)
+                r.put(f"score_{scores:03d}_value", found.group(2), ln.ref)
+        elif section == "TRADELINES":
+            head = _TRADELINE.match(text)
+            amounts = _TRADELINE_AMOUNTS.match(text)
+            late = _TRADELINE_LATE.match(text)
+            if head:
+                tradelines += 1
+                current = tradelines
+                for part, value in (
+                    ("creditor", head["creditor"]),
+                    ("account_type", head["kind"]),
+                    ("ownership", head["owner"]),
+                    ("open_date", head["opened"]),
+                    ("status", head["status"]),
+                ):
+                    r.put(f"tradeline_{current:03d}_{part}", value, ln.ref)
+            elif amounts and current:
+                for part, value in zip(
+                    ("balance", "credit_limit", "monthly_payment", "past_due"),
+                    amounts.groups(),
+                    strict=True,
+                ):
+                    if value.lower() not in _NOTHING:
+                        r.put(f"tradeline_{current:03d}_{part}", value, ln.ref)
+            elif late and current:
+                for part, value in zip(
+                    ("late_30", "late_60", "late_90", "most_recent_late"),
+                    late.groups(),
+                    strict=True,
+                ):
+                    if value.lower() not in _NOTHING:
+                        r.put(f"tradeline_{current:03d}_{part}", value, ln.ref)
+            elif text.startswith("Remarks:") and current:
+                remark = text.split(":", 1)[1].strip()
+                if remark.lower() not in _NOTHING:
+                    r.put(f"tradeline_{current:03d}_remarks", remark, ln.ref)
+        elif section == "INQUIRIES":
+            found = re.match(rf"^(.+?)\s+({_DATE})$", text)
+            if found:
+                inquiries += 1
+                r.put(f"inquiry_{inquiries:03d}_creditor", found.group(1), ln.ref)
+                r.put(f"inquiry_{inquiries:03d}_date", found.group(2), ln.ref)
+    return ExtractionOutcome(r.fields, [], PROVIDER, MODEL, "fake-extract@1")
+
+
+def _read_mortgage_statement(lines: Sequence[DocLine]) -> ExtractionOutcome:
+    """The parts of the generated mortgage statement the loan record and the budget read."""
+    r = _Reader(lines)
+    first = next((ln for ln in r.lines if ln.page == 1), None)
+    if first:
+        r.put("servicer", first.text.strip(), first.ref)
+    r.take("statement_date", rf"^Statement date:\s*({_DATE})\s*$")
+    r.take("loan_number", r"^Loan number:\s*(\S+)\s*$")
+    r.take("borrower_names", r"^Borrower:\s*(.+)$")
+    r.take("unpaid_principal_balance", rf"^Unpaid principal balance\s+({_AMOUNT})\s*$")
+    r.take("interest_rate", r"^Interest rate\s+(\S+)\s*$")
+    r.take("payment_due_date", rf"^Payment due date:\s*({_DATE})\s*$")
+    r.take("principal_and_interest", rf"^Principal and interest\s+({_AMOUNT})\s*$")
+    r.take("escrow", rf"^Escrow[^\d]*\s({_AMOUNT})\s*$")
+    r.take("regular_monthly_payment", rf"^Monthly payment\s+({_AMOUNT})\s*$")
+    r.take("past_due_amount", rf"^Past due amount\s+({_AMOUNT})\s*$")
+    r.take("fees", rf"^Late fees\s+({_AMOUNT})\s*$")
+    r.take("total_amount_due", rf"^Total amount due\s+({_AMOUNT})\s*$")
+    return ExtractionOutcome(r.fields, [], PROVIDER, MODEL, "fake-extract@1")
+
+
+_ROW = re.compile(rf"^(.+?)\s+({_AMOUNT})\s*$")
+_APPLICATION_SECTIONS = {
+    "REASON FOR HARDSHIP": "reasons",
+    "MONTHLY INCOME": "income",
+    "MONTHLY EXPENSES": "expenses",
+    "ASSETS": "assets",
+}
+_APPLICATION_PREFIX = {
+    "income": "monthly_income_",
+    "expenses": "monthly_expenses_",
+    "assets": "assets_",
+}
+
+
+def _read_application(lines: Sequence[DocLine]) -> ExtractionOutcome:
+    """The generated mortgage assistance application: the reasons ticked, the intent, and the
+    stated income, expenses and assets as the borrower wrote them."""
+    r = _Reader(lines)
+    r.take("borrower_names", r"^Borrower:\s*(.+)$")
+    r.take("loan_number", r"^Loan number:\s*(\S+)\s*$")
+    r.take("property_address", r"^Property address:\s*(.+)$")
+    r.take("occupancy", r"^Occupancy:\s*(.+)$")
+    r.take("intent", r"^What do you want to do with the home\?\s*(.+)$")
+    r.take("signed_date", rf"Date signed:\s*({_DATE})\s*$")
+    section = ""
+    counts = {"reasons": 0, "income": 0, "expenses": 0, "assets": 0}
+    for ln in r.lines:
+        text = ln.text.strip()
+        if text in _APPLICATION_SECTIONS:
+            section = _APPLICATION_SECTIONS[text]
+            continue
+        if text.startswith(("What do you want", "Documents enclosed")):
+            section = ""
+        if section == "reasons":
+            ticked = re.match(r"^\[[xX]\]\s*(.+)$", text)
+            if ticked:
+                counts["reasons"] += 1
+                r.put(f"hardship_reasons_{counts['reasons']:03d}_reason", ticked.group(1), ln.ref)
+            continue
+        row = _ROW.match(text)
+        if not row or not section:
+            continue
+        description, amount = row.groups()
+        if section == "expenses" and description.lower().startswith("total monthly expenses"):
+            r.put("total_monthly_expenses", amount, ln.ref)
+            continue
+        counts[section] += 1
+        prefix = f"{_APPLICATION_PREFIX[section]}{counts[section]:03d}"
+        r.put(f"{prefix}_description", description, ln.ref)
+        r.put(f"{prefix}_amount", amount, ln.ref)
+    return ExtractionOutcome(r.fields, [], PROVIDER, MODEL, "fake-extract@1")
+
+
 class FakeExtractor:
     async def extract(self, doc_type: str, lines: Sequence[DocLine]) -> ExtractionOutcome:
         if doc_type == "pay_stub":
             return _read_pay_stub(lines)
         if doc_type == "bank_statement":
             return _read_bank_statement(lines)
+        if doc_type == "credit_report":
+            return _read_credit_report(lines)
+        if doc_type == "mortgage_statement":
+            return _read_mortgage_statement(lines)
+        if doc_type == "mortgage_assistance_application":
+            return _read_application(lines)
         return ExtractionOutcome({}, [], PROVIDER, MODEL, "fake-extract@1")
