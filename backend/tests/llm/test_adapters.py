@@ -95,10 +95,24 @@ async def test_bedrock_ignores_fallbacks_and_needs_region(monkeypatch: pytest.Mo
         await BedrockClaudeAdapter().complete(make_request())
 
 
-async def test_bedrock_builds_mantle_client(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("AWS_REGION", "us-east-1")
+async def test_bedrock_builds_the_runtime_client_not_mantle(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # bedrock-runtime (InvokeModel) is the endpoint that works with the models the AWS admin named
+    # (Sonnet 4.6, Haiku 4.5); the Mantle endpoint needs a separate permission that was not granted.
+    monkeypatch.setenv("AWS_REGION", "ap-south-1")
     client = BedrockClaudeAdapter()._create_client()
-    assert type(client).__name__ == "AsyncAnthropicBedrockMantle"
+    assert type(client).__name__ == "AsyncAnthropicBedrock"
+    assert client.aws_region == "ap-south-1"
+    assert str(client.base_url).startswith("https://bedrock-runtime.ap-south-1.amazonaws.com")
+
+
+async def test_bedrock_region_falls_back_to_aws_default_region(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("AWS_REGION", raising=False)
+    monkeypatch.setenv("AWS_DEFAULT_REGION", "us-east-1")
+    assert BedrockClaudeAdapter()._create_client().aws_region == "us-east-1"
 
 
 # ---------- Gemini and OpenAI (LangChain) ----------
