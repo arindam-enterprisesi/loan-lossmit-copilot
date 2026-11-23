@@ -2,6 +2,7 @@
 
 import { Upload, X } from "lucide-react";
 import { useRef, useState } from "react";
+import { useToast } from "@/components/shared/toast";
 import { Button } from "@/components/ui/button";
 import { uploadDocuments } from "@/lib/api";
 import { checkFiles, DOCUMENT_TYPES, docTypeLabel } from "@/lib/documents";
@@ -21,6 +22,7 @@ interface UploadPanelProps {
 
 /** Drop zone, document type and upload button for one case. Shows progress while the job runs. */
 export function UploadPanel({ caseId, onUploaded, onJobFinished }: UploadPanelProps) {
+  const toast = useToast();
   const inputRef = useRef<HTMLInputElement>(null);
   const [files, setFiles] = useState<File[]>([]);
   const [declaredType, setDeclaredType] = useState<DocumentType | "auto">("auto");
@@ -47,7 +49,8 @@ export function UploadPanel({ caseId, onUploaded, onJobFinished }: UploadPanelPr
       setFiles([]);
       onUploaded?.();
     } catch (e) {
-      setProblems([e instanceof Error ? e.message : "The upload did not finish. Try again."]);
+      // The files stay in the list, so "Try again" sends the same ones.
+      toast.error(e instanceof Error ? e.message : "The upload did not finish.", { retry: () => submit() });
     } finally {
       setUploading(false);
     }

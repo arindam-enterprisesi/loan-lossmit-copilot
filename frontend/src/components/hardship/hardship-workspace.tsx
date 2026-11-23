@@ -3,9 +3,12 @@
 import { useCallback, useEffect, useState } from "react";
 import { JobProgress } from "@/components/documents/job-progress";
 import { SELECT_CLASS } from "@/components/documents/select-class";
+import { EmptyState } from "@/components/shared/empty-state";
+import { ErrorNotice } from "@/components/shared/error-notice";
 import { FlagChip } from "@/components/shared/flag-chip";
+import { CardsSkeleton, TableSkeleton } from "@/components/shared/skeletons";
+import { useToast } from "@/components/shared/toast";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { adjustBudgetItem, confirmProfileItem, getLatestHardship, runHardshipAssessment } from "@/lib/api";
 import { ApiError } from "@/lib/api-error";
@@ -33,13 +36,16 @@ const messageOf = (e: unknown, fallback: string): string => (e instanceof Error 
  * returned it, with its working. A person confirms the judgements and adjusts budget items.
  */
 export function HardshipWorkspace({ cases, pillarSlug }: HardshipWorkspaceProps) {
+  const toast = useToast();
   const [caseId, setCaseId] = useState<string | null>(cases[0]?.id ?? null);
   const [assessment, setAssessment] = useState<HardshipAssessment | null>(null);
   const [loaded, setLoaded] = useState(false); // the check for an existing result has finished
-  const [error, setError] = useState<string | null>(null);
+  // What went wrong and which step "Try again" repeats.
+  const [error, setError] = useState<{ message: string; retry: () => void } | null>(null);
   const [jobId, setJobId] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
   const [selectedKey, setSelectedKey] = useState<ProfileKey | null>(null);
+  const [hoveredKey, setHoveredKey] = useState<ProfileKey | null>(null);
 
   // Loads the latest result. "Not run yet" (404) is a normal state, not an error.
   const load = useCallback(async () => {
@@ -49,7 +55,7 @@ export function HardshipWorkspace({ cases, pillarSlug }: HardshipWorkspaceProps)
       setError(null);
     } catch (e) {
       if (e instanceof ApiError && e.status === 404) setAssessment(null);
-      else setError(messageOf(e, "Could not load the hardship assessment."));
+      else setError({ message: messageOf(e, "Could not load the hardship assessment."), retry: () => void load() });
     } finally {
       setLoaded(true);
     }
@@ -62,7 +68,11 @@ export function HardshipWorkspace({ cases, pillarSlug }: HardshipWorkspaceProps)
   const { job } = useJobPoll(jobId, async (done) => {
     setRunning(false);
     if (done.status === "succeeded") await load();
-    else setError(done.error ? `The analysis failed: ${done.error}` : "The analysis failed.");
+    else
+      setError({
+        message: done.error ? `The analysis failed: ${done.error}` : "The analysis failed.",
+        retry: () => void onRun(),
+      });
   });
 
   const onRun = async () => {
@@ -73,18 +83,17 @@ export function HardshipWorkspace({ cases, pillarSlug }: HardshipWorkspaceProps)
       setJobId((await runHardshipAssessment(caseId)).id);
     } catch (e) {
       setRunning(false);
-      setError(messageOf(e, "Could not start the analysis."));
+      setError({ message: messageOf(e, "Could not start the analysis."), retry: () => void onRun() });
     }
   };
 
-  // Confirming has no window, so a failure is shown on the screen.
+  // Confirming has no window, so a failure is a toast. The screen is fine, so it gives another try.
   const onConfirmItem = async (key: ProfileKey) => {
     if (!caseId) return;
     try {
       setAssessment(await confirmProfileItem(caseId, { key, action: "confirm" }));
-      setError(null);
     } catch (e) {
-      setError(messageOf(e, "Could not confirm the item."));
+      toast.error(messageOf(e, "Could not confirm the item."), { retry: () => onConfirmItem(key) });
     }
   };
 
@@ -115,6 +124,7 @@ export function HardshipWorkspace({ cases, pillarSlug }: HardshipWorkspaceProps)
               setJobId(null);
               setRunning(false);
               setSelectedKey(null);
+              setHoveredKey(null);
               setCaseId(e.target.value);
             }}
           >
@@ -131,20 +141,22 @@ export function HardshipWorkspace({ cases, pillarSlug }: HardshipWorkspaceProps)
       </div>
 
       {running && job ? <JobProgress job={job} subject="Hardship analysis" /> : null}
-      {error ? (
-        <p role="alert" className="text-sm text-danger">
-          {error}
-        </p>
-      ) : null}
+      {error ? <ErrorNotice message={error.message} onRetry={error.retry} /> : null}
 
       {!loaded ? (
-        <Skeleton className="h-40 w-full" />
+        <div className="space-y-4">
+          <div className="grid gap-4 lg:grid-cols-2">
+            <CardsSkeleton count={1} label="Loading the letter" />
+            <CardsSkeleton count={4} label="Loading the profile" />
+          </div>
+          <TableSkeleton rows={3} columns={4} label="Loading the checks" />
+        </div>
       ) : !assessment || !caseId ? (
-        <div className="rounded-xl border border-dashed bg-panel p-8 text-center text-sm text-muted-foreground">
+        <EmptyState title={running ? "Reading the letter" : "Not run yet"}>
           {running
             ? "Reading the letter and building the budget. The result appears here when it is done."
             : `No hardship analysis yet${selectedCase ? ` for ${selectedCase.title}` : ""}. Press Run analysis to read the letter and build the budget.`}
-        </div>
+        </EmptyState>
       ) : (
         <>
           <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
@@ -168,11 +180,13 @@ export function HardshipWorkspace({ cases, pillarSlug }: HardshipWorkspaceProps)
                   caseId={caseId}
                   pillarSlug={pillarSlug}
                   selectedKey={selectedKey}
+                  hoveredKey={hoveredKey}
                 />
                 <ProfilePanel
                   items={assessment.profile}
                   selectedKey={selectedKey}
                   onSelect={setSelectedKey}
+                  onHover={setHoveredKey}
                   onConfirm={onConfirmItem}
                   onCorrect={onCorrectItem}
                 />

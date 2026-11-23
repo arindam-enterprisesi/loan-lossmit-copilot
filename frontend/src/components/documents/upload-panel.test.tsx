@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { ToastProvider } from "@/components/shared/toast";
 import { UploadPanel } from "./upload-panel";
 
 const api = vi.hoisted(() => ({
@@ -57,13 +58,39 @@ describe("UploadPanel", () => {
     expect(screen.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "100");
   });
 
-  it("shows the error and keeps the files when the upload fails", async () => {
+  it("shows the error as a message with Try again, and keeps the files, when the upload fails", async () => {
     api.uploadDocuments.mockRejectedValue(new Error("File too large"));
-    render(<UploadPanel caseId="c1" />);
+    render(
+      <ToastProvider>
+        <UploadPanel caseId="c1" />
+      </ToastProvider>,
+    );
     choose(pdf());
     fireEvent.click(screen.getByRole("button", { name: "Upload 1" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("File too large");
     expect(screen.getByText("paystub.pdf")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Try again" })).toBeInTheDocument();
+  });
+
+  it("Try again sends the same files again, and the message goes away", async () => {
+    api.uploadDocuments
+      .mockRejectedValueOnce(new Error("Network down"))
+      .mockResolvedValueOnce({ documents: [], job: { id: "job-1", status: "queued", progress: 0 } });
+    api.getJob.mockResolvedValue({ id: "job-1", status: "succeeded", progress: 1 });
+    const onUploaded = vi.fn();
+    render(
+      <ToastProvider>
+        <UploadPanel caseId="c1" onUploaded={onUploaded} />
+      </ToastProvider>,
+    );
+    choose(pdf());
+    fireEvent.click(screen.getByRole("button", { name: "Upload 1" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Try again" }));
+
+    await waitFor(() => expect(onUploaded).toHaveBeenCalledTimes(1));
+    expect(api.uploadDocuments).toHaveBeenCalledTimes(2);
+    expect(api.uploadDocuments.mock.calls[1][1]).toHaveLength(1); // the one file that was waiting
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
   it("cannot upload without a case", () => {

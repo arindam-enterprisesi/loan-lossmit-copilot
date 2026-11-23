@@ -48,6 +48,14 @@ describe("BudgetTable", () => {
     expect(screen.getByText(/Observed basis: July 2026 statement/)).toBeInTheDocument();
   });
 
+  it("shows a gap that came without a sign as it came, with no plus added", () => {
+    const budget = base().budget;
+    budget.lines = budget.lines.map((l) => (l.id === "other" ? { ...l, difference_unsigned: true } : l));
+    setup(budget);
+    expect(row("other").getByText("210.00")).toBeInTheDocument();
+    expect(row("other").queryByText("+210.00")).not.toBeInTheDocument();
+  });
+
   it("has no Adjust buttons when no one can adjust", () => {
     setup(base().budget, null);
     expect(screen.queryByRole("button", { name: /^Adjust / })).not.toBeInTheDocument();

@@ -129,7 +129,7 @@ describe("HardshipWorkspace with an earlier result: the Budget tab", () => {
   it("opens the working behind a measure", async () => {
     await openBudget();
     fireEvent.click(screen.getByRole("button", { name: "Show working for Arrears" }));
-    expect(screen.getByText(/3 × 1,720\.00/)).toBeInTheDocument();
+    expect(await screen.findByText(/3 × 1,720\.00/)).toBeInTheDocument();
   });
 
   it("adjusting 'Other' to 200.00 with a reason updates the measures and the table at once", async () => {
@@ -148,7 +148,7 @@ describe("HardshipWorkspace with an earlier result: the Budget tab", () => {
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Show working for Monthly surplus (observed)" }));
-    expect(screen.getAllByText(/3,350\.00 − 3,420\.00/)).toHaveLength(2); // both bases now use the same total
+    expect(await screen.findAllByText(/3,350\.00 − 3,420\.00/)).toHaveLength(2); // both bases now use the same total
   });
 
   it("the Hardship tab's spending check follows the adjustment", async () => {

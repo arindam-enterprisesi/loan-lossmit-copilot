@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { realAngelaHardship } from "./hardship-real-sample";
 
 // api.ts reads NEXT_PUBLIC_USE_MOCKS once when it loads, so each test loads a fresh copy.
 const loadApi = async (useMocks: "true" | "false") => {
@@ -121,18 +122,18 @@ describe("completeness calls", () => {
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
     const { runCompleteness } = await loadApi("true");
-    const r = await runCompleteness("22222222-2222-4222-8222-222222222222", "pillar2-loss-mitigation@1");
+    const r = await runCompleteness("22222222-2222-4222-8222-222222222222", "pillar2-hardship@1");
     expect(r.overall_status).toBe("incomplete");
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });
 
 describe("hardship assessment calls", () => {
-  it("real mode: POSTs the run and GETs the latest result from the Feature Design paths", async () => {
+  it("real mode: POSTs the run (the backend answers { job }) and GETs the latest result, translated", async () => {
     const fetchMock = vi
       .fn()
-      .mockResolvedValueOnce(reply(202, job))
-      .mockResolvedValueOnce(reply(200, { id: "h1", case_id: "c1", measures: [] }));
+      .mockResolvedValueOnce(reply(202, { job }))
+      .mockResolvedValueOnce(reply(200, realAngelaHardship()));
     vi.stubGlobal("fetch", fetchMock);
     const { getLatestHardship, runHardshipAssessment } = await loadApi("false");
 
@@ -140,8 +141,12 @@ describe("hardship assessment calls", () => {
     expect(fetchMock.mock.calls[0][0]).toMatch(/\/cases\/c1\/hardship-assessment$/);
     expect(fetchMock.mock.calls[0][1].method).toBe("POST");
 
-    expect((await getLatestHardship("c1")).id).toBe("h1");
+    const latest = await getLatestHardship("c1");
     expect(fetchMock.mock.calls[1][0]).toMatch(/\/cases\/c1\/hardship-assessment\/latest$/);
+    expect(latest.id).toBe("99999999-9999-4999-8999-000000000001");
+    expect(latest.case_id).toBe("c1");
+    expect(latest.profile.map((p) => p.value_label)).toEqual(["Reduction in income", "July 2026", "Unknown", "Keep the home"]);
+    expect(latest.measures.find((m) => m.id === "surplus")?.value).toBe("-280.00");
   });
 
   it("real mode: a 404 before the first run becomes an ApiError", async () => {
@@ -150,34 +155,35 @@ describe("hardship assessment calls", () => {
     await expect(getLatestHardship("c1")).rejects.toMatchObject({ status: 404, message: "No assessment yet" });
   });
 
-  it("real mode: PUTs a confirmation, and a correction with a trimmed value and reason", async () => {
-    const fetchMock = vi.fn().mockImplementation(async () => reply(200, { id: "h1" })); // a fresh body each call
+  it("real mode: PUTs a confirmation naming the item, and a correction with a trimmed value and reason", async () => {
+    const fetchMock = vi.fn().mockImplementation(async () => reply(200, realAngelaHardship())); // a fresh body each call
     vi.stubGlobal("fetch", fetchMock);
     const { confirmProfileItem } = await loadApi("false");
 
     await confirmProfileItem("c1", { key: "intent", action: "confirm" });
     expect(fetchMock.mock.calls[0][0]).toMatch(/\/cases\/c1\/hardship-assessment\/latest\/confirmations$/);
     expect(fetchMock.mock.calls[0][1].method).toBe("PUT");
-    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ key: "intent", action: "confirm" });
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ intent: {} });
 
     await confirmProfileItem("c1", { key: "duration", action: "correct", value: " long_term ", reason: "  Letter from employer  " });
     expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual({
-      key: "duration",
-      action: "correct",
-      value: "long_term",
-      reason: "Letter from employer",
+      duration: { value: "long_term", reason: "Letter from employer" },
     });
   });
 
-  it("real mode: PATCHes a budget adjustment with a trimmed amount and reason", async () => {
-    const fetchMock = vi.fn().mockResolvedValue(reply(200, { id: "h1" }));
+  it("real mode: PATCHes a budget line with the adjusted amount as trimmed text, and a trimmed reason", async () => {
+    const fetchMock = vi.fn().mockImplementation(async () => reply(200, realAngelaHardship()));
     vi.stubGlobal("fetch", fetchMock);
     const { adjustBudgetItem } = await loadApi("false");
 
-    expect((await adjustBudgetItem("c1", "other", { amount: " 200.00 ", reason: "  One-off repair  " })).id).toBe("h1");
-    expect(fetchMock.mock.calls[0][0]).toMatch(/\/cases\/c1\/hardship-assessment\/latest\/budget-items\/other$/);
+    const result = await adjustBudgetItem("c1", "44444444-4444-4444-8444-000000000005", {
+      amount: " 200.00 ",
+      reason: "  One-off repair  ",
+    });
+    expect(result.budget.lines).toHaveLength(5); // the answer is translated too
+    expect(fetchMock.mock.calls[0][0]).toMatch(/\/cases\/c1\/hardship-assessment\/latest\/budget\/44444444-4444-4444-8444-000000000005$/);
     expect(fetchMock.mock.calls[0][1].method).toBe("PATCH");
-    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ amount: "200.00", reason: "One-off repair" });
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ adjusted_amount: "200.00", reason: "One-off repair" });
   });
 
   it("real mode: a 422 for a missing reason becomes an ApiError", async () => {

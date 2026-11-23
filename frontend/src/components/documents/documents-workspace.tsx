@@ -5,7 +5,8 @@ import { setDocumentType, listDocuments } from "@/lib/api";
 import type { Case, DocumentSummary, DocumentType } from "@/lib/types";
 import { useJobPoll } from "@/lib/use-job";
 import { CompletenessPanel } from "@/components/completeness/completeness-panel";
-import { Skeleton } from "@/components/ui/skeleton";
+import { ErrorNotice } from "@/components/shared/error-notice";
+import { TableSkeleton } from "@/components/shared/skeletons";
 import { SELECT_CLASS } from "./select-class";
 import { DocumentTable } from "./document-table";
 import { JobProgress } from "./job-progress";
@@ -94,20 +95,17 @@ export function DocumentsWorkspace({ cases, pillarSlug, section }: DocumentsWork
         <h2 id="docs-heading" className="mb-3 text-lg">
           {selectedCase ? `Documents for ${selectedCase.title}` : "Documents"}
         </h2>
-        {error ? (
-          <p role="alert" className="mb-3 text-sm text-danger">
-            {error}
-          </p>
-        ) : null}
+        {error ? <ErrorNotice message={error} onRetry={load} className="mb-3" /> : null}
         {documents ? (
           <DocumentTable
             documents={documents}
             pillarSlug={pillarSlug}
             section={section}
+            filtered={needsReviewOnly}
             onSetType={onSetType}
           />
-        ) : (
-          <Skeleton className="h-40 w-full" />
+        ) : error ? null : (
+          <TableSkeleton rows={4} columns={6} label="Loading documents" />
         )}
       </section>
 

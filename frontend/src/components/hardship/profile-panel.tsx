@@ -5,7 +5,7 @@ import { FlagChip } from "@/components/shared/flag-chip";
 import { ReasonDialog } from "@/components/shared/reason-dialog";
 import { Button } from "@/components/ui/button";
 import { formatDate } from "@/lib/format";
-import { HARDSHIP_REASON_MAX, reviewLabel } from "@/lib/hardship";
+import { HARDSHIP_REASON_MAX, ONSET_HINT, ONSET_PATTERN, reviewLabel } from "@/lib/hardship";
 import type { ProfileItem, ProfileKey } from "@/lib/hardship-types";
 import { cn } from "@/lib/utils";
 
@@ -14,6 +14,8 @@ interface ProfilePanelProps {
   selectedKey: ProfileKey | null;
   /** Shows the item's quote strongly in the letter. */
   onSelect: (key: ProfileKey) => void;
+  /** Called with the item's key while the pointer or keyboard focus is on its card, and null when it leaves. */
+  onHover?: (key: ProfileKey | null) => void;
   onConfirm: (key: ProfileKey) => void;
   /**
    * Sends a correction. If it throws, the window stays open and shows the message, so nothing typed
@@ -30,7 +32,7 @@ const reviewTone = (item: ProfileItem) =>
  * when the quote was checked in code. The specialist confirms or corrects each one. Corrections keep
  * the original reading and need a reason.
  */
-export function ProfilePanel({ items, selectedKey, onSelect, onConfirm, onCorrect }: ProfilePanelProps) {
+export function ProfilePanel({ items, selectedKey, onSelect, onHover, onConfirm, onCorrect }: ProfilePanelProps) {
   const [correcting, setCorrecting] = useState<ProfileItem | null>(null);
 
   return (
@@ -42,6 +44,13 @@ export function ProfilePanel({ items, selectedKey, onSelect, onConfirm, onCorrec
         <article
           key={item.key}
           aria-label={item.label}
+          onMouseEnter={() => onHover?.(item.key)}
+          onMouseLeave={() => onHover?.(null)}
+          onFocus={() => onHover?.(item.key)}
+          onBlur={(e) => {
+            // Moving between the buttons of one card is not leaving the card.
+            if (!e.currentTarget.contains(e.relatedTarget as Node | null)) onHover?.(null);
+          }}
           className={cn("rounded-xl border bg-card p-4", item.key === selectedKey && "ring-2 ring-gold/60")}
         >
           <div className="flex flex-wrap items-start justify-between gap-2">
@@ -128,8 +137,9 @@ export function ProfilePanel({ items, selectedKey, onSelect, onConfirm, onCorrec
           correcting
             ? {
                 label: correcting.options ? "Correct value" : `Correct ${correcting.label.toLowerCase()}`,
-                initialValue: correcting.options ? correcting.value : correcting.value_label,
+                initialValue: correcting.value,
                 options: correcting.options ?? undefined,
+                validate: correcting.key === "onset" ? (v) => (ONSET_PATTERN.test(v.trim()) ? null : ONSET_HINT) : undefined,
               }
             : undefined
         }

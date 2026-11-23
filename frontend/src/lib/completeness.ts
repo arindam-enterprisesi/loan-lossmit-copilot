@@ -23,12 +23,12 @@ export type ChecklistResult = Omit<CompletenessResult, "items"> & { items: Check
 
 /**
  * Which checklist each menu section runs. The ids are configuration on the backend
- * (backend/config); the one in the contract's example is "pillar1-wage-earner@1". The loss
- * mitigation id is my guess until Abhay confirms it.
+ * (backend/config/checklists.yaml): "pillar1-wage-earner@1" for underwriting and "pillar2-hardship@1"
+ * for loss mitigation (read from Abhay's config on main, 23 Nov 2026).
  */
 export const CHECKLIST_BY_PILLAR: Record<string, string> = {
   underwriting: "pillar1-wage-earner@1",
-  "loss-mitigation": "pillar2-loss-mitigation@1",
+  "loss-mitigation": "pillar2-hardship@1",
 };
 
 /** The longest reason accepted when an item is overridden (same limit as other reasons). */

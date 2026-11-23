@@ -90,8 +90,8 @@ describe("ReviewWorkspace on the mock pay stub", () => {
     fireEvent.click(screen.getByRole("button", { name: "Save correction" }));
 
     expect(await screen.findByText(/Originally read as/)).toBeInTheDocument();
-    expect(screen.getByText("2083.61").tagName).toBe("S");
-    expect(screen.getByText("2033.61")).toBeInTheDocument();
+    expect(screen.getByText("2,083.61").tagName).toBe("S");
+    expect(screen.getByText("2,033.61")).toBeInTheDocument();
     await waitFor(() => expect(screen.getByText("Nothing flagged")).toBeInTheDocument());
     expect(screen.queryByText("DI-CHK-02")).not.toBeInTheDocument();
     expect(screen.getByText("Reviewed")).toBeInTheDocument(); // document status chip in the header
@@ -203,6 +203,9 @@ describe("ReviewWorkspace without anything to review", () => {
         backHref="/underwriting/document-intelligence"
       />,
     );
-    expect(await screen.findByRole("alert")).toHaveTextContent("nothing to review for this document yet");
+    expect(await screen.findByText("Nothing to review yet")).toBeInTheDocument();
+    expect(screen.getByText(/nothing to review for this document yet/)).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument(); // not a failure
+    expect(screen.getByRole("button", { name: "Check again" })).toBeEnabled();
   });
 });

@@ -3,9 +3,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { JobProgress } from "@/components/documents/job-progress";
 import { SELECT_CLASS } from "@/components/documents/select-class";
+import { EmptyState } from "@/components/shared/empty-state";
+import { ErrorNotice } from "@/components/shared/error-notice";
 import { FlagChip } from "@/components/shared/flag-chip";
+import { CardsSkeleton, TableSkeleton } from "@/components/shared/skeletons";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
 import { ApiError } from "@/lib/api-error";
 import { getLatestIncome, runIncomeAnalysis, setIncomeComponent } from "@/lib/api";
 import { formatDate } from "@/lib/format";
@@ -32,7 +34,8 @@ export function IncomeWorkspace({ cases, pillarSlug }: IncomeWorkspaceProps) {
   const [caseId, setCaseId] = useState<string | null>(cases[0]?.id ?? null);
   const [analysis, setAnalysis] = useState<IncomeAnalysis | null>(null);
   const [loaded, setLoaded] = useState(false); // the check for an existing result has finished
-  const [error, setError] = useState<string | null>(null);
+  // What went wrong and which step "Try again" repeats.
+  const [error, setError] = useState<{ message: string; retry: () => void } | null>(null);
   const [jobId, setJobId] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
   const [copyNote, setCopyNote] = useState<string | null>(null);
@@ -45,7 +48,7 @@ export function IncomeWorkspace({ cases, pillarSlug }: IncomeWorkspaceProps) {
       setError(null);
     } catch (e) {
       if (e instanceof ApiError && e.status === 404) setAnalysis(null);
-      else setError(messageOf(e, "Could not load the income analysis."));
+      else setError({ message: messageOf(e, "Could not load the income analysis."), retry: () => void load() });
     } finally {
       setLoaded(true);
     }
@@ -58,7 +61,11 @@ export function IncomeWorkspace({ cases, pillarSlug }: IncomeWorkspaceProps) {
   const { job } = useJobPoll(jobId, async (done) => {
     setRunning(false);
     if (done.status === "succeeded") await load();
-    else setError(done.error ? `The analysis failed: ${done.error}` : "The analysis failed.");
+    else
+      setError({
+        message: done.error ? `The analysis failed: ${done.error}` : "The analysis failed.",
+        retry: () => void onRun(),
+      });
   });
 
   const onRun = async () => {
@@ -70,7 +77,7 @@ export function IncomeWorkspace({ cases, pillarSlug }: IncomeWorkspaceProps) {
       setJobId((await runIncomeAnalysis(caseId)).id);
     } catch (e) {
       setRunning(false);
-      setError(messageOf(e, "Could not start the analysis."));
+      setError({ message: messageOf(e, "Could not start the analysis."), retry: () => void onRun() });
     }
   };
 
@@ -123,20 +130,19 @@ export function IncomeWorkspace({ cases, pillarSlug }: IncomeWorkspaceProps) {
       </div>
 
       {running && job ? <JobProgress job={job} subject="Income analysis" /> : null}
-      {error ? (
-        <p role="alert" className="text-sm text-danger">
-          {error}
-        </p>
-      ) : null}
+      {error ? <ErrorNotice message={error.message} onRetry={error.retry} /> : null}
 
       {!loaded ? (
-        <Skeleton className="h-40 w-full" />
-      ) : !analysis ? (
-        <div className="rounded-xl border border-dashed bg-panel p-8 text-center text-sm text-muted-foreground">
-          {running
-            ? "Calculating. The result appears here when it is done."
-            : `No income analysis yet${selectedCase ? ` for ${selectedCase.title}` : ""}. Press Run analysis to calculate it from the documents.`}
+        <div className="space-y-4">
+          <TableSkeleton rows={3} columns={5} label="Loading the income analysis" />
+          <CardsSkeleton count={1} label="Loading flags" />
         </div>
+      ) : !analysis ? (
+        <EmptyState title={running ? "Calculating" : "Not run yet"}>
+          {running
+            ? "The result appears here when it is done."
+            : `No income analysis yet${selectedCase ? ` for ${selectedCase.title}` : ""}. Press Run analysis to calculate it from the documents.`}
+        </EmptyState>
       ) : (
         <>
           <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">

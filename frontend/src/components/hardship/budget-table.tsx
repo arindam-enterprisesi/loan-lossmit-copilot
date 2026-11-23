@@ -67,7 +67,7 @@ export function BudgetTable({ budget, onAdjust }: BudgetTableProps) {
                 <TableCell className="text-right align-top">{formatMoney(l.stated)}</TableCell>
                 <TableCell className="text-right align-top font-semibold text-navy">{formatMoney(l.observed)}</TableCell>
                 <TableCell className="text-right align-top">
-                  <div className={cn(l.flagged && "font-semibold text-navy")}>{signedMoney(l.difference)}</div>
+                  <div className={cn(l.flagged && "font-semibold text-navy")}>{l.difference_unsigned ? formatMoney(l.difference) : signedMoney(l.difference)}</div>
                   {l.flagged ? <FlagChip tone="warning">Flagged</FlagChip> : null}
                 </TableCell>
                 {onAdjust ? (

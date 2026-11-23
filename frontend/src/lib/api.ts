@@ -24,6 +24,12 @@ import { ApiError } from "./api-error";
 import type { ChecklistResult } from "./completeness";
 import { cleanReason } from "./documents";
 import type { BudgetAdjustmentRequest, HardshipAssessment, ProfileConfirmation } from "./hardship-types";
+import {
+  adjustmentRequest,
+  confirmationRequest,
+  type RealHardshipAssessment,
+  toHardshipAssessment,
+} from "./hardship-real";
 import type { IncomeAnalysis, IncomeDecision } from "./income-types";
 import type {
   Case,
@@ -224,18 +230,26 @@ export async function overrideCompletenessItem(
 
 /**
  * POST /cases/{id}/hardship-assessment: queues a run (the letter is read by one AI call) and returns
- * its job to poll with getJob. Path from Feature Design 7.8; not in contracts/openapi.yaml yet, so the
- * answer (a Job) is our proposal to Arindam. Throws ApiError 422 when the case has no hardship letter.
+ * its job to poll with getJob. Path from Feature Design 7.8; not in contracts/openapi.yaml yet. The real
+ * backend answers `{ job }` (backend/app/api/routers/hardship.py), so the job is taken out of it.
+ * Throws ApiError 409 when the case has no hardship letter.
  */
 export async function runHardshipAssessment(caseId: string): Promise<Job> {
   if (USE_MOCKS) return runHardshipMock(caseId);
-  return request<Job>(`/cases/${caseId}/hardship-assessment`, { method: "POST" });
+  return (await request<{ job: Job }>(`/cases/${caseId}/hardship-assessment`, { method: "POST" })).job;
 }
 
-/** GET /cases/{id}/hardship-assessment/latest: profile, checks, budget and measures. 404 before the first run. */
+/**
+ * GET /cases/{id}/hardship-assessment/latest: profile, checks, budget and measures. 404 before the
+ * first run. The real answer has its own shape (see hardship-real.ts), which is translated here so the
+ * screen sees one shape in both modes.
+ */
 export async function getLatestHardship(caseId: string): Promise<HardshipAssessment> {
   if (USE_MOCKS) return getLatestHardshipMock(caseId);
-  return request<HardshipAssessment>(`/cases/${caseId}/hardship-assessment/latest`);
+  return toHardshipAssessment(
+    await request<RealHardshipAssessment>(`/cases/${caseId}/hardship-assessment/latest`),
+    caseId,
+  );
 }
 
 /**
@@ -254,16 +268,21 @@ export async function confirmProfileItem(
     ...(confirmation.reason?.trim() ? { reason: confirmation.reason.trim() } : {}),
   };
   if (USE_MOCKS) return confirmProfileItemMock(caseId, clean);
-  return request<HardshipAssessment>(`/cases/${caseId}/hardship-assessment/latest/confirmations`, {
-    method: "PUT",
-    body: JSON.stringify(clean),
-  });
+  // The real body names the item: { duration: { value, reason } }, or { duration: {} } to confirm it.
+  return toHardshipAssessment(
+    await request<RealHardshipAssessment>(`/cases/${caseId}/hardship-assessment/latest/confirmations`, {
+      method: "PUT",
+      body: JSON.stringify(confirmationRequest(clean)),
+    }),
+    caseId,
+  );
 }
 
 /**
- * PATCH /cases/{id}/hardship-assessment/latest/budget-items/{item}: set how much of an expense counts
+ * PATCH /cases/{id}/hardship-assessment/latest/budget/{line_id}: set how much of an expense counts
  * each month, with a required reason (ApiError 422 without one). Never calls the AI. Returns the whole
- * recalculated assessment, so every measure updates at once. Same proposal as above.
+ * recalculated assessment, so every measure updates at once. The mock keeps the earlier proposed path
+ * (`budget-items`); the real backend's path and body (`adjusted_amount`) are used in real mode.
  */
 export async function adjustBudgetItem(
   caseId: string,
@@ -272,10 +291,13 @@ export async function adjustBudgetItem(
 ): Promise<HardshipAssessment> {
   const clean = { amount: adjustment.amount.trim(), reason: adjustment.reason.trim() };
   if (USE_MOCKS) return adjustBudgetItemMock(caseId, itemId, clean);
-  return request<HardshipAssessment>(`/cases/${caseId}/hardship-assessment/latest/budget-items/${itemId}`, {
-    method: "PATCH",
-    body: JSON.stringify(clean),
-  });
+  return toHardshipAssessment(
+    await request<RealHardshipAssessment>(`/cases/${caseId}/hardship-assessment/latest/budget/${itemId}`, {
+      method: "PATCH",
+      body: JSON.stringify(adjustmentRequest(clean)),
+    }),
+    caseId,
+  );
 }
 
 /** A page picture link. Real links are presigned and expire after a few minutes. */

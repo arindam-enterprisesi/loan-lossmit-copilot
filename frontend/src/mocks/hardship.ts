@@ -10,7 +10,7 @@
 // budget item (Feature Design 7.4: "adjusting the budget never calls the AI"): the difference, the
 // flag, the totals and the surplus are worked out again, in whole cents so nothing is a float.
 import { ApiError } from "@/lib/api-error";
-import { AMOUNT_PATTERN, HARDSHIP_REASON_MAX } from "@/lib/hardship";
+import { AMOUNT_PATTERN, HARDSHIP_REASON_MAX, monthLabel, ONSET_HINT, ONSET_PATTERN } from "@/lib/hardship";
 import type {
   Budget,
   BudgetAdjustmentRequest,
@@ -104,7 +104,7 @@ function profile(): ProfileItem[] {
     {
       key: "onset",
       label: "Onset",
-      value: "July 2026",
+      value: "2026-07",
       value_label: "July 2026",
       quote: quote("in July", 6),
       quote_verified: true,
@@ -406,8 +406,8 @@ export function hasHardshipSeed(caseId: string): boolean {
 
 /**
  * PUT .../confirmations: records a specialist's decision on one profile item. A confirmation keeps
- * the value; a correction replaces it with a value from the allowed list (or free text for the
- * onset) and needs a reason. What was originally read is kept in `review.original_label`.
+ * the value; a correction replaces it with a value from the allowed list (or a month, YYYY-MM, for
+ * the onset) and needs a reason. What was originally read is kept in `review.original_label`.
  * Returns a new assessment, not a changed one.
  */
 export function applyConfirmation(
@@ -433,10 +433,12 @@ export function applyConfirmation(
     }
     const option = target.options?.find((o) => o.value === value);
     if (target.options && !option) throw new ApiError(422, "Choose one of the listed values");
+    // The onset is a month, written the way the backend stores it.
+    if (target.key === "onset" && !ONSET_PATTERN.test(value)) throw new ApiError(422, ONSET_HINT);
     next = {
       ...target,
       value,
-      value_label: option?.label ?? value,
+      value_label: option?.label ?? (target.key === "onset" ? monthLabel(value) : value),
       review: { status: "corrected", reason, by, at, original_label },
     };
   } else {

@@ -269,7 +269,7 @@ Checked: type check, lint and the full test suite pass. The banned-wording scan 
 
 Open:
 - Override is not in the contract. Ask Arindam for the endpoint, the three extra item fields, and the rule that only partly met or missing items can be overridden.
-- The Loss Mitigation checklist id `pillar2-loss-mitigation@1` is my guess. Ask Abhay for the real one.
+- The Loss Mitigation checklist id `pillar2-loss-mitigation@1` was my guess. (Day 5: the real one is `pillar2-hardship@1`, fixed.)
 - The spec has a third item status, "Needs review" (a future-dated pay stub, an uncertain owner), and an overall "Needs review". The contract has only satisfied, partial, missing and overridden, and only complete or incomplete. If the backend adds them, the chips and the summary need one more case each.
 - The mock document list on this screen has 4 documents for Daniel, while the scenario's full case has more (credit report, tax return). The checklist follows the scenario, so a "Documents used" link only appears where the mock list has the document.
 - Daniel's scenario says the 2024 W-2 and tax return are missing on purpose, yet the income cross-checks (Group 1) quote 2024 figures from them. The scenario's own expected figures do both, so I kept them. Worth asking Abhay whether the income service reads 2024 from those documents.
@@ -341,34 +341,95 @@ Open:
 - Nothing is committed yet. Day 4 is on branch `feat/amogh/doc-review-viewer` as uncommitted files. The plan is a new branch on top of it, then a rebase onto `main` once PR #8 is merged.
 - Not looked at in a browser by me. Please click through the three screens (Income analysis, Documents with Completeness, Hardship and budget) before the PR.
 
+## Day 5 (Fri 20 Nov 2026 in the plan, built Mon 23 Nov)
+Goal from the brief: build the Hardship tab against the real `GET .../hardship-assessment/latest` and `PUT .../confirmations`, light up a quote's lines in the letter when its profile item is hovered, then polish only the four demo screens (upload, review, income, hardship): loading skeletons, empty states, error messages with retry, and numbers with two decimals and thousands separators.
+
+A note on the design: no Claude Design prompt came with this day, and the Hardship screen was already built on Day 4. So I built from the design system we already use, and this day is the hover, the real backend's shapes and the polish.
+
+### Group 1: the Hardship tab, the hover, and the real backend's shapes
+In one line: pointing at a profile item now lights its lines in the letter, and the screen can read the real backend's hardship answers, not only the mock.
+
+What I found first: on 23 Nov PRs #8 and #10 merged, so Abhay's income and completeness endpoints are on `main`. His branch `feat/abhay/frontend-unblock` had the real hardship endpoints; it merged as #12 the same evening, and I checked that the hardship shape on `main` is the one I translated. They differ from what I proposed on Day 4:
+- Running it answers `{ job }`, not a bare job.
+- Confirming is a `PUT .../latest/confirmations` whose body names the item: `{ duration: { value, reason } }`, or `{ duration: {} }` to confirm. Mine sent `{ key, action, value, reason }`.
+- Adjusting a budget line is `PATCH .../latest/budget/{line_id}` with `{ adjusted_amount, reason }`. Mine was `.../budget-items/{item}` with `{ amount, reason }`.
+- The answer has a different shape (profile objects, measures as calculations with a one-line working text, checks with a `values` list), and ratios come as six-place decimals ("0.409524").
+- It has no letter text, only each quote and the line IDs it sits on.
+- A corrected onset must be a month written `YYYY-MM`.
+
+What I did:
+1. **Hover.** Pointing at a profile card, or putting the keyboard focus on one of its buttons, lights the lines that quote came from in the letter (a soft gold band) and shows the quote strongly. It wins over the item picked with "Show in letter" until the pointer leaves, then the picked item shows again. A quote over several lines lights every line.
+2. **The real shapes.** A new file `src/lib/hardship-real.ts` reads the backend's answer into the shape the screen already uses, so the screens did not change for it. In real mode `api.ts` now uses the real paths and bodies. In mock mode nothing changed. It calculates nothing: it renames, picks labels and cuts the backend's working text into steps.
+3. **Onset.** The onset is now a month written `YYYY-MM` (shown as "July 2026"), checked as you type, in the mock too, so both behave like the real backend.
+4. **Checklist id.** The Loss Mitigation checklist id is `pillar2-hardship@1` (read from Abhay's config). I had guessed another one; it is fixed.
+
+Decisions:
+- The screen never sees the backend's shape. If it changes, only `hardship-real.ts` changes.
+- A percentage is shown from the end of the backend's own working text ("... = 40.95%"). The screen never multiplies a ratio by 100. If that text is missing, the ratio is shown as it came.
+- The backend sends the gap on a budget line without a sign. The screen shows it as it came ("210.00") and does not add a plus sign it cannot be sure of.
+- The backend does not send the letter's text, so in real mode the letter shows the quoted lines only, with a note saying so. A quote over several lines shows on its first line.
+- The backend does not send the lists a correction chooses from, so the reason, duration and intent lists are repeated in `hardship-real.ts` (the reasons mirror `backend/config/hardship.yaml`).
+- The backend flags budget lines and checks, not measures. So in real mode the surplus card has no "Flagged" chip; the flagged "Other" line carries the backend's sentence.
+- The reviewer shows as the backend's user id until it sends a name.
+
+### Group 2: polish on the four demo screens
+In one line: the same loading, empty and error behaviour on upload, review, income and hardship, and one way of writing numbers.
+- **Loading.** Each screen shows a skeleton shaped like what is coming (a table, cards, or a page beside a list) instead of one grey block. Each is announced to screen readers as loading.
+- **Empty states.** One shared panel with a title and what to do next: "No documents yet", "No documents with flagged fields", "Nothing to review yet" (with Check again), "Not run yet" (income and hardship).
+- **Errors.** Two kinds, on purpose:
+  - A failure that stops a screen showing what it should (it could not load, the run could not start, or the run failed) shows a notice in place with **Try again**, which repeats that step.
+  - A failure of one action while the screen is fine (an upload, saving a field review, confirming a profile item) shows a message at the bottom right with **Try again**, which does the same action again. It stays until dismissed or retried. What was typed or chosen is kept.
+  - A failure inside a window (correction, adjustment, type) stays in the window, as before.
+  - An edit conflict still shows the Reload message on the review screen.
+- **Numbers.** Values read from documents now show like every other figure: `2083.61` becomes `2,083.61`. Only text with exactly two decimals is changed, so a year, an account number or a name is never given commas. Nothing is parsed or rounded.
+- An upload that finishes with a file-type problem still lists the problem under the drop zone.
+
+What I did: new shared pieces `toast.tsx` (provider mounted once in the pillar layout), `error-notice.tsx`, `empty-state.tsx`, `skeletons.tsx`, and `formatFieldValue` in `lib/format.ts`; then used them in the documents screen, document table, field list and rows, review screen, upload panel, income screen and hardship screen.
+
+### Group 3: tests and checks
+Tests: 445 to 538. New tests cover: the translation of the real hardship answer from a sample written from Abhay's schema (profile, corrections, the letter's quoted lines, five measures with the backend's percentage text, the budget and an adjustment, the checks, and what a person sends); the real paths and bodies in `api.test.ts`; the hover on the letter, the cards (pointer and keyboard) and the whole screen; the toasts (a failure stays, a confirmation goes away, no stacking, a failing retry); the notice, empty and skeleton pieces; the field value formatting and the onset month; the review, documents, income and hardship screens loading, failing, retrying and being empty; and the unsigned gap. I also made four drawer assertions wait for the side panel, because they failed now and then when the whole suite ran at once.
+
+Checked: type check, lint and all 538 tests pass; the production build passes (dev server stopped first, then restarted clean); the banned-wording scan of `src` and `public` is clean; `/loss-mitigation/hardship-budget` loads, `/underwriting/hardship-budget` is a 404. I have not looked at it in a browser: please open the Hardship tab, point at each profile card, and watch the letter on the left.
+
+Open:
+- Income and completeness still use my own shapes. The real ones on `main` differ (see the checklist), so they need the same kind of translation file. That is the next piece of work.
+- Real mode still needs a login screen and CORS before anything can run against the real backend. The hardship translation is tested on a sample written from the schema, not on a real answer.
+- Only the Hardship tab's letter is partial in real mode, until the backend can return the letter's text.
+
 ## Going live checklist (real backend instead of mocks)
-Everything runs on mocks today. Flipping `NEXT_PUBLIC_USE_MOCKS=false` needs the items below. I update this list after every group, and tick items when the other side delivers them.
+Everything runs on mocks today. Flipping `NEXT_PUBLIC_USE_MOCKS=false` needs the items below. I update this list after every group or day, and tick items when the other side delivers them.
 
 Needed before real mode works at all:
-- [ ] Login screen and token handling. The backend has `/auth/login` (seeded users `underwriter` and `lm_specialist`), but the frontend has no sign-in page, so no request carries a token yet. Mine to build.
-- [ ] CORS on the backend, so the browser on port 3000 may call the API on port 8000. Abhay.
-- [ ] Document endpoints on `main` (upload, list, extraction, field review, document type). Abhay's PR #10 looks like the pipeline for these. Check when it merges.
+- [ ] Login screen and token handling. The backend has `/auth/login` (seeded users `underwriter` and `lm_specialist`), but the frontend has no sign-in page, so no request carries a token yet. Mine to build next.
+- [x] CORS on the backend, so the browser on port 3000 may call the API on port 8000. On `main` since #12 (23 Nov). It reads its allowed origins from the backend settings, so the frontend's address (port 3000) has to be in that list when the backend runs.
+- [x] Document, income and completeness endpoints on `main`: merged in #10 on 23 Nov. Still to do on my side: check my Day 2 and 3 screens against the real document answers once login and CORS exist.
+- [x] Hardship endpoints on `main`: merged in #12 (23 Nov). The frontend reads them through `hardship-real.ts`; not yet tried against a running backend.
+
+Real shapes on `main` that my screens do not read yet (from Abhay's #10, found 23 Nov). Each needs a translation file like `hardship-real.ts`:
+- [ ] Income analysis. Paths: `POST /cases/{id}/income-analysis` (answers `{ job, analysis_id }`), `GET .../latest`, `PATCH .../latest/components/{component_id}` with `{ included, reason }` (component ids are UUIDs). Mine are `/income/analysis...`. The answer differs: `ytd` and `monthly` are plain text, each component's working is one text string inside `calculation`, an override is `{ included, reason, by, at }` beside `system_included`, flags carry `refs`, and there is a `candidate_label`. The AI explanations are empty ("explanations not generated") until `income-explain@1` is wired in, so the flag cards need an honest empty state for them. (Day 4, Groups 1 to 3)
+- [ ] Completeness override. The real one is `PATCH /cases/{id}/completeness/latest/items/{item_id}` with `{ action: "override" | "clear", reason }`. Mine is `.../items/{item_id}` with `{ reason }`. An overridden item comes as status `overridden` with `override_reason`, but with no who and when, which the project's rule on corrections needs. "Needs review" arrives as `partial` with a "Needs review:" prefix. The Loss Mitigation checklist id is `pillar2-hardship@1` (done). (Day 4, Group 4)
 
 Contract gaps (Arindam owns `contracts/`; I only ask):
-- [ ] Income analysis: run, latest result, include or exclude a component with a reason. Shape proposed in `src/lib/income-types.ts`, paths proposed in `src/lib/api.ts`. The PATCH is `/cases/{id}/income/analysis/components/{component_id}` with `{included, reason}`, answering with the whole recalculated analysis; reason required (422), and every decision kept as audit history. (Day 4, Groups 1 and 3)
-- [ ] Completeness: the run and latest endpoints exist (the screen already uses them). An override with a reason does not. Proposed: `PATCH /cases/{id}/completeness/items/{item_id}` with `{reason}`, answering with the whole recalculated result, reason required (422), only for partial or missing items, and the item carrying `original_status`, `overridden_by` and `overridden_at` so the checklist's own answer is kept. (Day 4, Group 4)
-- [ ] Page image endpoint and its answer (a link only, or a link plus an expiry time). (Day 3)
-- [ ] Hardship and budget: none of the four endpoints are in the contract. Paths are from Feature Design 7.8 (`POST /cases/{id}/hardship-assessment` returning a job, `GET .../latest`, `PUT .../latest/confirmations` with `{key, action, value?, reason?}`, `PATCH .../latest/budget-items/{item}` with `{amount, reason}`). Each change answers with the whole updated assessment. Shapes proposed in `src/lib/hardship-types.ts`. Reasons required (422), originals kept, every change kept as audit history. (Day 4, Group 5)
+- [ ] Income, completeness override and hardship endpoints are in Abhay's code and in `docs/contract-proposal-d4.md`, but not in `contracts/openapi.yaml`. Ask Arindam to add them, so the contract and not only the code says what they are. (Day 4)
+- [ ] Page image endpoint: now on `main` (#12) as `GET /documents/{id}/pages/{page}` (`getPageImage`). I have not connected it yet: `getPageImage` in `api.ts` still answers "none" in real mode. (Day 3)
 
 Questions for Abhay and Arindam:
 - [ ] Bounding boxes: is the origin the top left of the page, as I assume? (Day 3)
 - [ ] Upload: multipart through the API (the contract) or a presigned S3 upload (the tech design)? (Day 2)
 - [ ] When a document's type changes, does the real backend drop the old extraction, as the mock does? (Day 3)
-- [ ] Hardship: does the backend run the letter reading as a job (the screen polls it, like income) or answer at once? And does it return `quote_verified` per item, and the line IDs of each letter line? The screen needs the letter's lines to highlight the quotes. (Day 4, Group 5)
-- [ ] Hardship: the stated-against-observed tolerance (10% or 25.00, whichever is larger) is in the mock only. Confirm it is a versioned, illustrative setting in `backend/config`, and that the backend sets the flag, not the screen. (Day 4, Group 5)
-- [ ] Completeness: what is the Loss Mitigation checklist id? I use `pillar2-loss-mitigation@1` as a guess. Also: will the spec's "Needs review" status be added to the contract? (Day 4, Group 4)
-- [ ] Completeness and the income screen: overrides and decisions show as "demo.reviewer" in the mock. After login the backend fills the name from the token. (Day 4, Groups 3 and 4)
-- [ ] Income decisions: who is recorded as the person? The mock says "demo.reviewer". After login, the backend should fill it from the token. (Day 4, Group 3)
-- [ ] Income: when Abhay's calculation lands, do the figures and working match the scenario numbers (5,980.00 base, 444.41 overtime, 228.34 bonus)? (Day 4)
+- [ ] Hardship: can the answer include the letter's text with its line IDs (or a lines endpoint)? Today it has only the quoted lines, so the letter is partial. (Day 5)
+- [ ] Hardship: can `confirmation.by` be a name and not a user id? And can the answer include the allowed values for the reason, so I do not repeat the list from `hardship.yaml`? (Day 5)
+- [ ] Hardship: the checks carry no document references, so each side's source shows only "Application", "Pay stubs" or "Hardship letter". Can each check say which document and line it used? (Day 5)
+- [ ] Hardship: measures are never flagged, only budget lines and checks. Is that meant? (Day 5)
+- [ ] Completeness and income: can an override or a decision say who and when (a name, not an id)? Today the mock shows "demo.reviewer". After login the backend should fill it from the token. (Day 4)
+- [ ] Income: when I connect the real answer, do the figures and working match the scenario numbers (5,980.00 base, 444.41 overtime, 228.34 bonus)? (Day 4)
+- [x] Hardship: is the letter reading a job? Yes, it answers `{ job }`. Does it return `quote_verified`? Yes, as `verified`. (Day 5)
+- [x] Hardship: the stated-against-observed tolerance. It is in `thresholds.yaml` (`stated_vs_observed_tolerance`) and the backend sets the flags. (Day 5)
+- [x] Completeness: the Loss Mitigation checklist id is `pillar2-hardship@1`. (Day 5)
 
 Housekeeping:
 - [ ] Add `npm test` to the CI frontend job (it runs typecheck, lint and build today).
 - [ ] Evidence links on the Income screen open the document's review screen. Make the review screen open on a given page and line (mine, small). (Day 4, Group 2)
-- [ ] The Hardship and budget screen is built and tested on the mock. When the endpoints exist, flip `NEXT_PUBLIC_USE_MOCKS=false`, run Angela's case, and check the profile (reduction in income, July 2026, unknown, keep), the 40 to 30 hours against a 25.00% pay drop, surplus -70.00 stated and -280.00 observed, housing ratio 40.95% from 30.71%, arrears 5,160.00 and liquid assets 640.25 = 12.41%. (Day 4, Group 5)
-- [ ] The Completeness panel is built and tested on the mock. When Abhay's completeness service is on `main`, flip `NEXT_PUBLIC_USE_MOCKS=false`, run Daniel's case and check it shows Incomplete with pay stubs 14 of 30 days and the 2024 W-2 and tax return missing, then Angela's with the August bank statement missing. (Day 4, Group 4)
-- [ ] The income screen is built and tested on the mock. When the real endpoints exist, flip `NEXT_PUBLIC_USE_MOCKS=false`, run Daniel's case, and check the screen shows 5,980.00 with the backend's working. That is the Day 4 "done when", and it is met on the mock (the end-to-end test `income-flow.test.tsx` walks it). Once real mode works, the same steps should be tried by hand. (Day 4, Group 6)
+- [ ] The Hardship and budget screen is built on the mock and on a sample of the real answer. Once the endpoints, login and CORS exist, flip `NEXT_PUBLIC_USE_MOCKS=false`, run Angela's case, and check the profile (reduction in income, July 2026, unknown, keep), the 40 to 30 hours against a 25.00% pay drop, surplus -70.00 stated and -280.00 observed, housing ratio 40.95% from 30.71%, arrears 5,160.00 and liquid assets 640.25 = 12.41%. (Day 4 and 5)
+- [ ] The Completeness panel is built on the mock. After it reads the real answer, run Daniel's case and check it shows Incomplete with pay stubs 14 of 30 days and the 2024 W-2 and tax return missing, then Angela's with the August bank statement missing. (Day 4, Group 4)
+- [ ] The income screen is built on the mock. After it reads the real answer, run Daniel's case and check it shows 5,980.00 with the backend's working. That is the Day 4 "done when", met on the mock (the end-to-end test `income-flow.test.tsx` walks it). (Day 4, Group 6)

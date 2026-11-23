@@ -69,7 +69,7 @@ describe("Angela's mock hardship assessment: the letter and the profile", () => 
     expect(assessment().profile.every((p) => p.review === null)).toBe(true);
   });
 
-  it("allows a list of values for the reason, the duration and the intent, and free text for the onset", () => {
+  it("allows a list of values for the reason, the duration and the intent, and a typed month for the onset", () => {
     const a = assessment();
     expect(profile(a, "primary_reason").options).toHaveLength(9);
     expect(profile(a, "duration").options?.map((o) => o.value)).toEqual(["temporary", "long_term", "unknown"]);
@@ -215,14 +215,23 @@ describe("confirming and correcting a profile item", () => {
     expect(profile(a, "duration").quote?.text).toContain("I do not know whether my hours will return"); // quote untouched
   });
 
-  it("the onset is free text", () => {
+  it("the onset is a month written YYYY-MM, shown as a month name", () => {
     const a = applyConfirmation(
       assessment(),
-      { key: "onset", action: "correct", value: "June 2026", reason: "Pay stub shows the cut from June" },
+      { key: "onset", action: "correct", value: "2026-06", reason: "Pay stub shows the cut from June" },
       "u",
       AT,
     );
-    expect(profile(a, "onset")).toMatchObject({ value: "June 2026", value_label: "June 2026" });
+    expect(profile(a, "onset")).toMatchObject({ value: "2026-06", value_label: "June 2026" });
+    expect(profile(a, "onset").review?.original_label).toBe("July 2026");
+  });
+
+  it("refuses an onset that is not a month written YYYY-MM (422), as the backend does", () => {
+    for (const value of ["June 2026", "2026-13", "2026-6", "26-06"]) {
+      expect(() =>
+        applyConfirmation(assessment(), { key: "onset", action: "correct", value, reason: "r" }, "u", AT),
+      ).toThrow(expect.objectContaining({ status: 422 }));
+    }
   });
 
   it("correcting twice, or confirming then correcting, still remembers what the letter said", () => {
