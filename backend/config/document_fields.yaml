@@ -10,7 +10,7 @@
 #
 # `rows` flattens a repeating group of his schema (earnings lines, transactions, Box 12 entries)
 # into fields named <prefix><nnn>_<part>, numbered from 001 in document order.
-version: "2026-11-19.1"
+version: "2026-11-23.1"
 label: illustrative
 
 types:
@@ -138,9 +138,73 @@ types:
       - {name: adjusted_gross_income, label: Adjusted gross income, kind: amount}
 
   # Types that are classified here and read by later features: no field list yet.
-  credit_report: {label: credit report}
-  mortgage_assistance_application: {label: mortgage assistance application}
-  mortgage_statement: {label: mortgage statement}
+  # The credit report has no extract schema yet (Features 4 and 3 read it). These fields are defined
+  # ahead of it under the names that schema must produce, so Feature 3 reads a credit report's debts
+  # as soon as one is extracted. None is required, so a reader that cannot read the type raises
+  # nothing new. See docs/build-log.md.
+  credit_report:
+    label: credit report
+    borrower_field: consumer_name
+    fields:
+      - {name: consumer_name, label: Consumer, kind: text}
+      - {name: report_date, label: Report date, kind: date}
+    rows:
+      - source: tradelines
+        prefix: tradeline_
+        parts:
+          creditor: text
+          account_type: text
+          balance: amount
+          credit_limit: amount
+          monthly_payment: amount
+
+  # The stated side of the hardship budget (Feature 7): income, expenses and assets as the borrower
+  # wrote them, and the reasons ticked. Names follow Arindam's MortgageAssistanceApplicationFields.
+  mortgage_assistance_application:
+    label: mortgage assistance application
+    borrower_field: borrower_names
+    fields:
+      - {name: borrower_names, label: Borrower names, kind: text}
+      - {name: loan_number, label: Loan number, kind: text}
+      - {name: property_address, label: Property address, kind: text}
+      - {name: occupancy, label: Occupancy, kind: text}
+      - {name: intent, label: Stated intent, kind: text}
+      - {name: total_monthly_expenses, label: Total monthly expenses, kind: amount}
+      - {name: signed_date, label: Date signed, kind: date}
+    rows:
+      - source: hardship_reasons
+        prefix: hardship_reasons_
+        parts: {reason: text}
+      - source: monthly_income
+        prefix: monthly_income_
+        parts: {description: text, amount: amount}
+      - source: monthly_expenses
+        prefix: monthly_expenses_
+        parts: {description: text, amount: amount}
+      - source: assets
+        prefix: assets_
+        parts: {description: text, amount: amount}
+
+  # Arrears and the payment parts (Feature 7 and the loan record). Names follow Arindam's
+  # MortgageStatementFields.
+  mortgage_statement:
+    label: mortgage statement
+    borrower_field: borrower_names
+    fields:
+      - {name: servicer, label: Servicer, kind: text}
+      - {name: borrower_names, label: Borrower names, kind: text}
+      - {name: loan_number, label: Loan number, kind: text}
+      - {name: statement_date, label: Statement date, kind: date}
+      - {name: payment_due_date, label: Payment due date, kind: date}
+      - {name: unpaid_principal_balance, label: Unpaid principal balance, kind: amount}
+      - {name: interest_rate, label: Interest rate, kind: text}
+      - {name: principal_and_interest, label: Principal and interest, kind: amount}
+      - {name: escrow, label: Escrow, kind: amount}
+      - {name: regular_monthly_payment, label: Regular monthly payment, kind: amount}
+      - {name: past_due_amount, label: Past due amount, kind: amount}
+      - {name: fees, label: Late charges and fees, kind: amount}
+      - {name: total_amount_due, label: Total amount due, kind: amount}
+
   benefits_letter: {label: benefits letter}
   expense_bill: {label: expense bill}
   hardship_letter: {label: hardship letter}

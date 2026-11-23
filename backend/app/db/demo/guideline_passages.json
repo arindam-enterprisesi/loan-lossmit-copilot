@@ -1,0 +1,85 @@
+{
+  "label": "Seeded sample: invented illustrative passages. Arindam's guideline index replaces them when its loader fills the tables.",
+  "sources": [
+    {
+      "id": "sample-investor-a-v1",
+      "title": "Sample Investor A servicing guide, version 1 (illustrative)",
+      "kind": "investor_guide",
+      "label": "illustrative"
+    },
+    {
+      "id": "reg-x-1024-41",
+      "title": "12 CFR 1024.41, loss mitigation procedures (illustrative paraphrase)",
+      "kind": "regulation",
+      "label": "illustrative"
+    }
+  ],
+  "passages": [
+    {
+      "id": "sample-investor-a-v1.order.1",
+      "source_id": "sample-investor-a-v1",
+      "heading": "Order of options",
+      "text": "Options are evaluated in a fixed order: repayment plan, forbearance, payment deferral, loan modification, short sale, then deed in lieu. The evaluation stops at the first option whose conditions are met. Short sale and deed in lieu are evaluated only when no earlier option's conditions are met."
+    },
+    {
+      "id": "sample-investor-a-v1.repayment-plan.1",
+      "source_id": "sample-investor-a-v1",
+      "heading": "Repayment plan: hardship",
+      "text": "A repayment plan is considered only when the borrower's hardship has been confirmed as resolved."
+    },
+    {
+      "id": "sample-investor-a-v1.repayment-plan.2",
+      "source_id": "sample-investor-a-v1",
+      "heading": "Repayment plan: surplus",
+      "text": "The borrower's documented monthly surplus must be at least the arrears divided by six, so the arrears can be repaid in six months."
+    },
+    {
+      "id": "sample-investor-a-v1.forbearance.1",
+      "source_id": "sample-investor-a-v1",
+      "heading": "Forbearance: hardship",
+      "text": "Forbearance is considered only when the borrower's hardship has been confirmed as temporary."
+    },
+    {
+      "id": "sample-investor-a-v1.payment-deferral.1",
+      "source_id": "sample-investor-a-v1",
+      "heading": "Payment deferral: hardship",
+      "text": "A payment deferral is considered only when the borrower's hardship has been confirmed as resolved."
+    },
+    {
+      "id": "sample-investor-a-v1.payment-deferral.2",
+      "source_id": "sample-investor-a-v1",
+      "heading": "Payment deferral: surplus",
+      "text": "The borrower's documented monthly surplus at the contractual payment must be zero or more."
+    },
+    {
+      "id": "sample-investor-a-v1.payment-deferral.3",
+      "source_id": "sample-investor-a-v1",
+      "heading": "Payment deferral: delinquency",
+      "text": "The loan must be six or fewer months delinquent."
+    },
+    {
+      "id": "sample-investor-a-v1.loan-modification.1",
+      "source_id": "sample-investor-a-v1",
+      "heading": "Loan modification: hardship",
+      "text": "A loan modification is considered only when the borrower's hardship has been confirmed as long-term or its duration is unknown."
+    },
+    {
+      "id": "sample-investor-a-v1.loan-modification.2",
+      "source_id": "sample-investor-a-v1",
+      "heading": "Loan modification: intent",
+      "text": "The borrower must have confirmed that they intend to keep the home."
+    },
+    {
+      "id": "sample-investor-a-v1.loan-modification.3",
+      "source_id": "sample-investor-a-v1",
+      "heading": "Loan modification: target payment",
+      "text": "The target payment is 35% of the borrower's documented gross monthly income. It must be below the current contractual payment."
+    },
+    {
+      "id": "reg-x-1024-41.b",
+      "source_id": "reg-x-1024-41",
+      "heading": "Incomplete applications (paraphrase)",
+      "text": "Illustrative paraphrase, not the regulation's text: when a loss mitigation application is incomplete, the servicer notifies the borrower of the missing documents. Dates under the regulation are computed by code from a configured rule, never by a model."
+    }
+  ]
+}

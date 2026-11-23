@@ -52,6 +52,15 @@ def state(url: str) -> dict[str, Any]:
         ),
         "documents": query(url, "SELECT count(*) FROM documents"),
         "profiles": query(url, "SELECT case_id, source FROM hardship_profiles"),
+        "reports": query(
+            url, "SELECT case_id, kind, source, status FROM reports ORDER BY kind, case_id"
+        ),
+        "report_parts": query(
+            url,
+            "SELECT (SELECT count(*) FROM findings), (SELECT count(*) FROM conditions), "
+            "(SELECT count(*) FROM waterfall_results), (SELECT count(*) FROM lender_views), "
+            "(SELECT count(*) FROM agent_runs), (SELECT count(*) FROM budget_lines)",
+        ),
         "audit": query(url, "SELECT action, count(*) FROM audit_events GROUP BY 1 ORDER BY 1"),
         "revision": query(url, "SELECT version_num FROM alembic_version"),
     }
@@ -125,9 +134,19 @@ def test_a_reset_leaves_users_cases_profiles_and_angelas_hardship_profile(
     )
     assert after["documents"][0][0] == 0  # nothing is uploaded unless asked
     assert [(p.case_id, p.source) for p in after["profiles"]] == [(ANGELA, "seeded_sample")]
-    assert after["revision"][0][0] == "0006"  # at the newest migration
+    # The sample reports to review: Daniel's draft underwriting report and Angela's recommendation.
+    assert sorted((r.case_id, r.kind, r.source, r.status) for r in after["reports"]) == sorted(
+        [
+            (DANIEL, "underwriting", "seeded_sample", "draft"),
+            (ANGELA, "lm_recommendation", "seeded_sample", "draft"),
+        ]
+    )
+    # findings, conditions, options, lender views, agent runs, budget lines (Angela's, five)
+    assert tuple(after["report_parts"][0]) == (8, 6, 6, 1, 6, 5)
+    assert after["revision"][0][0] == "0008"  # at the newest migration
     assert (summary.users, summary.cases, summary.documents) == (3, 2, 0)
     assert summary.hardship_profile_seeded
+    assert summary.reports_seeded == 2 and summary.budget_computed
 
 
 def test_a_second_reset_gives_the_same_state(fresh_db_url: str, s3_storage: Storage) -> None:

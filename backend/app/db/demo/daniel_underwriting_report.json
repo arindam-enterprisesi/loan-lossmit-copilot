@@ -1,0 +1,128 @@
+{
+  "label": "Seeded sample: the Feature Design 6.8 worked example, written by hand. The agents do not write it.",
+  "sections": {
+    "snapshot": {
+      "borrower": "Daniel Reyes",
+      "loan": "Purchase of a primary residence",
+      "property_value": "400000.00",
+      "loan_amount": "360000.00",
+      "ltv": "90.00%",
+      "candidate_monthly_income": "5980.00",
+      "dti": "44.70%",
+      "dti_review_level": "43%"
+    },
+    "conflicts": [
+      {
+        "title": "DTI changes with the treatment of overtime",
+        "detail": "DTI is 44.70% with overtime and bonus left out of income, or 41.61% if overtime is counted. The underwriter decides which income to use.",
+        "evidence": [
+          {"type": "calculation", "name": "dti"},
+          {"type": "calculation", "name": "dti_with_overtime"}
+        ]
+      }
+    ],
+    "missing_information": [
+      "Pay stubs for the last 16 days of the 30-day period",
+      "Page 3 of the August 2026 bank statement"
+    ],
+    "potential_risks": [
+      "The funds to close are not yet documented.",
+      "A 2,000.00 transfer from an individual has no source on file."
+    ],
+    "guideline_references": [],
+    "automated_findings_comparison": null,
+    "note": "Illustrative sample. Every figure comes from a stored calculation; this text carries no decision."
+  },
+  "findings": [
+    {
+      "priority": "significant",
+      "title": "Documented assets are 27,273.68 short of the funds to close",
+      "detail": "Documented assets are 9,226.32 against 36,500.00 needed to close: 36,500.00 - 9,226.32 = 27,273.68.",
+      "evidence": [
+        {"type": "calculation", "name": "documented_assets"},
+        {"type": "calculation", "name": "funds_shortfall"},
+        {"type": "rule", "id": "AL-W105"}
+      ]
+    },
+    {
+      "priority": "significant",
+      "title": "A 2,000.00 transfer on 2026-09-22 has no documented source",
+      "detail": "A transfer of 2,000.00 from an individual on 2026-09-22 is above the large-deposit minimum and is not payroll.",
+      "evidence": [
+        {"type": "calculation", "name": "large_deposit"},
+        {"type": "rule", "id": "AL-W101"}
+      ]
+    },
+    {
+      "priority": "significant",
+      "title": "DTI is 44.70%, above the illustrative 43% review level",
+      "detail": "(1,980.00 + 693.00) / 5,980.00 = 44.70%. With overtime counted the figure is 41.61%.",
+      "evidence": [
+        {"type": "calculation", "name": "dti"},
+        {"type": "calculation", "name": "dti_with_overtime"},
+        {"type": "rule", "id": "AL-W106"}
+      ]
+    },
+    {
+      "priority": "attention",
+      "title": "Overtime and bonus are excluded: their history covers 2026 only",
+      "detail": "Only 2026 is documented for these components, and two years are needed under the illustrative settings.",
+      "evidence": [{"type": "rule", "id": "INC-W101"}]
+    },
+    {
+      "priority": "attention",
+      "title": "A 30-day late payment appears 19 months before the credit report",
+      "detail": "The Northgate Card shows one 30-day late payment, 19 months before the report date.",
+      "evidence": [{"type": "calculation", "name": "months_since_late_payment"}]
+    },
+    {
+      "priority": "attention",
+      "title": "The pay stubs cover 16 days fewer than the 30 days required",
+      "detail": "The documents in the file do not span the full 30-day period on the checklist.",
+      "evidence": [{"type": "checklist", "id": "pay_stubs_30_days"}]
+    },
+    {
+      "priority": "attention",
+      "title": "Page 3 of the August 2026 bank statement is missing",
+      "detail": "The statement prints three pages and two were received.",
+      "evidence": [{"type": "rule", "id": "DI-W701"}]
+    },
+    {
+      "priority": "information",
+      "title": "The printed net pay was corrected by a reviewer",
+      "detail": "The stub prints 2,083.61; gross 3,070.50 less deductions 1,036.89 is 2,033.61, which matches the bank deposits.",
+      "evidence": [{"type": "rule", "id": "DI-CHK-06"}]
+    }
+  ],
+  "conditions": [
+    {
+      "text": "Provide the source of the 2,000.00 transfer received on 2026-09-22, for example a gift letter and the donor's bank record.",
+      "priority": "significant"
+    },
+    {
+      "text": "Document the funds to close: 27,273.68 of the 36,500.00 needed is not yet supported by the statements on file.",
+      "priority": "significant"
+    },
+    {
+      "text": "Provide pay stubs that cover the full 30-day period before the application.",
+      "priority": "attention"
+    },
+    {
+      "text": "Provide page 3 of the August 2026 bank statement.",
+      "priority": "attention"
+    },
+    {
+      "text": "Provide documents covering a second year of overtime and bonus history, since 2026 is the only year on file.",
+      "priority": "attention"
+    },
+    {
+      "text": "Provide a written explanation of the 30-day late payment on the Northgate Card.",
+      "priority": "information"
+    }
+  ],
+  "agents": [
+    {"agent": "researcher", "summary": "Looked up the guideline passage for each finding (seeded: no search was run)."},
+    {"agent": "writer", "summary": "Drafted the report from the stored results (seeded: written by hand)."},
+    {"agent": "critic", "summary": "Checked every figure against a stored result (seeded: not run)."}
+  ]
+}

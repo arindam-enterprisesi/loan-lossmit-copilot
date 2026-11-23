@@ -116,13 +116,26 @@ async def test_the_seeded_profile_comes_back_with_every_quote_verified(
         "config_label",
         "profile",
         "flags",
+        "confirmed_by",
+        "confirmed_at",
         "budget",
         "measures",
+        "checks",
+        "budget_flags",
+        "budget_note",
     }
     assert body["source"] == "seeded_sample" and body["letter_document_id"] == str(letter)
     assert (body["config_version"], body["config_label"]) == (CONFIG.version, CONFIG.label)
     assert body["flags"] == []
-    assert (body["budget"], body["measures"]) == ([], [])  # filled in on D6
+    # The budget is computed with the reading or on demand; until then it says so.
+    assert (body["budget"], body["measures"], body["checks"], body["budget_flags"]) == (
+        [],
+        [],
+        [],
+        [],
+    )
+    assert body["budget_note"] == "The budget has not been computed for this reading yet."
+    assert (body["confirmed_by"], body["confirmed_at"]) == (None, None)
 
     profile = body["profile"]
     assert set(profile) == {
@@ -143,6 +156,7 @@ async def test_the_seeded_profile_comes_back_with_every_quote_verified(
         "category_label": "Reduction in income",
         "sensitive": False,
         "financial_effect": "hours and pay reduced by a quarter",
+        "confirmation": None,  # nobody has confirmed it yet
     }
     assert (profile["onset"]["as_stated"], profile["onset"]["month"]) == ("July", "2026-07")
     assert (profile["duration"]["category"], profile["intent"]["category"]) == ("unknown", "keep")

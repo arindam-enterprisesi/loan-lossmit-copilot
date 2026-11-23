@@ -579,8 +579,11 @@ def validate(
     """Run every check that applies to this document's type."""
     run = _Checks(inp, rules, cfg)
     run.check_fields()
-    if not cfg.has_fields(inp.doc_type) and not inp.fields:
-        # A type no reader is configured for yet (for example a W-2): say so instead of passing.
+    if not inp.fields and not cfg.required_fields(inp.doc_type):
+        # Nothing was read and nothing was required, so no field is flagged as missing either: a
+        # type no reader handles yet (a credit report, or an application read by the rule-based
+        # fake) says so instead of passing quietly. A type with required fields gets an empty row
+        # for each of them, and those are flagged one by one instead.
         run.emit("DI-W604", "document", None, (), template="DI-W604:none")
     if inp.doc_type == "pay_stub":
         run.check_pay_stub()

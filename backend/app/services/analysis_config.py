@@ -21,7 +21,7 @@ from typing import Generic, Literal, TypeVar
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from app.db.enums import IncomeComponentKind
+from app.db.enums import IncomeComponentKind, TransactionCategory
 from app.services.document_config import FlagTemplate
 
 CONFIG_DIR = Path(__file__).resolve().parents[2] / "config"
@@ -131,9 +131,32 @@ class ThresholdsConfig(_Strict):
     version: str
     label: Label
     source: str = Field(min_length=1)
+    # Income (Feature Design 2.3).
     tolerance_absolute: Setting[Decimal]
     tolerance_relative: Setting[Decimal]
     decline_threshold: Setting[Decimal]
+    # Assets and liabilities (Feature Design 3.3).
+    large_deposit_minimum: Setting[Decimal]
+    recurring_debit_min_months: Setting[int]
+    recurring_debit_tolerance: Setting[Decimal]
+    payroll_match_tolerance: Setting[Decimal]
+    payroll_match_days: Setting[int]
+    dti_min_liability_payment: Setting[Decimal]
+    dti_exclude_rent_on_purchase: Setting[bool]
+    dti_review_level: Setting[Decimal]
+    # The hardship budget (Feature Design 7.3 and 7.5).
+    stated_vs_observed_share: Setting[Decimal]
+    stated_vs_observed_amount: Setting[Decimal]
+    pay_vs_hours_points: Setting[Decimal]
+    budget_categories: Setting[list[str]]
+    budget_category_map: Setting[dict[str, str]]
+    # Flag messages for the asset and budget checks: templates, filled in by code (rule 3).
+    flags: dict[str, FlagTemplate]
+
+    def flag(self, code: str, **values: object) -> tuple[str, str]:
+        """The severity and filled-in message for ``code`` (or ``code:variant``)."""
+        template = self.flags[code]
+        return template.severity, template.message.format(**values)
 
     @model_validator(mode="after")
     def _sensible(self) -> ThresholdsConfig:
@@ -141,12 +164,47 @@ class ThresholdsConfig(_Strict):
             raise ValueError("a tolerance cannot be negative")
         if not Decimal(0) < self.decline_threshold.value < Decimal(1):
             raise ValueError("decline_threshold is a share between 0 and 1")
+        for name in (
+            "large_deposit_minimum",
+            "recurring_debit_tolerance",
+            "payroll_match_tolerance",
+            "dti_min_liability_payment",
+            "stated_vs_observed_amount",
+            "pay_vs_hours_points",
+        ):
+            if getattr(self, name).value < 0:
+                raise ValueError(f"{name} cannot be negative")
+        if self.recurring_debit_min_months.value < 1:
+            raise ValueError("recurring_debit_min_months counts statement months, at least 1")
+        if self.payroll_match_days.value < 0:
+            raise ValueError("payroll_match_days cannot be negative")
+        if not Decimal(0) < self.dti_review_level.value < Decimal(1):
+            raise ValueError("dti_review_level is a share between 0 and 1")
+        if not Decimal(0) <= self.stated_vs_observed_share.value <= Decimal(1):
+            raise ValueError("stated_vs_observed_share is a share between 0 and 1")
+        lines = self.budget_categories.value
+        if len(set(lines)) != len(lines):
+            raise ValueError("budget_categories must be unique")
+        known = {c.value for c in TransactionCategory}
+        for category, line in self.budget_category_map.value.items():
+            if category not in known:
+                raise ValueError(f"budget_category_map: {category!r} is not a transaction category")
+            if line not in lines:
+                raise ValueError(f"budget_category_map: {line!r} is not a budget category")
         return self
 
     def tolerance_for(self, a: Decimal, b: Decimal) -> Decimal:
         """1.00 or 0.5% of the larger figure, whichever is larger (Feature Design 2.3)."""
         relative = self.tolerance_relative.value * max(abs(a), abs(b))
         return max(self.tolerance_absolute.value, relative)
+
+    def stated_vs_observed_tolerance(self, stated: Decimal, observed: Decimal) -> Decimal:
+        """10% of the larger figure or 25.00, whichever is larger (Feature Design 7.3).
+
+        A stated and an observed amount that differ by more than this are flagged.
+        """
+        relative = self.stated_vs_observed_share.value * max(abs(stated), abs(observed))
+        return max(self.stated_vs_observed_amount.value, relative)
 
 
 # --- checklists.yaml ------------------------------------------------------------------------

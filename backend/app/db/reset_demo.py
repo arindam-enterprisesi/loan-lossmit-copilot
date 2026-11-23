@@ -4,7 +4,9 @@
 
 It empties the database, removes the files stored in S3, and rebuilds the demo: the three users, the
 two cases with their profiles (Daniel Reyes, Pillar 1, and Angela Whitfield, Pillar 2), and Angela's
-hardship profile. With ``--upload`` it also uploads each borrower's generated documents and reads
+hardship profile, plus the sample reports to review (Daniel's draft underwriting report with its
+six suggested conditions, Angela's waterfall, lender view and draft report: all labelled
+``seeded_sample``). With ``--upload`` it also uploads each borrower's generated documents and reads
 them straight away, in this process, with no Redis and no worker (``--fake-reader`` uses the
 rule-based reader, for when no model provider works). Run ``make data`` first to generate the
 documents.
@@ -39,13 +41,16 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from sqlalchemy.pool import NullPool
 
 from app.db.demo.hardship import seed_hardship_profile
+from app.db.demo.reports import seed_lm_recommendation, seed_underwriting_report
 from app.db.enums import EmploymentType, Pillar
 from app.db.seed import DEMO_CASES, DEMO_USERS, case_id, seed, user_id
+from app.services import budget_runs, hardship_runs
 from app.services import cases as case_service
 from app.services import documents as document_service
 from app.services.fake_reader import FakeClassifier, FakeExtractor
 from app.services.ingestion_config import IngestionConfig, get_ingestion_config
 from app.services.security import CurrentUser
+from app.services.transaction_labels import FakeLabeller, TransactionLabeller, get_labeller
 from app.settings import REPO_ROOT, get_settings
 from app.storage import Storage, StorageError
 from app.worker import process_documents
@@ -76,6 +81,8 @@ class ResetSummary:
     files_deleted: int
     hardship_profile_seeded: bool
     seconds: float
+    reports_seeded: int = 0
+    budget_computed: bool = False
 
 
 @dataclass(frozen=True)
@@ -260,7 +267,7 @@ async def _populate(
     fake_reader: bool,
     rendered_dir: Path,
     config: IngestionConfig,
-) -> tuple[int, int, int, bool]:
+) -> tuple[int, int, int, bool, int, bool]:
     """Seed users, cases and profiles; optionally upload and read; seed the hardship profile."""
     engine = create_async_engine(url, poolclass=NullPool)
     factory = async_sessionmaker(engine, expire_on_commit=False)
@@ -277,15 +284,60 @@ async def _populate(
                     factory, storage, scenario, rendered_dir, config, fake_reader=fake_reader
                 )
         hardship_seeded = False
+        budget_built = False
+        reports = 0
         async with factory() as session:
             for scenario in scenarios:
                 if scenario.pillar is Pillar.LOSS_MITIGATION:
                     await seed_hardship_profile(session, scenario.case_id)
+                    await seed_lm_recommendation(session, scenario.case_id)
                     hardship_seeded = True
+                else:
+                    await seed_underwriting_report(session, scenario.case_id)
+                reports += 1
+            await session.commit()  # the seeds are safe before anything that can fail
+        async with factory() as session:
+            for scenario in scenarios:
+                if scenario.pillar is Pillar.LOSS_MITIGATION:
+                    budget_built = await _build_budget(
+                        session, scenario, upload=upload, fake_reader=fake_reader
+                    )
             await session.commit()
-        return seeded.users_created, seeded.cases_created, documents, hardship_seeded
+        return (
+            seeded.users_created,
+            seeded.cases_created,
+            documents,
+            hardship_seeded,
+            reports,
+            budget_built,
+        )
     finally:
         await engine.dispose()
+
+
+async def _build_budget(
+    session: AsyncSession, scenario: Scenario, *, upload: bool, fake_reader: bool
+) -> bool:
+    """Build the loss mitigation case's budget on its seeded profile from whatever was uploaded.
+
+    The statements' lines are labelled by the model (or the keyword labeller with
+    ``--fake-reader``). With no upload there are no documents, so the budget says what it cannot
+    compute. A labelling failure must not stop the reset: the budget is then built from no labels
+    and says so.
+    """
+    view = await hardship_runs.latest(session, scenario.case_id)
+    if view is None:
+        return False
+    labeller: TransactionLabeller | None = None
+    if upload:
+        labeller = FakeLabeller() if fake_reader else get_labeller()
+    try:
+        await budget_runs.compute_for_run(session, view.run, labeller=labeller)
+    except Exception as exc:
+        logger.warning("budget not built with labels (%s); building it without", type(exc).__name__)
+        await session.rollback()
+        await budget_runs.compute_for_run(session, view.run)
+    return True
 
 
 # --- the whole reset ------------------------------------------------------------------------
@@ -321,7 +373,7 @@ def reset_demo(
     keys = asyncio.run(_stored_keys(database_url))
     files_deleted = _delete_stored_files(storage, keys)
     _recreate_schema(database_url)
-    users, cases, documents, hardship = asyncio.run(
+    users, cases, documents, hardship, reports, budget = asyncio.run(
         _populate(
             database_url,
             storage,
@@ -339,6 +391,8 @@ def reset_demo(
         files_deleted=files_deleted,
         hardship_profile_seeded=hardship,
         seconds=time.monotonic() - started,
+        reports_seeded=reports,
+        budget_computed=budget,
     )
 
 
@@ -389,7 +443,8 @@ def main(argv: list[str] | None = None) -> None:
     print(
         f"Done in {summary.seconds:.0f} s: {summary.users} users, {summary.cases} cases, "
         f"{summary.documents} documents uploaded, {summary.files_deleted} old file(s) removed, "
-        f"hardship profile {'seeded' if summary.hardship_profile_seeded else 'not seeded'}."
+        f"hardship profile {'seeded' if summary.hardship_profile_seeded else 'not seeded'}, "
+        f"{summary.reports_seeded} sample report(s) seeded."
     )
 
 

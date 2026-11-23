@@ -13,9 +13,11 @@ from typing import Any, ClassVar
 from arq.connections import RedisSettings
 
 from app.db.session import get_sessionmaker
+from app.services.asset_runs import run_asset_job
 from app.services.classification import get_classifier
 from app.services.document_config import get_document_fields, get_validation_config
 from app.services.extractor import get_extractor
+from app.services.hardship import run_hardship_job
 from app.services.income_runs import run_income_job
 from app.services.ingestion_config import get_ingestion_config
 from app.services.ocr import default_ocr
@@ -78,8 +80,35 @@ async def run_income_analysis(ctx: dict[str, Any], job_id: str, run_id: str) -> 
     )
 
 
+async def run_asset_analysis(ctx: dict[str, Any], job_id: str, run_id: str) -> None:
+    """Label a case's statement lines, analyse assets and liabilities, store the result."""
+    await run_asset_job(
+        ctx.get("session_factory") or get_sessionmaker(),
+        uuid.UUID(job_id),
+        uuid.UUID(run_id),
+        labeller=ctx.get("labeller"),
+    )
+
+
+async def run_hardship_reading(ctx: dict[str, Any], job_id: str, user_id: str) -> None:
+    """Read a case's hardship letter, store the profile, and build the budget."""
+    await run_hardship_job(
+        ctx.get("session_factory") or get_sessionmaker(),
+        uuid.UUID(job_id),
+        uuid.UUID(user_id),
+        reader=ctx.get("hardship_reader"),
+        labeller=ctx.get("labeller"),
+    )
+
+
 class WorkerSettings:
-    functions: ClassVar[list[Any]] = [ping, process_documents, run_income_analysis]
+    functions: ClassVar[list[Any]] = [
+        ping,
+        process_documents,
+        run_income_analysis,
+        run_asset_analysis,
+        run_hardship_reading,
+    ]
     on_startup = startup
     redis_settings = RedisSettings.from_dsn(get_settings().redis_url)
     job_timeout = get_settings().worker_job_timeout

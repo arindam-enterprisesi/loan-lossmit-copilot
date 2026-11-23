@@ -479,6 +479,19 @@ def test_a_type_with_no_configured_fields_says_nothing_was_extracted() -> None:
     assert (flag.entity, flag.field) == ("document", None)
 
 
+@pytest.mark.parametrize(
+    "doc_type", ["credit_report", "mortgage_assistance_application", "mortgage_statement"]
+)
+def test_a_type_with_fields_but_none_required_still_says_nothing_was_extracted(
+    doc_type: str,
+) -> None:
+    # Their fields are configured, none is required, and a reader that cannot read them returns
+    # nothing. That must not pass quietly: the warning stays, as it was before the fields existed.
+    inp = ValidationInput(doc_type, {}, {}, (PageInput(1),))
+    flag = only(run(inp), "DI-W604")
+    assert flag.message == "No fields were extracted from this document."
+
+
 def test_a_configured_type_with_no_fields_extracted_is_not_that_flag() -> None:
     # A pay stub the reader returned nothing for: required fields are missing, not "no reader".
     inp = ValidationInput("pay_stub", {}, {}, (PageInput(1),))

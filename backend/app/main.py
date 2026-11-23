@@ -9,7 +9,20 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.errors import register_error_handlers
-from app.api.routers import auth, cases, completeness, documents, hardship, income, jobs
+from app.api.routers import (
+    asset_liability,
+    audit,
+    auth,
+    cases,
+    completeness,
+    documents,
+    guidelines,
+    hardship,
+    income,
+    jobs,
+    lm_recommendation,
+    underwriting,
+)
 from app.services.queue import close_queue
 from app.settings import get_settings
 
@@ -53,6 +66,11 @@ app.include_router(cases.router, prefix=API_PREFIX)
 app.include_router(documents.router, prefix=API_PREFIX)
 app.include_router(jobs.router, prefix=API_PREFIX)
 app.include_router(income.router, prefix=API_PREFIX)
+app.include_router(asset_liability.router, prefix=API_PREFIX)
+app.include_router(underwriting.router, prefix=API_PREFIX)
+app.include_router(lm_recommendation.router, prefix=API_PREFIX)
+app.include_router(audit.router, prefix=API_PREFIX)
+app.include_router(guidelines.router, prefix=API_PREFIX)
 app.include_router(completeness.router, prefix=API_PREFIX)
 app.include_router(hardship.router, prefix=API_PREFIX)
 

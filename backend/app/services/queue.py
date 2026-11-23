@@ -14,6 +14,8 @@ from app.settings import get_settings
 
 PROCESS_FUNCTION = "process_documents"
 INCOME_FUNCTION = "run_income_analysis"
+ASSET_FUNCTION = "run_asset_analysis"
+HARDSHIP_FUNCTION = "run_hardship_reading"
 
 
 class JobQueue(Protocol):
