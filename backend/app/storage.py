@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING, Any
 
 import boto3
 from botocore.config import Config
-from botocore.exceptions import ClientError
+from botocore.exceptions import BotoCoreError, ClientError
 
 from app.settings import Settings, get_settings
 
@@ -47,7 +47,7 @@ class Storage:
 
     def _get_client(self) -> S3Client:
         if self._client is None:
-            _drop_blank_aws_env()
+            drop_blank_aws_env()
             s = self._settings
             session = boto3.Session(
                 profile_name=s.aws_profile,
@@ -80,7 +80,9 @@ class Storage:
         extra: dict[str, Any] = {"ContentType": content_type} if content_type else {}
         try:
             self._get_client().put_object(Bucket=self.bucket, Key=full, Body=data, **extra)
-        except ClientError as exc:
+        except (ClientError, BotoCoreError) as exc:
+            # BotoCoreError covers failures before S3 answers (no connection, timeout, bad
+            # credentials). They are storage failures too, not crashes.
             raise StorageError(f"put failed: {_code(exc)}") from exc
         return full
 
@@ -92,13 +94,15 @@ class Storage:
             if _code(exc) in {"NoSuchKey", "404"}:
                 raise ObjectNotFoundError(f"no object at {key!r}") from exc
             raise StorageError(f"get failed: {_code(exc)}") from exc
+        except BotoCoreError as exc:
+            raise StorageError(f"get failed: {_code(exc)}") from exc
         return response["Body"].read()
 
     def delete(self, key: str) -> None:
         full = self.full_key(key)
         try:
             self._get_client().delete_object(Bucket=self.bucket, Key=full)
-        except ClientError as exc:
+        except (ClientError, BotoCoreError) as exc:
             raise StorageError(f"delete failed: {_code(exc)}") from exc
 
     def presigned_get(self, key: str, expires: int = PRESIGN_SECONDS) -> str:
@@ -111,7 +115,7 @@ class Storage:
         )
 
 
-def _drop_blank_aws_env() -> None:
+def drop_blank_aws_env() -> None:
     """Remove blank ``AWS_*`` variables from the process environment.
 
     boto3 reads ``AWS_PROFILE`` itself, so a blank ``AWS_PROFILE=`` (what
@@ -122,5 +126,8 @@ def _drop_blank_aws_env() -> None:
         del os.environ[name]
 
 
-def _code(exc: ClientError) -> str:
-    return str(exc.response.get("Error", {}).get("Code", "unknown"))
+def _code(exc: ClientError | BotoCoreError) -> str:
+    """A short, safe description of a failure: the S3 error code, or the exception's class name."""
+    if isinstance(exc, ClientError):
+        return str(exc.response.get("Error", {}).get("Code", "unknown"))
+    return type(exc).__name__

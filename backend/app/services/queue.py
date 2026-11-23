@@ -12,7 +12,8 @@ from arq.connections import ArqRedis, RedisSettings
 
 from app.settings import get_settings
 
-INGEST_FUNCTION = "ingest_documents"
+PROCESS_FUNCTION = "process_documents"
+INCOME_FUNCTION = "run_income_analysis"
 
 
 class JobQueue(Protocol):

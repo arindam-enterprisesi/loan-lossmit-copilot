@@ -1,0 +1,23 @@
+# Hardship letter reading (Feature Design 7.3 and 7.5). Read by app/prompts/schemas/hardship.py.
+# Every setting is versioned and labelled; change the version when you change a value.
+# The stated-against-observed tolerance (FD 7.3) belongs with the budget checks in
+# app/services and can be added here by its owner.
+version: "2026-11-19.1"
+label: illustrative
+
+# The category list the hardship@1 prompt must choose from (FD 7.3 sample list).
+# sensitive: the profile records only the category and its financial effect, never
+# the details (no diagnosis, no family circumstances).
+categories:
+  - {key: reduction_in_income, label: Reduction in income, sensitive: false}
+  - {key: unemployment, label: Unemployment, sensitive: false}
+  - {key: increase_in_housing_expense, label: Increase in housing expense, sensitive: false}
+  - {key: medical_or_disability, label: Medical or disability, sensitive: true}
+  - {key: divorce_or_separation, label: Divorce or separation, sensitive: true}
+  - {key: death_in_household, label: Death in household, sensitive: true}
+  - {key: disaster, label: Disaster, sensitive: false}
+  - {key: business_failure, label: Business failure, sensitive: false}
+  - {key: other, label: Other, sensitive: false}
+
+# "A short maximum, so quotes stay quotes" (FD 7.3). Longer quotes are flagged.
+max_quote_chars: 160

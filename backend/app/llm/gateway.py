@@ -83,9 +83,12 @@ class Gateway:
         self._config = config
         self._prompts_dir = prompts_dir
 
+    @property
+    def config(self) -> LLMConfig:
+        return self._config() if callable(self._config) else self._config
+
     def _task_config(self, task: str, provider: str | None) -> TaskConfig:
-        config = self._config() if callable(self._config) else self._config
-        return config.for_task(task, provider)
+        return self.config.for_task(task, provider)
 
     def _log(self, **fields: Any) -> None:
         call_log.info(json.dumps(fields, sort_keys=True), extra={"llm_call": fields})

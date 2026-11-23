@@ -24,7 +24,7 @@ from app.services.ingestion_config import (
     get_ingestion_config,
     load_ingestion_config,
 )
-from app.services.queue import INGEST_FUNCTION, ArqQueue
+from app.services.queue import PROCESS_FUNCTION, ArqQueue
 from app.services.storage_keys import original_key, page_image_key
 from app.worker import WorkerSettings
 
@@ -196,14 +196,14 @@ async def test_the_arq_queue_connects_on_first_use_and_names_the_job(
     queue = ArqQueue("redis://example.invalid:6379/3")
     assert opened == []  # nothing is opened until something is queued
 
-    await queue.enqueue(INGEST_FUNCTION, "job-1", ["d1", "d2"], job_id="job-1")
-    await queue.enqueue(INGEST_FUNCTION, "job-2", ["d3"], job_id="job-2")
+    await queue.enqueue(PROCESS_FUNCTION, "job-1", ["d1", "d2"], job_id="job-1")
+    await queue.enqueue(PROCESS_FUNCTION, "job-2", ["d3"], job_id="job-2")
 
     assert len(opened) == 1 and opened[0].host == "example.invalid" and opened[0].database == 3
     assert opened[0].conn_retries == 1  # fail fast inside a request
     assert pool.calls == [
-        ("ingest_documents", ("job-1", ["d1", "d2"]), "job-1"),
-        ("ingest_documents", ("job-2", ["d3"]), "job-2"),
+        ("process_documents", ("job-1", ["d1", "d2"]), "job-1"),
+        ("process_documents", ("job-2", ["d3"]), "job-2"),
     ]
     await queue.close()
     assert pool.closed
@@ -211,4 +211,4 @@ async def test_the_arq_queue_connects_on_first_use_and_names_the_job(
 
 def test_the_worker_runs_the_function_the_api_queues() -> None:
     names = {fn.__name__ for fn in WorkerSettings.functions}
-    assert INGEST_FUNCTION in names
+    assert PROCESS_FUNCTION in names

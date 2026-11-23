@@ -1,8 +1,10 @@
 from collections.abc import Iterator
+from typing import Any
 from urllib.parse import parse_qs, urlparse
 
 import boto3
 import pytest
+from botocore.exceptions import EndpointConnectionError
 from moto import mock_aws
 
 from app.settings import Settings
@@ -76,6 +78,32 @@ def test_client_builds_with_blank_profile_from_env_example(
     monkeypatch.setenv("AWS_DEFAULT_REGION", "us-east-1")
     store = Storage(Settings(_env_file=None, s3_bucket=BUCKET))
     assert store._get_client() is not None
+
+
+class _Unreachable:
+    """An S3 client whose network is down: botocore raises EndpointConnectionError."""
+
+    def put_object(self, **_: Any) -> Any:
+        raise EndpointConnectionError(endpoint_url="https://s3.example.invalid/secret-key")
+
+    def get_object(self, **_: Any) -> Any:
+        raise EndpointConnectionError(endpoint_url="https://s3.example.invalid/secret-key")
+
+    def delete_object(self, **_: Any) -> Any:
+        raise EndpointConnectionError(endpoint_url="https://s3.example.invalid/secret-key")
+
+
+def test_a_connection_error_is_a_storage_error_that_names_no_url() -> None:
+    store = Storage(Settings(_env_file=None, s3_bucket=BUCKET), client=_Unreachable())  # type: ignore[arg-type]
+    for call in (
+        lambda: store.put("a.txt", b"x"),
+        lambda: store.get("a.txt"),
+        lambda: store.delete("a.txt"),
+    ):
+        with pytest.raises(StorageError, match="EndpointConnectionError") as caught:
+            call()
+        assert not isinstance(caught.value, ObjectNotFoundError)
+        assert "secret-key" not in str(caught.value)
 
 
 def test_missing_bucket_is_an_error() -> None:

@@ -1,0 +1,280 @@
+{
+ "source": "data/synthetic/scenarios/daniel_reyes.json -> pay_stub_2026-09-27.pdf (rendered by data/synthetic/generate.py, read by app.services.ingestion.parse_pdf)",
+ "lines": [
+  {
+   "page": 1,
+   "line": 1,
+   "text": "Cedar Valley Manufacturing, Inc."
+  },
+  {
+   "page": 1,
+   "line": 2,
+   "text": "1200 Industrial Parkway, Columbus, OH 43228"
+  },
+  {
+   "page": 1,
+   "line": 3,
+   "text": "EIN 31-4408172"
+  },
+  {
+   "page": 1,
+   "line": 4,
+   "text": "EARNINGS STATEMENT"
+  },
+  {
+   "page": 1,
+   "line": 5,
+   "text": "Employee: Daniel Reyes"
+  },
+  {
+   "page": 1,
+   "line": 6,
+   "text": "Employee ID: E-20417"
+  },
+  {
+   "page": 1,
+   "line": 7,
+   "text": "Address: 418 Alder Street, Apt 3B, Columbus, OH 43215"
+  },
+  {
+   "page": 1,
+   "line": 8,
+   "text": "Pay frequency: Biweekly"
+  },
+  {
+   "page": 1,
+   "line": 9,
+   "text": "Pay period: 2026-09-14 to 2026-09-27"
+  },
+  {
+   "page": 1,
+   "line": 10,
+   "text": "Pay date: 2026-10-02"
+  },
+  {
+   "page": 1,
+   "line": 11,
+   "text": "Pay period 19 of 26"
+  },
+  {
+   "page": 1,
+   "line": 12,
+   "text": "Direct deposit: account ending 6032"
+  },
+  {
+   "page": 1,
+   "line": 13,
+   "text": "EARNINGS Hours Rate Current Year to date"
+  },
+  {
+   "page": 1,
+   "line": 14,
+   "text": "Regular 80.00 34.50 2,760.00 52,440.00"
+  },
+  {
+   "page": 1,
+   "line": 15,
+   "text": "Overtime 1.5x 3.96 51.75 204.93 3,897.10"
+  },
+  {
+   "page": 1,
+   "line": 16,
+   "text": "Bonus 105.57 2,002.40"
+  },
+  {
+   "page": 1,
+   "line": 17,
+   "text": "Gross Pay 3,070.50 58,339.50"
+  },
+  {
+   "page": 1,
+   "line": 18,
+   "text": "DEDUCTIONS Current Year to date"
+  },
+  {
+   "page": 1,
+   "line": 19,
+   "text": "Federal income tax 428.30 8,137.70"
+  },
+  {
+   "page": 1,
+   "line": 20,
+   "text": "State income tax 131.84 2,504.96"
+  },
+  {
+   "page": 1,
+   "line": 21,
+   "text": "Social Security 186.50 3,543.50"
+  },
+  {
+   "page": 1,
+   "line": 22,
+   "text": "Medicare 43.62 828.78"
+  },
+  {
+   "page": 1,
+   "line": 23,
+   "text": "401(k) deferral 184.23 3,500.37"
+  },
+  {
+   "page": 1,
+   "line": 24,
+   "text": "Health insurance (pre-tax) 62.40 1,185.60"
+  },
+  {
+   "page": 1,
+   "line": 25,
+   "text": "Total Deductions 1,036.89 19,700.91"
+  },
+  {
+   "page": 1,
+   "line": 26,
+   "text": "PAY SUMMARY"
+  },
+  {
+   "page": 1,
+   "line": 27,
+   "text": "Gross pay, current period 3,070.50"
+  },
+  {
+   "page": 1,
+   "line": 28,
+   "text": "Less deductions, current period 1,036.89"
+  },
+  {
+   "page": 1,
+   "line": 29,
+   "text": "Gross pay, year to date 58,339.50"
+  },
+  {
+   "page": 1,
+   "line": 30,
+   "text": "Deductions, year to date 19,700.91"
+  },
+  {
+   "page": 1,
+   "line": 31,
+   "text": "Net Pay 2,083.61"
+  },
+  {
+   "page": 1,
+   "line": 32,
+   "text": "Net pay, year to date 38,638.59"
+  },
+  {
+   "page": 1,
+   "line": 33,
+   "text": "Questions about this statement? Contact Payroll, (614) 555-0182."
+  },
+  {
+   "page": 1,
+   "line": 34,
+   "text": "Page 1 of 2"
+  },
+  {
+   "page": 1,
+   "line": 35,
+   "text": "SYNTHETIC SAMPLE - invented data, not a real document"
+  },
+  {
+   "page": 2,
+   "line": 1,
+   "text": "Cedar Valley Manufacturing, Inc."
+  },
+  {
+   "page": 2,
+   "line": 2,
+   "text": "EARNINGS STATEMENT (continued)"
+  },
+  {
+   "page": 2,
+   "line": 3,
+   "text": "Employee: Daniel Reyes"
+  },
+  {
+   "page": 2,
+   "line": 4,
+   "text": "Pay date: 2026-10-02"
+  },
+  {
+   "page": 2,
+   "line": 5,
+   "text": "YEAR-TO-DATE SUMMARY"
+  },
+  {
+   "page": 2,
+   "line": 6,
+   "text": "Regular, year to date 52,440.00"
+  },
+  {
+   "page": 2,
+   "line": 7,
+   "text": "Overtime 1.5x, year to date 3,897.10"
+  },
+  {
+   "page": 2,
+   "line": 8,
+   "text": "Bonus, year to date 2,002.40"
+  },
+  {
+   "page": 2,
+   "line": 9,
+   "text": "Federal income tax, year to date 8,137.70"
+  },
+  {
+   "page": 2,
+   "line": 10,
+   "text": "State income tax, year to date 2,504.96"
+  },
+  {
+   "page": 2,
+   "line": 11,
+   "text": "Social Security, year to date 3,543.50"
+  },
+  {
+   "page": 2,
+   "line": 12,
+   "text": "Medicare, year to date 828.78"
+  },
+  {
+   "page": 2,
+   "line": 13,
+   "text": "401(k) deferral, year to date 3,500.37"
+  },
+  {
+   "page": 2,
+   "line": 14,
+   "text": "Health insurance (pre-tax), year to date 1,185.60"
+  },
+  {
+   "page": 2,
+   "line": 15,
+   "text": "Gross pay, year to date 58,339.50"
+  },
+  {
+   "page": 2,
+   "line": 16,
+   "text": "Net pay, year to date 38,638.59"
+  },
+  {
+   "page": 2,
+   "line": 17,
+   "text": "Pay periods elapsed this year: 19 of 26"
+  },
+  {
+   "page": 2,
+   "line": 18,
+   "text": "Employer message: open enrollment begins November 1."
+  },
+  {
+   "page": 2,
+   "line": 19,
+   "text": "Page 2 of 2"
+  },
+  {
+   "page": 2,
+   "line": 20,
+   "text": "SYNTHETIC SAMPLE - invented data, not a real document"
+  }
+ ]
+}
