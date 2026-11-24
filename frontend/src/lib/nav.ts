@@ -39,9 +39,9 @@ export interface PillarConfig {
 
 const shared = {
   businessChat: { slug: "business-chat", label: "Business chat", icon: MessageSquare, status: "soon" },
-  hitl: { slug: "hitl-actions", label: "HITL actions", icon: Users, status: "soon" },
+  hitl: { slug: "hitl-actions", label: "HITL actions", icon: Users, status: "live" },
   governance: { slug: "agent-governance", label: "Agent governance", icon: ShieldCheck, status: "soon" },
-  context: { slug: "context-settings", label: "Context settings", icon: Settings, status: "soon" },
+  context: { slug: "context-settings", label: "Context settings", icon: Settings, status: "live" },
   profile: { slug: "profile", label: "Profile", icon: User, status: "soon" },
 } satisfies Record<string, NavItem>;
 

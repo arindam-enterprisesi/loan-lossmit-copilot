@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { PageHeader } from "@/components/layout/page-header";
+import { NoCases } from "@/components/shared/no-cases";
 import { FlagChip } from "@/components/shared/flag-chip";
 import {
   Table,
@@ -20,6 +21,14 @@ export default async function CasesPage({ params }: { params: Promise<{ pillar: 
   if (!pillar) notFound();
 
   const cases = await loadCases(pillar);
+  if (cases.length === 0) {
+    return (
+      <>
+        <PageHeader title="Cases" description="Each case groups the documents and results for one borrower." />
+        <NoCases />
+      </>
+    );
+  }
   const docs = await Promise.all(cases.map((c) => loadDocuments(c.id)));
 
   return (

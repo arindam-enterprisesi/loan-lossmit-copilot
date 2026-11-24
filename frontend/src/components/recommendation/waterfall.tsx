@@ -98,7 +98,7 @@ function OptionCard({ card, onOverride, onOpenPassage }: OptionCardProps) {
       <div className="flex flex-wrap items-center gap-3">
         <span
           aria-hidden
-          className="flex size-7 shrink-0 items-center justify-center rounded-full bg-panel text-xs font-semibold tabular-nums text-muted-foreground ring-1 ring-inset ring-border"
+          className="flex h-7 min-w-7 shrink-0 items-center justify-center rounded-full bg-panel px-1.5 text-xs font-semibold whitespace-nowrap tabular-nums text-muted-foreground ring-1 ring-inset ring-border"
         >
           {card.position}
         </span>

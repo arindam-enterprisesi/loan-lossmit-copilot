@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { SELECT_CLASS } from "@/components/documents/select-class";
 import { AgentSteps } from "@/components/copilot/agent-steps";
 import { ReportNotices } from "@/components/copilot/report-notices";
@@ -10,20 +10,22 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorNotice } from "@/components/shared/error-notice";
 import { CardsSkeleton } from "@/components/shared/skeletons";
 import { Button } from "@/components/ui/button";
-import { getLatestLmRecommendation, overrideLmCondition, rerunLmAgent, runLmRecommendation, signOffLm } from "@/lib/api";
-import type { OverrideRequest, SignOffResult } from "@/lib/copilot-types";
+import { addLmAnnotation, getLatestLmRecommendation, overrideLmCondition, rerunLmAgent, runLmRecommendation, signOffLm } from "@/lib/api";
+import type { AnnotationSection, OverrideRequest, SignOffResult } from "@/lib/copilot-types";
+import { notesFor } from "@/lib/copilot";
 import { formatDate } from "@/lib/format";
 import type { Case } from "@/lib/types";
 import { useAgentRun } from "@/lib/use-agent-run";
 import { LenderView } from "./lender-view";
 import { RuleSetBanner } from "./rule-set-banner";
+import { SectionNotes } from "./section-notes";
 import { Waterfall } from "./waterfall";
 
 interface RecommendationWorkspaceProps {
   cases: Case[];
 }
 
-function BulletSection({ id, title, items }: { id: string; title: string; items: string[] }) {
+function BulletSection({ id, title, items, notes }: { id: string; title: string; items: string[]; notes?: ReactNode }) {
   if (items.length === 0) return null;
   return (
     <section aria-labelledby={id} className="space-y-2">
@@ -35,6 +37,7 @@ function BulletSection({ id, title, items }: { id: string; title: string; items:
           <li key={item}>{item}</li>
         ))}
       </ul>
+      {notes}
     </section>
   );
 }
@@ -64,6 +67,13 @@ export function RecommendationWorkspace({ cases }: RecommendationWorkspaceProps)
     if (!caseId) return;
     setData(await overrideLmCondition(caseId, conditionId, req));
   };
+  const onAnnotate = async (section: AnnotationSection, text: string) => {
+    if (!caseId) return;
+    setData(await addLmAnnotation(caseId, { section, text }));
+  };
+  const notes = (section: AnnotationSection) => (
+    <SectionNotes section={section} notes={notesFor(data?.annotations ?? [], section)} onAdd={onAnnotate} canAdd={report !== null} />
+  );
   const onSignOff = async (note: string): Promise<SignOffResult> => {
     if (!caseId) throw new Error("No case is selected.");
     const result = await signOffLm(caseId, note);
@@ -85,7 +95,7 @@ export function RecommendationWorkspace({ cases }: RecommendationWorkspaceProps)
           </select>
         </label>
         <Button onClick={run.start} disabled={!caseId || run.working}>
-          {data ? "Run again" : "Run recommendation"}
+          {run.working ? "Running…" : data ? "Run again" : "Run recommendation"}
         </Button>
         {report ? <span className="pb-2 text-xs text-muted-foreground">Report version {report.version} · {formatDate(report.created_at)}</span> : null}
       </div>
@@ -105,7 +115,10 @@ export function RecommendationWorkspace({ cases }: RecommendationWorkspaceProps)
           {data?.lender_view ? <LenderView view={data.lender_view} /> : null}
 
           {data && data.waterfall.length > 0 ? (
-            <Waterfall options={data.waterfall} onOverride={onOverride} onOpenPassage={setPassageId} />
+            <>
+              <Waterfall options={data.waterfall} onOverride={onOverride} onOpenPassage={setPassageId} />
+              {notes("waterfall")}
+            </>
           ) : null}
 
           <section aria-labelledby="agents-heading" className="space-y-3">
@@ -133,6 +146,7 @@ export function RecommendationWorkspace({ cases }: RecommendationWorkspaceProps)
                     Lender view
                   </h3>
                   <p className="text-sm text-navy">{report.sections.lender_view}</p>
+                  {notes("lender_view")}
                 </section>
                 {report.sections.borrower_situation ? (
                   <section aria-labelledby="situation-heading" className="space-y-1">
@@ -140,11 +154,12 @@ export function RecommendationWorkspace({ cases }: RecommendationWorkspaceProps)
                       The borrower&apos;s situation
                     </h3>
                     <p className="text-sm text-navy">{report.sections.borrower_situation}</p>
+                    {notes("borrower_situation")}
                   </section>
                 ) : null}
-                <BulletSection id="missing-heading" title="Missing information" items={report.sections.missing_information} />
-                <BulletSection id="compliance-heading" title="Compliance points" items={report.sections.compliance_points} />
-                <BulletSection id="review-heading" title="Items for human review" items={report.sections.items_for_human_review} />
+                <BulletSection id="missing-heading" title="Missing information" items={report.sections.missing_information} notes={notes("missing_information")} />
+                <BulletSection id="compliance-heading" title="Compliance points" items={report.sections.compliance_points} notes={notes("compliance_points")} />
+                <BulletSection id="review-heading" title="Items for human review" items={report.sections.items_for_human_review} notes={notes("items_for_human_review")} />
                 {report.sections.note ? <p className="text-xs text-muted-foreground">{report.sections.note}</p> : null}
               </section>
 

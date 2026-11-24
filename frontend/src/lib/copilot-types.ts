@@ -246,6 +246,30 @@ export interface RuleSet {
   banner: string | null;
 }
 
+/** The parts of the recommendation a reviewer can leave a note on. */
+export type AnnotationSection =
+  | "waterfall"
+  | "lender_view"
+  | "borrower_situation"
+  | "missing_information"
+  | "compliance_points"
+  | "items_for_human_review";
+
+/** A reviewer's note on one part of the recommendation. Notes are only added: the report text is never changed. */
+export interface Annotation {
+  id: string;
+  section: AnnotationSection;
+  text: string;
+  /** A user ID from the real backend (no name yet); "demo.reviewer" in the mock. */
+  by: string;
+  at: string;
+}
+
+export interface AnnotationRequest {
+  section: AnnotationSection;
+  text: string;
+}
+
 export interface LmRecommendation {
   run_id: string;
   run_status: RunStatus;
@@ -256,6 +280,8 @@ export interface LmRecommendation {
   lender_view: LenderView | null;
   /** Null until the agents have written one. */
   report: ReportInfo<LmSections> | null;
+  /** The reviewer's notes, oldest first. The backend has no endpoint for them yet (see the going-live checklist). */
+  annotations: Annotation[];
   agent_runs: AgentRun[];
   sign_offs: SignOff[];
 }

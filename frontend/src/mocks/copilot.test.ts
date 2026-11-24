@@ -14,6 +14,7 @@ import {
   evaluateAngela,
   hasCopilotSeed,
   LENDER_SETTINGS,
+  addAnnotation,
   overrideCondition,
   recommendationAt,
   recomputeWaterfall,
@@ -409,6 +410,50 @@ describe("overriding a waterfall condition", () => {
     const again = structuredClone(fresh);
     recomputeWaterfall(again);
     expect(again).toEqual(fresh);
+  });
+});
+
+describe("notes on the recommendation", () => {
+  it("adds a trimmed note on one part, with who and when, and shows it in the recommendation", () => {
+    const run = lm(false);
+    addAnnotation(run, { section: "lender_view", text: "  Confirm the property value with the servicer  " }, DONE);
+    const notes = recommendationAt(run, DONE).annotations;
+    expect(notes).toEqual([
+      { id: "an-1", section: "lender_view", text: "Confirm the property value with the servicer", by: "demo.reviewer", at: new Date(DONE).toISOString() },
+    ]);
+  });
+
+  it("keeps every note in the order written, and never changes what the agents wrote", () => {
+    const run = lm(false);
+    const before = JSON.stringify(recommendationAt(run, DONE).report?.sections);
+    addAnnotation(run, { section: "waterfall", text: "first" }, DONE);
+    addAnnotation(run, { section: "waterfall", text: "second" }, DONE + 1);
+    expect(recommendationAt(run, DONE + 2).annotations.map((a) => a.text)).toEqual(["first", "second"]);
+    expect(JSON.stringify(recommendationAt(run, DONE + 2).report?.sections)).toBe(before);
+  });
+
+  it("refuses a blank note, an unknown part and a very long note (422), and a note while the agents work (409)", () => {
+    const run = lm(false);
+    throwsApi(() => addAnnotation(run, { section: "waterfall", text: "   " }, DONE), 422, /needs text/);
+    throwsApi(() => addAnnotation(run, { section: "nothing" as never, text: "x" }, DONE), 422, /Choose a part/);
+    throwsApi(() => addAnnotation(run, { section: "waterfall", text: "x".repeat(1001) }, DONE), 422, /at most 1000/);
+    throwsApi(() => addAnnotation(run, { section: "waterfall", text: "x" }, T0 + 1), 409);
+    expect(recommendationAt(run, DONE).annotations).toEqual([]);
+  });
+
+  it("puts a signed-off report back in review, and keeps the sign-off", () => {
+    const run = lm(false);
+    signOff(run, undefined, DONE);
+    addAnnotation(run, { section: "compliance_points", text: "Check the date again" }, DONE + 1);
+    const rec = recommendationAt(run, DONE + 2);
+    expect(rec.report?.status).toBe("in_review");
+    expect(rec.sign_offs).toHaveLength(1);
+  });
+
+  it("starts a new run with no notes", () => {
+    const run = lm(false);
+    addAnnotation(run, { section: "waterfall", text: "x" }, DONE);
+    expect(recommendationAt(lm(false), DONE).annotations).toEqual([]);
   });
 });
 

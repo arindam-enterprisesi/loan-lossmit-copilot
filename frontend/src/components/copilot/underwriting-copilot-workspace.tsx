@@ -97,7 +97,7 @@ export function UnderwritingCopilotWorkspace({ cases, pillarSlug }: Underwriting
           </select>
         </label>
         <Button onClick={run.start} disabled={!caseId || run.working}>
-          {data ? "Run again" : "Run copilot"}
+          {run.working ? "Running…" : data ? "Run again" : "Run copilot"}
         </Button>
         {data?.report ? <span className="pb-2 text-xs text-muted-foreground">Report version {data.report.version} · {formatDate(data.report.created_at)}</span> : null}
       </div>

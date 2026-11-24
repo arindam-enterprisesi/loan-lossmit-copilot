@@ -3,6 +3,7 @@ import { PageHeader } from "@/components/layout/page-header";
 import { findNavItem, pillarFromSlug } from "@/lib/nav";
 import { loadCases } from "@/lib/server-api";
 import { IncomeWorkspace } from "./income-workspace";
+import { NoCases } from "@/components/shared/no-cases";
 
 /** Server shell for the "Income analysis" menu item. Only the Loan Processing pillar has it. */
 export async function IncomeScreen({ params }: { params: Promise<{ pillar: string }> }) {
@@ -18,7 +19,7 @@ export async function IncomeScreen({ params }: { params: Promise<{ pillar: strin
         title={item.label}
         description="Income by component with the working behind each figure. A person decides what counts."
       />
-      <IncomeWorkspace cases={cases} pillarSlug={pillarSlug} />
+      {cases.length === 0 ? <NoCases /> : <IncomeWorkspace cases={cases} pillarSlug={pillarSlug} />}
     </>
   );
 }

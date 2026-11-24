@@ -90,6 +90,7 @@ describe("UnderwritingCopilotWorkspace with an earlier run", () => {
     expect(screen.getByRole("heading", { name: "Sign off review" })).toBeInTheDocument();
     expect(screen.getByText("Records a review. Not a decision.")).toBeInTheDocument();
     expect(screen.getByText(/6 suggested conditions have not been reviewed/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Sign off review" })).toBeDisabled();
   });
 
   it("accepts a condition, rejects one with a reason, edits one, and adds one, keeping what the agents wrote", async () => {
@@ -125,15 +126,29 @@ describe("UnderwritingCopilotWorkspace with an earlier run", () => {
     expect(condition(7).getByText("Added by a reviewer")).toBeInTheDocument();
   });
 
-  it("signs off the review, says it is not a decision, and how many conditions were left", async () => {
+  it("signs off only once every condition has a decision, then says who signed and when", async () => {
     renderScreen();
     await screen.findByRole("heading", { name: "Sign off review" });
-    fireEvent.click(screen.getByRole("button", { name: "Accept condition 1" }));
-    await waitFor(() => expect(condition(1).getByText("Accepted")).toBeInTheDocument());
+    const signOffButton = () => screen.getByRole("button", { name: "Sign off review" });
+    for (let n = 1; n <= 5; n++) {
+      fireEvent.click(screen.getByRole("button", { name: `Accept condition ${n}` }));
+      await waitFor(() => expect(condition(n).getByText("Accepted")).toBeInTheDocument());
+      expect(signOffButton()).toBeDisabled(); // one is still undecided
+    }
+    expect(screen.getByText(/1 suggested condition has not been reviewed/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Reject condition 6" }));
+    await screen.findByRole("dialog");
+    reason("not required for this file");
+    fireEvent.click(screen.getByRole("button", { name: "Reject condition" }));
+    await waitFor(() => expect(condition(6).getByText("Rejected")).toBeInTheDocument());
+    await waitFor(() => expect(signOffButton()).toBeEnabled());
+    expect(screen.queryByText(/have not been reviewed/)).not.toBeInTheDocument();
+
     fireEvent.change(screen.getByLabelText("Note (optional)"), { target: { value: "Reviewed the file" } });
-    fireEvent.click(screen.getByRole("button", { name: "Sign off review" }));
-    expect(await screen.findByText(/Review recorded\. 5 suggested conditions were left unreviewed\./)).toBeInTheDocument();
+    fireEvent.click(signOffButton());
+    expect(await screen.findByText("Review recorded.")).toBeInTheDocument();
     expect(screen.getByText("Review signed off")).toBeInTheDocument();
+    expect(await screen.findByText(/Review signed off by/)).toHaveTextContent(/demo\.reviewer on \d{1,2} \w{3} \d{4}, version 1\./);
     const earlier = await screen.findByRole("list", { name: "Sign-offs" });
     expect(within(earlier).getByText(/demo\.reviewer · .* · version 1 · Reviewed the file/)).toBeInTheDocument();
   });
@@ -141,9 +156,16 @@ describe("UnderwritingCopilotWorkspace with an earlier run", () => {
   it("a change after the sign-off puts the report back in review and keeps the sign-off", async () => {
     renderScreen();
     await screen.findByRole("heading", { name: "Sign off review" });
+    for (let n = 1; n <= 6; n++) {
+      fireEvent.click(screen.getByRole("button", { name: `Accept condition ${n}` }));
+      await waitFor(() => expect(condition(n).getByText("Accepted")).toBeInTheDocument());
+    }
     fireEvent.click(screen.getByRole("button", { name: "Sign off review" }));
     await screen.findByText("Review signed off");
-    fireEvent.click(screen.getByRole("button", { name: "Accept condition 2" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add condition" }));
+    await screen.findByRole("dialog");
+    fireEvent.change(screen.getByLabelText("Condition"), { target: { value: "Provide the gift letter." } });
+    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Add condition" }));
     expect(await screen.findByText(/The report changed after the last sign-off/)).toBeInTheDocument();
     expect(screen.getByText("In review")).toBeInTheDocument();
     expect(screen.getByRole("list", { name: "Sign-offs" })).toBeInTheDocument();
@@ -168,7 +190,7 @@ describe("UnderwritingCopilotWorkspace when the Critic failed", () => {
     await screen.findByRole("heading", { name: "Case snapshot" });
     fireEvent.click(screen.getByRole("button", { name: "Re-run the Critic" }));
     expect(await screen.findByText("Running")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Run again" })).toBeDisabled(); // not while an agent is running
+    expect(screen.getByRole("button", { name: "Running…" })).toBeDisabled(); // not while an agent is running
     await waitFor(() => expect(within(screen.getByTestId("agent-critic")).getByText("Done")).toBeInTheDocument(), { timeout: 6000 });
     expect(within(screen.getByTestId("agent-critic")).getByText("Attempt 2")).toBeInTheDocument();
     await screen.findByRole("heading", { name: "Case snapshot" });

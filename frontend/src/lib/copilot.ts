@@ -8,6 +8,8 @@ import type {
   AgentName,
   AgentRun,
   AgentStatus,
+  Annotation,
+  AnnotationSection,
   Condition,
   ConditionDecision,
   EvidenceRef,
@@ -229,7 +231,7 @@ export const OVERRIDE_STATUS_OPTIONS: { value: OverrideStatus; label: string }[]
 export interface WaterfallCard {
   key: string;
   title: string;
-  /** "1", or "5 and 6" for the two together. */
+  /** "1", or "5–6" for the two together. */
   position: string;
   status: WaterfallStatus;
   options: WaterfallOption[];
@@ -246,7 +248,7 @@ export function waterfallCards(options: WaterfallOption[]): WaterfallCard[] {
       cards.push({
         key: "short_sale_deed_in_lieu",
         title: "Short sale and deed-in-lieu",
-        position: `${o.order_no} and ${next.order_no}`,
+        position: `${o.order_no}–${next.order_no}`,
         status: o.status,
         options: [o, next],
       });
@@ -309,3 +311,22 @@ export const LENDER_FIGURES = [
   },
   { key: "advantage", label: "Advantage of the modification", chain: ["modification_advantage"] },
 ] as const;
+
+// ---- Notes on the recommendation ---------------------------------------------------------------------
+
+export const ANNOTATION_MAX = 1000;
+
+export const ANNOTATION_SECTION_LABEL: Record<AnnotationSection, string> = {
+  waterfall: "Waterfall",
+  lender_view: "Lender view",
+  borrower_situation: "The borrower's situation",
+  missing_information: "Missing information",
+  compliance_points: "Compliance points",
+  items_for_human_review: "Items for human review",
+};
+
+export const ANNOTATION_SECTIONS = Object.keys(ANNOTATION_SECTION_LABEL) as AnnotationSection[];
+
+/** The notes on one part of the recommendation, in the order they were written. */
+export const notesFor = (annotations: Annotation[], section: AnnotationSection): Annotation[] =>
+  annotations.filter((a) => a.section === section);

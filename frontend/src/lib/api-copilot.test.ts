@@ -148,6 +148,23 @@ describe("the loss mitigation recommendation, real mode", () => {
     expect(out.waterfall).toHaveLength(2);
   });
 
+  it("POSTs a trimmed note on one part, and says plainly when the backend has no endpoint for notes", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(reply(200, { ...realAngelaRecommendation(), annotations: [{ id: "a1", section: "waterfall", text: "Seen", by: "u-1", at: "2026-11-24T10:00:00Z" }] }))
+      .mockResolvedValueOnce(reply(404, { message: "Not found" }));
+    vi.stubGlobal("fetch", fetchMock);
+    const { addLmAnnotation } = await loadApi("false");
+    const out = await addLmAnnotation("c2", { section: "waterfall", text: "  Seen  " });
+    expect(call(fetchMock)).toEqual({
+      url: "/api/proxy/cases/c2/lm-recommendation/latest/annotations",
+      method: "POST",
+      body: { section: "waterfall", text: "Seen" },
+    });
+    expect(out.annotations).toHaveLength(1);
+    await expect(addLmAnnotation("c2", { section: "waterfall", text: "x" })).rejects.toThrow("Adding a note is not available on this backend yet.");
+  });
+
   it("re-runs one agent and signs off on the recommendation's own paths", async () => {
     const fetchMock = vi.fn().mockImplementation(async () => reply(201, { sign_off: { id: "s", report_version: 1, signed_by: "u", role: "lm_specialist", signed_at: "2026-11-24T10:00:00Z", note: null, statement: "Records a review. Not a decision." }, report_status: "signed_off", pending_conditions: 0 }));
     vi.stubGlobal("fetch", fetchMock);

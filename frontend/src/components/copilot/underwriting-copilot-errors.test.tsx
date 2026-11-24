@@ -146,7 +146,9 @@ describe("UnderwritingCopilotWorkspace when something goes wrong", () => {
   });
 
   it("when the sign-off fails, the message sits in the sign-off bar and the note is kept", async () => {
-    latest.mockResolvedValue(finished());
+    const reviewed = finished();
+    reviewed.conditions = reviewed.conditions.map((c) => ({ ...c, decision: "accepted" as const })); // sign-off waits for a decision on each
+    latest.mockResolvedValue(reviewed);
     signOff.mockRejectedValue(new ApiError(403, "Your role cannot review this report"));
     renderScreen();
     await screen.findByRole("heading", { name: "Sign off review" });

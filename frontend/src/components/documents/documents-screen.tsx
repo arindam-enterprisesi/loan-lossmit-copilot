@@ -4,6 +4,7 @@ import { findNavItem, pillarFromSlug } from "@/lib/nav";
 import { loadCases } from "@/lib/server-api";
 import { DocumentsWorkspace } from "./documents-workspace";
 import { ReviewWorkspace } from "./review-workspace";
+import { NoCases } from "@/components/shared/no-cases";
 
 type Params = Promise<{ pillar: string }>;
 
@@ -24,7 +25,7 @@ export async function DocumentsScreen({ params, section }: { params: Params; sec
         title={item.label}
         description="Upload documents, then review what was read from each one next to the page."
       />
-      <DocumentsWorkspace cases={cases} pillarSlug={pillarSlug} section={section} />
+      {cases.length === 0 ? <NoCases /> : <DocumentsWorkspace cases={cases} pillarSlug={pillarSlug} section={section} />}
     </>
   );
 }

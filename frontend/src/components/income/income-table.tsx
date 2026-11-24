@@ -118,7 +118,7 @@ export function IncomeTable({ analysis, pillarSlug, onDecide }: IncomeTableProps
                   ) : null}
                 </div>
                 {c.override ? (
-                  <div className="mt-1 max-w-56 space-y-0.5 text-xs text-muted-foreground">
+                  <div className="mt-1 max-w-56 space-y-0.5 whitespace-normal text-xs text-muted-foreground">
                     <div>
                       {c.override.included ? "Included" : "Excluded"} by {c.override.by}, {formatDate(c.override.at)}
                     </div>
@@ -129,7 +129,7 @@ export function IncomeTable({ analysis, pillarSlug, onDecide }: IncomeTableProps
                     </div>
                   </div>
                 ) : !c.included && c.rule_note ? (
-                  <div className="mt-1 max-w-56 text-xs text-muted-foreground">{c.rule_note}</div>
+                  <div className="mt-1 max-w-56 whitespace-normal text-xs text-muted-foreground">{c.rule_note}</div>
                 ) : null}
               </TableCell>
             </TableRow>

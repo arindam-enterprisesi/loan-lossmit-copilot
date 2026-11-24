@@ -99,7 +99,7 @@ export function TransactionsTable({ transactions, caseId, pillarSlug, onReclassi
                       <TableCell className="align-top whitespace-normal">
                         <FlagChip tone={t.category_source === "user" ? "info" : "neutral"}>{categoryLabel(t.category)}</FlagChip>
                         {t.change ? (
-                          <div className="mt-1 max-w-56 space-y-0.5 text-xs text-muted-foreground">
+                          <div className="mt-1 max-w-56 space-y-0.5 whitespace-normal text-xs text-muted-foreground">
                             <div>
                               {t.category_source === "user" ? "Changed" : "Updated"} by {t.change.by}, {formatDate(t.change.at)}
                             </div>
@@ -124,7 +124,7 @@ export function TransactionsTable({ transactions, caseId, pillarSlug, onReclassi
                           {t.sourced ? <FlagChip tone="success">Sourced</FlagChip> : null}
                         </div>
                         {t.sourced && t.sourced_note ? (
-                          <div className="mt-1 max-w-56 text-xs text-muted-foreground">Source: {t.sourced_note}</div>
+                          <div className="mt-1 max-w-56 whitespace-normal text-xs text-muted-foreground">Source: {t.sourced_note}</div>
                         ) : null}
                         {t.flags.map((f) => (
                           <div key={`${f.code}-m`} className="mt-1 max-w-60 text-xs text-muted-foreground">

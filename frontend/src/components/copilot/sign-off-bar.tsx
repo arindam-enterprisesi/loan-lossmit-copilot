@@ -11,7 +11,7 @@ import { formatDate } from "@/lib/format";
 interface SignOffBarProps {
   signOffs: SignOff[];
   reportStatus: ReportStatus;
-  /** Underwriting only: suggested conditions nobody has reviewed. They are named, and do not stop the sign-off. */
+  /** Underwriting only: suggested conditions nobody has reviewed. The sign-off waits until each has a decision (Feature Design 6.2). */
   undecided?: number;
   onSignOff: (note: string) => Promise<SignOffResult>;
 }
@@ -49,6 +49,10 @@ export function SignOffBar({ signOffs, reportStatus, undecided = 0, onSignOff }:
   };
 
   const changedSince = reportStatus === "in_review" && signOffs.length > 0;
+  const blockedId = `${noteId}-blocked`;
+  // The most recent sign-off, whichever order the backend lists them in.
+  const latestSignOff = signOffs.reduce<SignOff | null>((best, s) => (!best || s.signed_at > best.signed_at ? s : best), null);
+  const signedNow = reportStatus === "signed_off";
 
   return (
     <section aria-labelledby="sign-off-heading" className="space-y-3 rounded-xl border-2 border-navy/20 bg-card p-4">
@@ -65,9 +69,15 @@ export function SignOffBar({ signOffs, reportStatus, undecided = 0, onSignOff }:
       </div>
 
       {undecided > 0 ? (
-        <p role="note" className="rounded-lg border border-gold/50 bg-gold/10 px-3 py-2 text-sm text-navy">
-          {undecided === 1 ? "1 suggested condition has" : `${undecided} suggested conditions have`} not been reviewed. You can still sign off; the
-          record will say how many were left.
+        <p id={blockedId} role="note" className="rounded-lg border border-gold/50 bg-gold/10 px-3 py-2 text-sm text-navy">
+          {undecided === 1 ? "1 suggested condition has" : `${undecided} suggested conditions have`} not been reviewed. Accept, edit or reject
+          {undecided === 1 ? " it" : " each one"} to sign off.
+        </p>
+      ) : null}
+      {signedNow && latestSignOff ? (
+        <p role="status" className="rounded-lg border border-success/40 bg-success/10 px-3 py-2 text-sm text-navy">
+          Review signed off by <span className="font-semibold">{latestSignOff.signed_by}</span> on {formatDate(latestSignOff.signed_at)}, version{" "}
+          {latestSignOff.report_version}.
         </p>
       ) : null}
       {changedSince ? (
@@ -92,15 +102,12 @@ export function SignOffBar({ signOffs, reportStatus, undecided = 0, onSignOff }:
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
-        <Button onClick={submit} disabled={busy}>
+        <Button onClick={submit} disabled={busy || undecided > 0} aria-describedby={undecided > 0 ? blockedId : undefined}>
           Sign off review
         </Button>
         {recorded ? (
           <span role="status" className="text-sm text-success">
             Review recorded.
-            {recorded.pending_conditions > 0
-              ? ` ${recorded.pending_conditions} suggested ${recorded.pending_conditions === 1 ? "condition was" : "conditions were"} left unreviewed.`
-              : ""}
           </span>
         ) : null}
       </div>

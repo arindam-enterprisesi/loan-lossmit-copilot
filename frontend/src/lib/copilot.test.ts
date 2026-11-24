@@ -137,7 +137,7 @@ describe("the waterfall cards", () => {
     expect(cards.map((c) => [c.title, c.position, c.status])).toEqual([
       ["Repayment plan", "1", "not_met"],
       ["Loan modification", "4", "met"],
-      ["Short sale and deed-in-lieu", "5 and 6", "not_reached"],
+      ["Short sale and deed-in-lieu", "5–6", "not_reached"],
     ]);
     expect(cards[2].options.map((o) => o.option)).toEqual(["short_sale", "deed_in_lieu"]);
   });

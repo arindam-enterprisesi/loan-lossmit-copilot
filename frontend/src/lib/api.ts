@@ -1,7 +1,9 @@
 // Thin API layer. Screens call these functions and never fetch directly, so the swap from mocks
 // to the real FastAPI backend (contracts/openapi.yaml) is a flag, not a rewrite.
 import { mockCases } from "@/mocks/data";
+import { mockSettings } from "@/mocks/settings";
 import {
+  addAnnotationMock,
   addConditionMock,
   adjustBudgetItemMock,
   decideConditionMock,
@@ -17,6 +19,7 @@ import {
   getLatestLmMock,
   getLatestUnderwritingMock,
   getLoanScenarioMock,
+  listAuditMock,
   listDocumentsMock,
   listGuidelineSourcesMock,
   overrideCompletenessItemMock,
@@ -55,9 +58,12 @@ import type {
   ObligationReview,
   TransactionReview,
 } from "./assets-types";
+import { auditQueryString, toAuditPage, type RealAuditPage } from "./audit-real";
+import type { AuditPage, AuditQuery } from "./audit-types";
 import type { ChecklistResult } from "./completeness";
 import type {
   AgentName,
+  AnnotationRequest,
   ConditionAddRequest,
   ConditionDecisionRequest,
   LmRecommendation,
@@ -77,6 +83,8 @@ import {
   type RealSignOffResult,
 } from "./copilot-real";
 import { cleanReason } from "./documents";
+import { toSettings, type RealSettings } from "./settings-real";
+import type { Settings } from "./settings-types";
 import { componentRequest, toIncomeAnalysis, type RealIncomeAnalysis } from "./income-real";
 import { toGuidelinePassage, toGuidelineSource, type RealPassage, type RealSource } from "./guidelines-real";
 import type { FeedbackRating, GuidelineAnswer, GuidelinePassage, GuidelineSource, SourceSet } from "./guidelines-types";
@@ -630,6 +638,26 @@ export async function overrideLmCondition(caseId: string, conditionId: string, r
   );
 }
 
+/**
+ * POST .../lm-recommendation/latest/annotations: a note on one part of the report (Feature Design 8.2, step 5).
+ * The backend has no endpoint for notes yet, so a real backend answers 404 or 405 and the screen says so.
+ * Notes are only added: nothing the agents wrote is changed. Answers with the recommendation as it now stands.
+ */
+export async function addLmAnnotation(caseId: string, req: AnnotationRequest): Promise<LmRecommendation> {
+  const body: AnnotationRequest = { section: req.section, text: req.text.trim() };
+  if (USE_MOCKS) return addAnnotationMock(caseId, body);
+  try {
+    return toLmRecommendation(
+      await request<RealLmRecommendation>(`/cases/${caseId}/lm-recommendation/latest/annotations`, { method: "POST", body: JSON.stringify(body) }),
+    );
+  } catch (e) {
+    if (e instanceof ApiError && (e.status === 404 || e.status === 405)) {
+      throw new ApiError(e.status, "Adding a note is not available on this backend yet.");
+    }
+    throw e;
+  }
+}
+
 /** POST .../lm-recommendation/latest/sign-off: records that a person reviewed this version. It is not a decision. */
 export async function signOffLm(caseId: string, note?: string): Promise<SignOffResult> {
   const body = note?.trim() ? { note: note.trim() } : {};
@@ -637,6 +665,32 @@ export async function signOffLm(caseId: string, note?: string): Promise<SignOffR
   return toSignOffResult(
     await request<RealSignOffResult>(`/cases/${caseId}/lm-recommendation/latest/sign-off`, { method: "POST", body: JSON.stringify(body) }),
   );
+}
+
+/**
+ * GET /cases/{id}/audit: every upload, analysis, review action and sign-off on a case, newest first (Feature
+ * Design: Audit Store). On `main` (backend/app/api/routers/audit.py), not yet in the contract. Filter by exact
+ * `action` or `entity_type`; page back with `before`, the id of the last event already shown.
+ */
+export async function listCaseAudit(caseId: string, query: AuditQuery = {}): Promise<AuditPage> {
+  if (USE_MOCKS) return listAuditMock(caseId, query);
+  return toAuditPage(await request<RealAuditPage>(`/cases/${caseId}/audit${auditQueryString(query)}`));
+}
+
+/**
+ * GET /settings (administrator): the model for each task and the version and label of every setting file. The
+ * backend has no such endpoint yet, so a real backend answers 404 or 405 and the screen says so. Read-only.
+ */
+export async function getSettings(): Promise<Settings> {
+  if (USE_MOCKS) return structuredClone(mockSettings);
+  try {
+    return toSettings(await request<RealSettings>("/settings"));
+  } catch (e) {
+    if (e instanceof ApiError && (e.status === 404 || e.status === 405)) {
+      throw new ApiError(e.status, "The settings endpoint is not available on this backend yet.");
+    }
+    throw e;
+  }
 }
 
 /** A page picture link. Real links are presigned and expire after a few minutes. */

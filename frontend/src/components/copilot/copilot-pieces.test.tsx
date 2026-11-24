@@ -237,19 +237,34 @@ describe("SignOffBar", () => {
     expect(onSignOff).toHaveBeenCalledWith("");
   });
 
-  it("says how many conditions were left unreviewed, before and after", async () => {
-    const onSignOff = vi.fn().mockResolvedValue(result({ pending_conditions: 2 }));
+  it("is disabled until every suggested condition has a decision, and says how many are left", () => {
+    const onSignOff = vi.fn();
     render(<SignOffBar signOffs={[]} reportStatus="draft" undecided={2} onSignOff={onSignOff} />);
-    expect(screen.getByRole("note")).toHaveTextContent("2 suggested conditions have not been reviewed. You can still sign off");
-    fireEvent.click(screen.getByRole("button", { name: "Sign off review" }));
-    expect(await screen.findByText(/2 suggested conditions were left unreviewed/)).toBeInTheDocument();
+    expect(screen.getByRole("note")).toHaveTextContent("2 suggested conditions have not been reviewed. Accept, edit or reject each one to sign off.");
+    const button = screen.getByRole("button", { name: "Sign off review" });
+    expect(button).toBeDisabled();
+    expect(button).toHaveAccessibleDescription(/2 suggested conditions have not been reviewed/);
+    fireEvent.click(button);
+    expect(onSignOff).not.toHaveBeenCalled();
   });
 
-  it("says '1 suggested condition has' in the singular, and says nothing when all are reviewed", () => {
+  it("says '1 suggested condition has' in the singular, and is enabled with no note when all are reviewed", () => {
     const { rerender } = render(<SignOffBar signOffs={[]} reportStatus="draft" undecided={1} onSignOff={vi.fn()} />);
-    expect(screen.getByRole("note")).toHaveTextContent("1 suggested condition has not been reviewed");
+    expect(screen.getByRole("note")).toHaveTextContent("1 suggested condition has not been reviewed. Accept, edit or reject it to sign off.");
     rerender(<SignOffBar signOffs={[]} reportStatus="draft" undecided={0} onSignOff={vi.fn()} />);
     expect(screen.queryByRole("note")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Sign off review" })).toBeEnabled();
+  });
+
+  it("after a sign-off, says who signed and when, using the most recent one", () => {
+    render(
+      <SignOffBar
+        signOffs={[signOff(2, { signed_by: "second.reviewer", signed_at: "2026-11-25T09:00:00Z" }), signOff(1, { signed_by: "first.reviewer" })]}
+        reportStatus="signed_off"
+        onSignOff={vi.fn()}
+      />,
+    );
+    expect(screen.getByRole("status")).toHaveTextContent("Review signed off by second.reviewer on 25 Nov 2026, version 2.");
   });
 
   it("shows a failure where the person is looking, keeps the note, and can try again", async () => {

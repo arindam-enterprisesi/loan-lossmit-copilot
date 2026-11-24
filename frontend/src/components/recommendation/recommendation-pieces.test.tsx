@@ -98,7 +98,7 @@ describe("Waterfall", () => {
     const last = within(screen.getByTestId("option-short_sale_deed_in_lieu"));
     expect(last.getByText("Short sale and deed-in-lieu")).toBeInTheDocument();
     expect(last.getByText("Not reached")).toBeInTheDocument();
-    expect(last.getByText("5 and 6")).toBeInTheDocument();
+    expect(last.getByText("5–6")).toBeInTheDocument();
   });
 
   it("says the rules stop at the first option whose conditions are met, and that Met is not a decision", () => {

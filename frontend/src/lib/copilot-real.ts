@@ -130,6 +130,8 @@ export interface RealLmRecommendation {
   waterfall: RealWaterfallOption[];
   lender_view: RealLenderView | null;
   report: RealReportBundle | null;
+  /** Not on `main` yet: a reviewer's notes, in the screen's own shape. */
+  annotations?: LmRecommendation["annotations"];
 }
 
 export interface RealSignOffResult {
@@ -346,6 +348,7 @@ export function toLmRecommendation(real: RealLmRecommendation): LmRecommendation
     })),
     lender_view: real.lender_view ? toLenderView(real.lender_view) : null,
     report: real.report ? toInfo(real.report.report, toLmSections(real.report.report.sections), agent_runs) : null,
+    annotations: real.annotations ?? [],
     agent_runs,
     sign_offs: real.report ? real.report.sign_offs.map(toSignOff) : [],
   };

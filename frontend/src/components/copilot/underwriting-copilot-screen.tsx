@@ -3,6 +3,7 @@ import { PageHeader } from "@/components/layout/page-header";
 import { findNavItem, pillarFromSlug } from "@/lib/nav";
 import { loadCases } from "@/lib/server-api";
 import { UnderwritingCopilotWorkspace } from "./underwriting-copilot-workspace";
+import { NoCases } from "@/components/shared/no-cases";
 
 /** Server shell for the "Underwriting copilot" menu item. Only the Loan Processing pillar has it. */
 export async function UnderwritingCopilotScreen({ params }: { params: Promise<{ pillar: string }> }) {
@@ -18,7 +19,7 @@ export async function UnderwritingCopilotScreen({ params }: { params: Promise<{ 
         title={item.label}
         description="Three agents research, write and check a draft report from the results of the earlier screens. The draft is for the underwriter to review; it decides nothing."
       />
-      <UnderwritingCopilotWorkspace cases={cases} pillarSlug={pillarSlug} />
+      {cases.length === 0 ? <NoCases /> : <UnderwritingCopilotWorkspace cases={cases} pillarSlug={pillarSlug} />}
     </>
   );
 }

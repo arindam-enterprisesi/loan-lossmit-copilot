@@ -10,6 +10,8 @@ import type {
   AgentName,
   AgentRun,
   AgentStatus,
+  Annotation,
+  AnnotationRequest,
   Condition,
   ConditionAddRequest,
   ConditionDecisionRequest,
@@ -32,7 +34,7 @@ import type {
   WaterfallOptionKey,
   WaterfallStatus,
 } from "@/lib/copilot-types";
-import { AGENT_ORDER, SIGN_OFF_STATEMENT } from "@/lib/copilot";
+import { AGENT_ORDER, ANNOTATION_MAX, ANNOTATION_SECTIONS, SIGN_OFF_STATEMENT } from "@/lib/copilot";
 import { ANGELA_CASE_ID, DANIEL_CASE_ID } from "./data";
 import { PAYSTUB_DOC_ID } from "./extraction";
 import { formatCents, fromCents, toCents } from "./income";
@@ -67,6 +69,8 @@ export interface CopilotRun {
   conditions: Condition[];
   /** Loss mitigation: the waterfall with any overrides. */
   options: WaterfallOption[];
+  /** Loss mitigation: the reviewer's notes on the report. */
+  annotations: Annotation[];
   signOffs: SignOff[];
   reportStatus: ReportStatus;
   reportVersion: number;
@@ -132,6 +136,7 @@ export function startRun(kind: CopilotKind, caseId: string, now: number, first: 
     reruns: [],
     conditions: kind === "underwriting" ? seedConditions() : [],
     options: kind === "lm" ? evaluateAngela(ANGELA_INPUTS) : [],
+    annotations: [],
     signOffs: [],
     reportStatus: "draft",
     reportVersion: 1,
@@ -553,6 +558,18 @@ export function overrideCondition(run: CopilotRun, conditionId: string, req: Ove
   touched(run);
 }
 
+/** A reviewer's note on one part of the recommendation. Only added; nothing the agents wrote is changed. */
+export function addAnnotation(run: CopilotRun, req: AnnotationRequest, now: number): void {
+  requireReport(run, now);
+  if (!ANNOTATION_SECTIONS.includes(req.section)) throw new ApiError(422, "Choose a part of the recommendation to add the note to.");
+  const text = reasonOf(req.text);
+  if (!text) throw new ApiError(422, "A note needs text.");
+  if (text.length > ANNOTATION_MAX) throw new ApiError(422, `A note can be at most ${ANNOTATION_MAX} characters.`);
+  const n = run.annotations.length + 1;
+  run.annotations.push({ id: `an-${n}`, section: req.section, text, by: REVIEWER, at: iso(now) });
+  touched(run);
+}
+
 /** How much a modification lowers the monthly payment: the contractual payment less the target payment (35% of documented gross income). */
 const paymentReduction = (inputs: Inputs): number =>
   toCents(inputs.contractual_payment) - Math.round((toCents(inputs.gross_monthly_income) * 35) / 100);
@@ -649,6 +666,7 @@ export function recommendationAt(run: CopilotRun, now: number): LmRecommendation
     rule_set: { ...RULE_SET },
     waterfall: structuredClone(run.options),
     lender_view: lender,
+    annotations: structuredClone(run.annotations),
     report: working
       ? null
       : {

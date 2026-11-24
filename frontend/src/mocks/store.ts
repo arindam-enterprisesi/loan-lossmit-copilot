@@ -40,6 +40,7 @@ import {
   type AssetRun,
 } from "./assets";
 import type {
+  AnnotationRequest,
   ConditionAddRequest,
   ConditionDecisionRequest,
   LmRecommendation,
@@ -47,8 +48,11 @@ import type {
   SignOffResult,
   UnderwritingReport,
 } from "@/lib/copilot-types";
+import type { AuditPage, AuditQuery } from "@/lib/audit-types";
+import { MOCK_ACTOR, queryAudit, seedAudit, type MockAuditEvent } from "./audit";
 import { applyOverride, buildCompleteness } from "./completeness";
 import {
+  addAnnotation,
   addCondition,
   decideCondition,
   overrideCondition,
@@ -61,7 +65,7 @@ import {
   type CopilotRun,
 } from "./copilot";
 import { buildGuidelineAnswer, getMockPassage, mockSources, type AskInput } from "./guidelines";
-import { DANIEL_CASE_ID, mockDocuments } from "./data";
+import { DANIEL_CASE_ID, mockCases, mockDocuments } from "./data";
 import { applyBudgetAdjustment, applyConfirmation, buildAngelaHardship, hasHardshipSeed } from "./hardship";
 import { MOCK_PAGE_IMAGES, PAYSTUB_DOC_ID, seedExtractions } from "./extraction";
 import { applyIncomeDecision, buildDanielIncome, hasIncomeSeed } from "./income";
@@ -116,6 +120,8 @@ interface StoreState {
   copilot: Map<string, CopilotRun>;
   /** Which of those have been run before: only the first run of a case has the demo's failed Critic. */
   copilotRan: Set<string>;
+  /** Every event in the audit trail, oldest first. Only ever added to. */
+  audit: MockAuditEvent[];
   counter: number;
 }
 
@@ -139,6 +145,7 @@ function createState(): StoreState {
     guidelineFeedback: new Map(),
     copilot: new Map(),
     copilotRan: new Set(),
+    audit: seedAudit(),
     counter: 0,
   };
 }
@@ -160,6 +167,36 @@ const find = (caseId: string, documentId: string): DocumentSummary => {
 };
 
 const iso = (ms: number): string => new Date(ms).toISOString();
+
+interface AuditNote {
+  entityId?: string | null;
+  before?: Record<string, unknown> | null;
+  after?: Record<string, unknown> | null;
+  reason?: string | null;
+}
+
+/** Adds one event to the audit trail, as the backend does for every review action. Events are never changed or removed. */
+function logAudit(caseId: string, action: string, entityType: string, note: AuditNote, now: number): void {
+  const pillar = mockCases.find((c) => c.id === caseId)?.pillar;
+  state.audit.push({
+    id: state.audit.length + 1,
+    case_id: caseId,
+    at: iso(now),
+    actor_name: MOCK_ACTOR,
+    role: pillar === "loss_mitigation" ? "lm_specialist" : "underwriter",
+    action,
+    entity_type: entityType,
+    entity_id: note.entityId ?? null,
+    before: note.before ?? null,
+    after: note.after ?? null,
+    reason: note.reason?.trim() || null,
+  });
+}
+
+/** GET /cases/{id}/audit: the case's events, newest first, filtered and paged like the backend does. */
+export function listAuditMock(caseId: string, query: AuditQuery = {}): AuditPage {
+  return queryAudit(state.audit, caseId, query);
+}
 
 export function listDocumentsMock(caseId: string, needsReview?: boolean): DocumentSummary[] {
   return structuredClone(
@@ -354,6 +391,7 @@ export function uploadMock(
     uploaded_at: iso(now),
   }));
   state.documents.push(...created);
+  for (const d of created) logAudit(caseId, "document.uploaded", "document", { entityId: d.id, after: { file_name: d.file_name } }, now);
   const job = createJob(
     created.map((d) => d.id),
     now,
@@ -383,6 +421,7 @@ export function setDocumentTypeMock(
     reason: reason ?? null,
     at: iso(now),
   });
+  logAudit(caseId, "document.type_set", "document", { entityId: doc.id, before: { doc_type: doc.doc_type ?? null }, after: { doc_type: docType }, reason }, now);
   doc.doc_type = docType;
   doc.type_certainty = "high";
   doc.status = "processing";
@@ -427,6 +466,7 @@ export function reviewFieldMock(
   if (review.action === "correct" && !review.value?.trim()) throw new ApiError(422, "A corrected value is required");
   if (review.action !== "confirm" && !review.reason?.trim()) throw new ApiError(422, "A reason is required");
 
+  const valueBefore = target.value;
   if (review.action === "correct") {
     target.value = review.value!.trim(); // original_value is never touched
     target.flags = []; // stands in for the backend re-running its checks, with no AI call
@@ -437,6 +477,18 @@ export function reviewFieldMock(
   target.reviewed_by = "demo.reviewer";
   target.reviewed_at = iso(now);
   target.version += 1;
+  logAudit(
+    caseId,
+    `field.${target.review_status}`,
+    "field",
+    {
+      entityId: doc.id,
+      before: { field: fieldName, value: valueBefore },
+      after: { field: fieldName, value: target.value, review_status: target.review_status },
+      reason: review.reason,
+    },
+    now,
+  );
 
   refreshDocument(doc, extraction);
   return structuredClone(target);
@@ -469,6 +521,7 @@ export function setIncomeComponentMock(
   if (!latest) throw new ApiError(404, "No income analysis yet. Run it first.");
   const updated = applyIncomeDecision(latest, componentId, decision, "demo.reviewer", iso(now));
   state.incomes.set(caseId, updated);
+  logAudit(caseId, decision.included ? "income.component_included" : "income.component_excluded", "income_component", { entityId: componentId, after: { included: decision.included }, reason: decision.reason }, now);
   return structuredClone(updated);
 }
 
@@ -554,6 +607,13 @@ export function reviewTransactionMock(
   if (!latest) throw new ApiError(404, "No asset analysis yet. Run it first.");
   const analysis = applyTransactionReview(latest.analysis, latest.run, transactionId, review, "demo.reviewer", iso(now));
   state.assets.set(caseId, { analysis, run: latest.run });
+  logAudit(
+    caseId,
+    review.sourced === undefined ? "assets.transaction_reclassified" : review.sourced ? "assets.deposit_sourced" : "assets.deposit_unsourced",
+    "transaction",
+    { entityId: transactionId, after: review.sourced === undefined ? { category: review.category } : { sourced: review.sourced }, reason: review.reason },
+    now,
+  );
   return structuredClone(analysis);
 }
 
@@ -568,6 +628,13 @@ export function reviewObligationMock(
   if (!latest) throw new ApiError(404, "No asset analysis yet. Run it first.");
   const analysis = applyObligationReview(latest.analysis, latest.run, obligationId, review, "demo.reviewer", iso(now));
   state.assets.set(caseId, { analysis, run: latest.run });
+  logAudit(
+    caseId,
+    review.counts_toward_dti ? "assets.obligation_included" : "assets.obligation_excluded",
+    "obligation",
+    { entityId: obligationId, after: { counts_toward_dti: review.counts_toward_dti }, reason: review.reason },
+    now,
+  );
   return structuredClone(analysis);
 }
 
@@ -594,6 +661,13 @@ export function confirmProfileItemMock(
   if (!latest) throw new ApiError(404, "No hardship assessment yet. Run it first.");
   const updated = applyConfirmation(latest, confirmation, "demo.reviewer", iso(now));
   state.hardship.set(caseId, updated);
+  logAudit(
+    caseId,
+    "hardship.confirmed",
+    "hardship_profile",
+    { after: { [confirmation.key]: confirmation.action === "correct" ? `corrected to ${confirmation.value ?? ""}` : "confirmed" }, reason: confirmation.reason },
+    now,
+  );
   return structuredClone(updated);
 }
 
@@ -608,6 +682,13 @@ export function adjustBudgetItemMock(
   if (!latest) throw new ApiError(404, "No hardship assessment yet. Run it first.");
   const updated = applyBudgetAdjustment(latest, itemId, request, "demo.reviewer", iso(now));
   state.hardship.set(caseId, updated);
+  logAudit(
+    caseId,
+    request.amount === null ? "budget.adjustment_cleared" : "budget.line_adjusted",
+    "budget_line",
+    { entityId: itemId, after: { amount: request.amount } , reason: request.reason },
+    now,
+  );
   return structuredClone(updated);
 }
 
@@ -639,6 +720,7 @@ export function overrideCompletenessItemMock(
   if (!latest) throw new ApiError(404, "No completeness result yet. Run the checklist first.");
   const updated = applyOverride(latest, itemId, reason, "demo.reviewer", iso(now));
   state.completeness.set(caseId, updated);
+  logAudit(caseId, "completeness.item_overridden", "completeness_item", { entityId: itemId, reason }, now);
   return structuredClone(updated);
 }
 
@@ -685,7 +767,15 @@ export function rerunCopilotAgentMock(kind: CopilotKind, caseId: string, agent: 
 /** PATCH .../latest/conditions/{id}: accept, edit or reject. Returns the report as it stands. */
 export function decideConditionMock(caseId: string, id: string, req: ConditionDecisionRequest, now: number = Date.now()): UnderwritingReport {
   const run = copilotRun("underwriting", caseId);
+  const before = run.conditions.find((c) => c.id === id)?.decision;
   decideCondition(run, id, req, now);
+  logAudit(
+    caseId,
+    `underwriting.condition_${req.decision}`,
+    "condition",
+    { entityId: id, before: { decision: before }, after: { decision: req.decision, edited_text: req.edited_text ?? null }, reason: req.reason },
+    now,
+  );
   return underwritingAt(run, now);
 }
 
@@ -693,6 +783,7 @@ export function decideConditionMock(caseId: string, id: string, req: ConditionDe
 export function addConditionMock(caseId: string, req: ConditionAddRequest, now: number = Date.now()): UnderwritingReport {
   const run = copilotRun("underwriting", caseId);
   addCondition(run, req, now);
+  logAudit(caseId, "underwriting.condition_added", "condition", { after: { text: req.text.trim(), priority: req.priority } }, now);
   return underwritingAt(run, now);
 }
 
@@ -700,10 +791,31 @@ export function addConditionMock(caseId: string, req: ConditionAddRequest, now: 
 export function overrideConditionMock(caseId: string, id: string, req: OverrideRequest, now: number = Date.now()): LmRecommendation {
   const run = copilotRun("lm", caseId);
   overrideCondition(run, id, req, now);
+  logAudit(caseId, "lm.condition_overridden", "waterfall_condition", { entityId: id, after: { condition: id, status: req.status }, reason: req.reason }, now);
+  return recommendationAt(run, now);
+}
+
+/** POST .../lm-recommendation/latest/annotations: a note on one part of the report. Returns the recommendation as it stands. */
+export function addAnnotationMock(caseId: string, req: AnnotationRequest, now: number = Date.now()): LmRecommendation {
+  const run = copilotRun("lm", caseId);
+  addAnnotation(run, req, now);
+  logAudit(caseId, "lm.annotation_added", "annotation", { after: { section: req.section, text: req.text.trim() } }, now);
   return recommendationAt(run, now);
 }
 
 /** POST .../latest/sign-off: records that a person reviewed this version. It is not a decision. */
 export function signOffMock(kind: CopilotKind, caseId: string, note?: string, now: number = Date.now()): SignOffResult {
-  return signOff(copilotRun(kind, caseId), note, now);
+  const result = signOff(copilotRun(kind, caseId), note, now);
+  logAudit(
+    caseId,
+    "report.signed_off",
+    "report",
+    {
+      before: { report_status: "in_review" },
+      after: { report_status: "signed_off", report_version: result.sign_off.report_version, kind, statement: result.sign_off.statement },
+      reason: note,
+    },
+    now,
+  );
+  return result;
 }

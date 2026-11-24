@@ -104,6 +104,50 @@ describe("RecommendationWorkspace with an earlier run", () => {
     expect(within(await screen.findByRole("list", { name: "Sign-offs" })).getByText(/demo\.reviewer · .* · version 1 · Add a note to request the August statement/)).toBeInTheDocument();
   });
 
+  it("adds a note on a part of the report, and on the waterfall, beside what the agents wrote", async () => {
+    renderScreen();
+    await screen.findByRole("heading", { name: "Compliance points" });
+    const complianceBefore = screen.getByRole("heading", { name: "Compliance points" }).closest("section")!.textContent;
+
+    fireEvent.click(screen.getByRole("button", { name: "Add a note on Compliance points" }));
+    fireEvent.change(screen.getByLabelText("Note on Compliance points"), { target: { value: "  Check the 120-day date with the servicer  " } });
+    fireEvent.click(screen.getByRole("button", { name: "Save note" }));
+    const notes = await screen.findByRole("list", { name: "Notes on Compliance points" });
+    expect(within(notes).getByText("Check the 120-day date with the servicer")).toBeInTheDocument();
+    expect(within(notes).getByText(/Reviewer note · demo\.reviewer · /)).toBeInTheDocument();
+    // the box closes, and the agents' own text is unchanged
+    expect(screen.queryByLabelText("Note on Compliance points")).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Compliance points" }).closest("section")!.textContent).toContain(complianceBefore!.replace("Add note", ""));
+
+    fireEvent.click(screen.getByRole("button", { name: "Add a note on Waterfall" }));
+    fireEvent.change(screen.getByLabelText("Note on Waterfall"), { target: { value: "Modification looks right to me" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save note" }));
+    expect(await screen.findByRole("list", { name: "Notes on Waterfall" })).toBeInTheDocument();
+  });
+
+  it("a note after the sign-off puts the report back in review and keeps the sign-off", async () => {
+    renderScreen();
+    await screen.findByRole("heading", { name: "Sign off review" });
+    fireEvent.click(screen.getByRole("button", { name: "Sign off review" }));
+    await screen.findByText("Review signed off");
+    fireEvent.click(screen.getByRole("button", { name: "Add a note on Lender view" }));
+    fireEvent.change(screen.getByLabelText("Note on Lender view"), { target: { value: "Second look" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save note" }));
+    expect(await screen.findByText(/The report changed after the last sign-off/)).toBeInTheDocument();
+    expect(screen.getByRole("list", { name: "Sign-offs" })).toBeInTheDocument();
+  });
+
+  it("will not save a blank note, and Cancel throws the box away", async () => {
+    renderScreen();
+    fireEvent.click(await screen.findByRole("button", { name: "Add a note on Missing information" }));
+    expect(screen.getByRole("button", { name: "Save note" })).toBeDisabled();
+    fireEvent.change(screen.getByLabelText("Note on Missing information"), { target: { value: "   " } });
+    expect(screen.getByRole("button", { name: "Save note" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByLabelText("Note on Missing information")).not.toBeInTheDocument();
+    expect(screen.queryByRole("list", { name: "Notes on Missing information" })).not.toBeInTheDocument();
+  });
+
   it("overrides a condition with a reason: the statuses recompute, the rules' own status stays visible, and the report says it predates the override", async () => {
     renderScreen();
     await screen.findByTestId("option-loan_modification");

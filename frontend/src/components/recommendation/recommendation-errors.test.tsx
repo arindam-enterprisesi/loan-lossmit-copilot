@@ -12,11 +12,12 @@ vi.mock("@/lib/api", () => ({
   runLmRecommendation: vi.fn(),
   rerunLmAgent: vi.fn(),
   overrideLmCondition: vi.fn(),
+  addLmAnnotation: vi.fn(),
   signOffLm: vi.fn(),
   getGuidelinePassage: vi.fn(),
   getJob: vi.fn(),
 }));
-import { getLatestLmRecommendation, overrideLmCondition, rerunLmAgent, runLmRecommendation, signOffLm } from "@/lib/api";
+import { addLmAnnotation, getLatestLmRecommendation, overrideLmCondition, rerunLmAgent, runLmRecommendation, signOffLm } from "@/lib/api";
 import { RecommendationWorkspace } from "./recommendation-workspace";
 
 const latest = vi.mocked(getLatestLmRecommendation);
@@ -24,6 +25,7 @@ const start = vi.mocked(runLmRecommendation);
 const rerun = vi.mocked(rerunLmAgent);
 const override = vi.mocked(overrideLmCondition);
 const signOff = vi.mocked(signOffLm);
+const annotate = vi.mocked(addLmAnnotation);
 
 const NOW = Date.now();
 const finished = (criticFails = false) => recommendationAt(startRun("lm", ANGELA_CASE_ID, 0, criticFails), NOW);
@@ -31,7 +33,7 @@ const finished = (criticFails = false) => recommendationAt(startRun("lm", ANGELA
 const working = () => recommendationAt(startRun("lm", ANGELA_CASE_ID, NOW, false), NOW);
 
 beforeEach(() => {
-  for (const m of [latest, start, rerun, override, signOff]) m.mockReset();
+  for (const m of [latest, start, rerun, override, signOff, annotate]) m.mockReset();
 });
 
 const renderScreen = () =>
@@ -127,6 +129,17 @@ describe("RecommendationWorkspace when something goes wrong", () => {
     await waitFor(() => expect(screen.getByTestId("option-forbearance")).toHaveAttribute("data-status", "met"));
     expect(override).toHaveBeenCalledWith(ANGELA_CASE_ID, "forbearance.hardship_temporary", { status: "met", reason: "Employer confirmed" });
     expect(screen.getByTestId("option-loan_modification")).toHaveAttribute("data-status", "not_reached");
+  });
+
+  it("when adding a note fails, the message sits in the note box and what was typed is kept", async () => {
+    latest.mockResolvedValue(finished());
+    annotate.mockRejectedValue(new ApiError(404, "Adding a note is not available on this backend yet."));
+    renderScreen();
+    fireEvent.click(await screen.findByRole("button", { name: "Add a note on Lender view" }));
+    fireEvent.change(screen.getByLabelText("Note on Lender view"), { target: { value: "keep this note" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save note" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Adding a note is not available on this backend yet.");
+    expect(screen.getByLabelText("Note on Lender view")).toHaveValue("keep this note");
   });
 
   it("when the sign-off fails, the message sits in the sign-off bar", async () => {

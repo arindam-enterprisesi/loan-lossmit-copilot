@@ -3,6 +3,7 @@ import { PageHeader } from "@/components/layout/page-header";
 import { findNavItem, pillarFromSlug } from "@/lib/nav";
 import { loadCases } from "@/lib/server-api";
 import { RecommendationWorkspace } from "./recommendation-workspace";
+import { NoCases } from "@/components/shared/no-cases";
 
 /** Server shell for the "Recommendation" menu item. Only the Loss Mitigation pillar has it. */
 export async function RecommendationScreen({ params }: { params: Promise<{ pillar: string }> }) {
@@ -18,7 +19,7 @@ export async function RecommendationScreen({ params }: { params: Promise<{ pilla
         title={item.label}
         description="The lender's view first, then each option's conditions in the investor's order. A draft for a person to review. It decides nothing."
       />
-      <RecommendationWorkspace cases={cases} />
+      {cases.length === 0 ? <NoCases /> : <RecommendationWorkspace cases={cases} />}
     </>
   );
 }
