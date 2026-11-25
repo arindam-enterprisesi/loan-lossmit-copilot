@@ -24,7 +24,7 @@ beforeEach(() => {
 });
 
 const angelaResult = () =>
-  buildCompleteness(ANGELA_CASE_ID, "pillar2-loss-mitigation@1", "2026-11-20T09:00:00.000Z", "c1");
+  buildCompleteness(ANGELA_CASE_ID, "pillar2-hardship@1", "2026-11-20T09:00:00.000Z", "c1");
 const renderPanel = () =>
   render(<CompletenessPanel caseId={ANGELA_CASE_ID} pillarSlug="loss-mitigation" section="document-intake" />);
 
@@ -49,7 +49,7 @@ describe("CompletenessPanel when something goes wrong", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Run checklist" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("Unknown checklist");
     expect(screen.getByRole("button", { name: "Run checklist" })).toBeEnabled();
-    expect(run).toHaveBeenCalledWith(ANGELA_CASE_ID, "pillar2-loss-mitigation@1");
+    expect(run).toHaveBeenCalledWith(ANGELA_CASE_ID, "pillar2-hardship@1");
   });
 
   it("keeps the window open with the backend's message when an override is refused, and changes nothing", async () => {

@@ -9,6 +9,31 @@ export const HARDSHIP_REASON_MAX = 500;
 /** A money amount as the backend writes it: digits with up to two decimals ("200", "200.5", "200.00"). */
 export const AMOUNT_PATTERN = /^\d+(\.\d{1,2})?$/;
 
+/** A month as the backend stores the onset: "2026-07". */
+export const ONSET_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;
+export const ONSET_HINT = "Write the month as YYYY-MM, for example 2026-07";
+
+const MONTH_NAMES = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
+
+/** "2026-07" -> "July 2026". Anything that is not a month is shown as it came. */
+export function monthLabel(value: string): string {
+  const match = /^(\d{4})-(0[1-9]|1[0-2])$/.exec(value);
+  return match ? `${MONTH_NAMES[Number(match[2]) - 1]} ${match[1]}` : value;
+}
+
 /** What follows a figure on the screen: nothing for money, a percent sign for a ratio. */
 export const MEASURE_UNIT_SUFFIX: Record<MeasureUnit, string> = { money: "", percent: "%" };
 

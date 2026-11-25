@@ -54,6 +54,10 @@ describe("nav config", () => {
     expect(findNavItem("loss_mitigation", "document-intake")?.status).toBe("live");
     expect(findNavItem("underwriting", "income-analysis")?.status).toBe("live");
     expect(findNavItem("loss_mitigation", "hardship-budget")?.status).toBe("live");
+    expect(findNavItem("underwriting", "guideline-assistant")?.status).toBe("live");
+    expect(findNavItem("loss_mitigation", "guideline-assistant")?.status).toBe("live"); // Regulation X questions come from here
+    expect(findNavItem("underwriting", "assets-liabilities")?.status).toBe("live");
+    expect(findNavItem("loss_mitigation", "assets-liabilities")).toBeUndefined(); // only Loan Processing has it
   });
 
   it("never uses decision wording in menu labels (CLAUDE.md rule 3)", () => {

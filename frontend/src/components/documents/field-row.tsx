@@ -9,6 +9,7 @@ import {
   REVIEW_STATUS_LABEL,
   REVIEW_STATUS_TONE,
 } from "@/lib/documents";
+import { formatFieldValue } from "@/lib/format";
 import type { Field, FieldReview } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { FieldReviewForm } from "./field-review-form";
@@ -54,11 +55,11 @@ export function FieldRow({ field, selected, highlighted, onSelect, onHover, onRe
               {fieldLabel(field.name)}
             </div>
             <div className="mt-0.5 break-words text-base font-semibold text-navy">
-              {field.value ?? "—"}
+              {formatFieldValue(field.value)}
             </div>
             {changed ? (
               <div className="mt-0.5 text-xs text-muted-foreground">
-                Originally read as <s>{field.original_value ?? "—"}</s>
+                Originally read as <s>{formatFieldValue(field.original_value)}</s>
               </div>
             ) : null}
           </div>

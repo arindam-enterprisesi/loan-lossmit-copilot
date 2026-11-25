@@ -39,9 +39,9 @@ export interface PillarConfig {
 
 const shared = {
   businessChat: { slug: "business-chat", label: "Business chat", icon: MessageSquare, status: "soon" },
-  hitl: { slug: "hitl-actions", label: "HITL actions", icon: Users, status: "soon" },
+  hitl: { slug: "hitl-actions", label: "HITL actions", icon: Users, status: "live" },
   governance: { slug: "agent-governance", label: "Agent governance", icon: ShieldCheck, status: "soon" },
-  context: { slug: "context-settings", label: "Context settings", icon: Settings, status: "soon" },
+  context: { slug: "context-settings", label: "Context settings", icon: Settings, status: "live" },
   profile: { slug: "profile", label: "Profile", icon: User, status: "soon" },
 } satisfies Record<string, NavItem>;
 
@@ -59,10 +59,10 @@ export const PILLARS: Record<Pillar, PillarConfig> = {
       shared.businessChat,
       { slug: "document-intelligence", label: "Document intelligence", icon: FileText, status: "live" },
       { slug: "income-analysis", label: "Income analysis", icon: Calculator, status: "live" },
-      { slug: "assets-liabilities", label: "Assets and liabilities", icon: Scale, status: "soon" },
+      { slug: "assets-liabilities", label: "Assets and liabilities", icon: Scale, status: "live" },
       { slug: "credit-report", label: "Credit report", icon: Gauge, status: "soon" },
-      { slug: "guideline-assistant", label: "Guideline assistant", icon: Search, status: "soon" },
-      { slug: "underwriting-copilot", label: "Underwriting copilot", icon: Bot, status: "soon" },
+      { slug: "guideline-assistant", label: "Guideline assistant", icon: Search, status: "live" },
+      { slug: "underwriting-copilot", label: "Underwriting copilot", icon: Bot, status: "live" },
       shared.hitl,
       shared.governance,
       shared.context,
@@ -80,7 +80,9 @@ export const PILLARS: Record<Pillar, PillarConfig> = {
       shared.businessChat,
       { slug: "document-intake", label: "Document intake", icon: ClipboardCheck, status: "live" },
       { slug: "hardship-budget", label: "Hardship and budget", icon: Calculator, status: "live" },
-      { slug: "recommendation", label: "Recommendation", icon: Scale, status: "soon" },
+      // Regulation X questions come from this pillar (Feature Design 5.1 lists the loss mitigation specialist as a user).
+      { slug: "guideline-assistant", label: "Guideline assistant", icon: Search, status: "live" },
+      { slug: "recommendation", label: "Recommendation", icon: Scale, status: "live" },
       shared.hitl,
       shared.governance,
       { slug: "agent-performance", label: "Agent performance", icon: Gauge, status: "soon" },

@@ -62,8 +62,8 @@ describe("FieldList", () => {
       version: 2,
     };
     render(<FieldList fields={[corrected]} selectedName={null} onSelect={() => {}} onReview={async () => true} />);
-    expect(screen.getByText("2033.61")).toBeInTheDocument();
-    const original = screen.getByText("2083.61");
+    expect(screen.getByText("2,033.61")).toBeInTheDocument();
+    const original = screen.getByText("2,083.61");
     expect(original.tagName).toBe("S");
     expect(screen.getByText("Corrected")).toBeInTheDocument();
     expect(screen.getByText(/OCR misread/)).toBeInTheDocument();

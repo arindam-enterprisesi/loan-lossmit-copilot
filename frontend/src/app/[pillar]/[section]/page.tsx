@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { PageHeader } from "@/components/layout/page-header";
+import { EmptyState } from "@/components/shared/empty-state";
 import { findNavItem, pillarFromSlug } from "@/lib/nav";
 
 // Placeholder for menu items whose screen is not built yet. A real screen replaces this by adding
@@ -16,10 +17,10 @@ export default async function SectionPlaceholder({
 
   return (
     <>
-      <PageHeader title={item.label} description="This screen is coming in a later build day." />
-      <div className="rounded-xl border border-dashed bg-panel p-10 text-center text-sm text-muted-foreground">
-        {item.label} is not built yet.
-      </div>
+      <PageHeader title={item.label} description="This screen is not part of this demo yet." />
+      <EmptyState title={`${item.label} is not available yet`}>
+        It is on the menu so the whole product can be seen, but it has nothing to show in this demo. Pick another item from the menu.
+      </EmptyState>
     </>
   );
 }

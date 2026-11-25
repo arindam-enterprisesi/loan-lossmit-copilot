@@ -359,6 +359,11 @@ export interface components {
         Case: components["schemas"]["CaseCreate"] & {
             /** Format: uuid */
             id: string;
+            /**
+             * @description Human case reference; LP for underwriting, LM for loss mitigation.
+             * @example LP-0001
+             */
+            case_ref?: string;
             profile?: components["schemas"]["CaseProfile"] | null;
             document_count?: number;
             /** Format: date-time */
@@ -496,6 +501,18 @@ export interface components {
         };
         /** @description Not a PDF, PNG or JPEG */
         UnsupportedMedia: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
+        /**
+         * @description A dependency is down; try again. code is storage_unavailable (nothing was saved) or
+         *     queue_unavailable (the upload was saved but could not be queued for processing).
+         */
+        ServiceUnavailable: {
             headers: {
                 [name: string]: unknown;
             };
@@ -731,6 +748,8 @@ export interface operations {
             404: components["responses"]["NotFound"];
             413: components["responses"]["TooLarge"];
             415: components["responses"]["UnsupportedMedia"];
+            422: components["responses"]["ValidationFailed"];
+            503: components["responses"]["ServiceUnavailable"];
         };
     };
     getExtraction: {

@@ -77,8 +77,17 @@ describe("DocumentTable", () => {
     expect(row.querySelector("a")).toBeNull();
   });
 
-  it("says so when there is nothing to list", () => {
+  it("says what to do when there are no documents yet", () => {
     setup([]);
-    expect(screen.getByText("No documents to show.")).toBeInTheDocument();
+    expect(screen.getByText("No documents yet")).toBeInTheDocument();
+    expect(screen.getByText(/Upload a file above/)).toBeInTheDocument();
+  });
+
+  it("says nothing matches when the list is narrowed to flagged documents", () => {
+    render(
+      <DocumentTable documents={[]} pillarSlug="underwriting" section="document-intelligence" filtered onSetType={vi.fn()} />,
+    );
+    expect(screen.getByText("No documents with flagged fields")).toBeInTheDocument();
+    expect(screen.getByText(/Clear the filter above/)).toBeInTheDocument();
   });
 });

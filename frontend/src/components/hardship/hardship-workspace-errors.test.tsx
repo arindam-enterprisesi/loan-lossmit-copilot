@@ -1,8 +1,9 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { ToastProvider } from "@/components/shared/toast";
 import { ApiError } from "@/lib/api-error";
 import { ANGELA_CASE_ID, mockCases } from "@/mocks/data";
-import { buildAngelaHardship } from "@/mocks/hardship";
+import { applyConfirmation, buildAngelaHardship } from "@/mocks/hardship";
 
 // The mock backend always answers well, so failures are staged by replacing the API layer.
 vi.mock("@/lib/api", () => ({
@@ -30,7 +31,43 @@ beforeEach(() => {
   adjust.mockReset();
 });
 
-const renderScreen = () => render(<HardshipWorkspace cases={mockCases.filter((c) => c.id === ANGELA_CASE_ID)} pillarSlug="loss-mitigation" />);
+const renderScreen = () =>
+  render(
+    <ToastProvider>
+      <HardshipWorkspace cases={mockCases.filter((c) => c.id === ANGELA_CASE_ID)} pillarSlug="loss-mitigation" />
+    </ToastProvider>,
+  );
+
+describe("HardshipWorkspace while loading", () => {
+  it("shows skeletons for the letter, the profile and the checks until the answer comes", () => {
+    latest.mockReturnValue(new Promise(() => {}));
+    renderScreen();
+    expect(screen.getByRole("status", { name: "Loading the letter" })).toBeInTheDocument();
+    expect(screen.getByRole("status", { name: "Loading the profile" })).toBeInTheDocument();
+    expect(screen.getByRole("status", { name: "Loading the checks" })).toBeInTheDocument();
+  });
+});
+
+describe("HardshipWorkspace when the budget has not been worked out yet (real backend)", () => {
+  it("says so on the Budget tab, in the backend's words, instead of showing empty tables as if they were results", async () => {
+    const note = "The budget has not been computed for this reading yet.";
+    latest.mockResolvedValue({ ...buildAngelaHardship("2026-11-20T09:00:00.000Z"), budget_note: note });
+    renderScreen();
+    await screen.findByRole("heading", { name: "Hardship profile" });
+    fireEvent.click(screen.getByRole("tab", { name: "Budget" }));
+    expect(await screen.findByText("Budget not worked out yet")).toBeInTheDocument();
+    expect(screen.getByText(note)).toBeInTheDocument();
+  });
+
+  it("shows no such note when there is none", async () => {
+    latest.mockResolvedValue(buildAngelaHardship("2026-11-20T09:00:00.000Z"));
+    renderScreen();
+    await screen.findByRole("heading", { name: "Hardship profile" });
+    fireEvent.click(screen.getByRole("tab", { name: "Budget" }));
+    await screen.findByRole("heading", { name: "Measures" });
+    expect(screen.queryByText("Budget not worked out yet")).not.toBeInTheDocument();
+  });
+});
 
 describe("HardshipWorkspace when something goes wrong", () => {
   it("treats a 404 before the first run as normal, not as an error", async () => {
@@ -40,10 +77,14 @@ describe("HardshipWorkspace when something goes wrong", () => {
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
-  it("shows an error when the latest result cannot be loaded", async () => {
-    latest.mockRejectedValue(new ApiError(500, "Server error"));
+  it("shows an error when the latest result cannot be loaded, and Try again loads it", async () => {
+    latest.mockRejectedValueOnce(new ApiError(500, "Server error"));
+    latest.mockResolvedValue(buildAngelaHardship("2026-11-20T09:00:00.000Z"));
     renderScreen();
     expect(await screen.findByRole("alert")).toHaveTextContent("Server error");
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    expect(await screen.findByRole("heading", { name: "Hardship profile" })).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
   it("shows an error and re-enables Run when the run cannot start", async () => {
@@ -53,6 +94,18 @@ describe("HardshipWorkspace when something goes wrong", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Run analysis" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("The service is busy");
     expect(screen.getByRole("button", { name: "Run analysis" })).toBeEnabled();
+  });
+
+  it("Try again after a failed start runs the analysis again", async () => {
+    latest.mockRejectedValue(new ApiError(404, "none"));
+    run.mockRejectedValueOnce(new ApiError(503, "The service is busy"));
+    run.mockResolvedValue({ id: "j1", status: "queued", progress: 0 });
+    job.mockResolvedValue({ id: "j1", status: "running", progress: 0.3 });
+    renderScreen();
+    fireEvent.click(await screen.findByRole("button", { name: "Run analysis" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Try again" }));
+    await waitFor(() => expect(run).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(screen.queryByRole("alert")).not.toBeInTheDocument());
   });
 
   it("shows the job's error when the analysis fails, and re-enables Run", async () => {
@@ -72,6 +125,22 @@ describe("HardshipWorkspace when something goes wrong", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Confirm Intent" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("Could not save");
     expect(within(screen.getByRole("article", { name: "Intent" })).getByText("Not reviewed")).toBeInTheDocument();
+  });
+
+  it("Try again on a failed Confirm confirms the same item", async () => {
+    latest.mockResolvedValue(buildAngelaHardship("2026-11-20T09:00:00.000Z"));
+    confirm.mockRejectedValueOnce(new ApiError(503, "Could not save"));
+    confirm.mockResolvedValue(
+      applyConfirmation(buildAngelaHardship("2026-11-20T09:00:00.000Z"), { key: "intent", action: "confirm" }, "demo.reviewer", "2026-11-20T10:00:00.000Z"),
+    );
+    renderScreen();
+    fireEvent.click(await screen.findByRole("button", { name: "Confirm Intent" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Try again" }));
+
+    await waitFor(() => expect(confirm).toHaveBeenCalledTimes(2));
+    expect(confirm).toHaveBeenLastCalledWith(ANGELA_CASE_ID, { key: "intent", action: "confirm" });
+    expect(await within(screen.getByRole("article", { name: "Intent" })).findByText("Reviewer-confirmed")).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
   it("keeps the window open with the message when a correction is refused", async () => {

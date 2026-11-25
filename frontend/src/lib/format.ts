@@ -19,6 +19,17 @@ export function formatMoney(amount: string | null | undefined): string {
   return `${sign}${whole.replace(/\B(?=(\d{3})+(?!\d))/g, ",")}${fraction}`;
 }
 
+/**
+ * A value read from a document, shown for a person. An amount with two decimals ("2760.00",
+ * "-1200.50") gets thousands separators ("2,760.00"), the same as every other figure on screen.
+ * Anything else is shown as it was read: a year, an account number, a name or a date has no
+ * decimals and must not get commas. Text only; nothing is parsed into a number or rounded.
+ */
+export function formatFieldValue(value: string | null | undefined): string {
+  if (value === null || value === undefined || value === "") return "—";
+  return /^-?\d+\.\d{2}$/.test(value) ? formatMoney(value) : value;
+}
+
 const dateFormat = new Intl.DateTimeFormat("en-GB", {
   day: "numeric",
   month: "short",
@@ -30,6 +41,22 @@ const dateFormat = new Intl.DateTimeFormat("en-GB", {
 export function formatDate(iso: string | null | undefined): string {
   if (!iso) return "—";
   return dateFormat.format(new Date(iso));
+}
+
+const dateTimeFormat = new Intl.DateTimeFormat("en-GB", {
+  day: "numeric",
+  month: "short",
+  year: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+  hour12: false,
+  timeZone: "UTC", // fixed zone so server and browser render the same text
+});
+
+/** ISO date-time -> "2 Nov 2026, 11:00 UTC". */
+export function formatDateTime(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  return `${dateTimeFormat.format(new Date(iso))} UTC`;
 }
 
 export const DOC_STATUS_LABEL: Record<DocumentStatus, string> = {

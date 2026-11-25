@@ -1,5 +1,6 @@
 "use client";
 
+import { EmptyState } from "@/components/shared/empty-state";
 import { sortFlaggedFirst } from "@/lib/documents";
 import type { Field, FieldReview } from "@/lib/types";
 import { FieldRow } from "./field-row";
@@ -27,11 +28,7 @@ export function FieldList({
   disabled,
 }: FieldListProps) {
   if (fields.length === 0) {
-    return (
-      <p className="rounded-lg border border-dashed bg-panel p-6 text-center text-sm text-muted-foreground">
-        No fields were extracted from this document.
-      </p>
-    );
+    return <EmptyState>No fields were extracted from this document.</EmptyState>;
   }
   return (
     <ul className="space-y-3" aria-label="Extracted fields">

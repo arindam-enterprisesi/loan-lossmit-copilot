@@ -2,14 +2,18 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { SignOutButton } from "@/components/auth/sign-out-button";
+import { ROLE_LABEL, pillarsFor, type SessionUser } from "@/lib/session";
 import { cn } from "@/lib/utils";
 import { PILLARS, PILLAR_SLUG, navHref } from "@/lib/nav";
 import type { Pillar } from "@/lib/types";
 
 /** Left navigation as on the PRD screens: product title, copilot switcher, menu with active state. */
-export function AppSidebar({ pillar }: { pillar: Pillar }) {
+export function AppSidebar({ pillar, user = null }: { pillar: Pillar; user?: SessionUser | null }) {
   const pathname = usePathname();
   const config = PILLARS[pillar];
+  // A signed-in person sees only the copilots their role can use. With the demo data, both.
+  const visiblePillars = (Object.keys(PILLARS) as Pillar[]).filter((key) => !user || pillarsFor(user.role).includes(key));
 
   return (
     <nav
@@ -23,8 +27,9 @@ export function AppSidebar({ pillar }: { pillar: Pillar }) {
         </div>
       </div>
 
+      {visiblePillars.length > 1 ? (
       <div role="group" aria-label="Switch copilot" className="grid grid-cols-2 gap-1 rounded-lg bg-accent p-1">
-        {(Object.keys(PILLARS) as Pillar[]).map((key) => (
+        {visiblePillars.map((key) => (
           <Link
             key={key}
             href={`/${PILLAR_SLUG[key]}`}
@@ -42,6 +47,7 @@ export function AppSidebar({ pillar }: { pillar: Pillar }) {
           </Link>
         ))}
       </div>
+      ) : null}
 
       <ul className="flex flex-col gap-0.5">
         {config.nav.map((item) => {
@@ -77,6 +83,16 @@ export function AppSidebar({ pillar }: { pillar: Pillar }) {
           );
         })}
       </ul>
+
+      {user ? (
+        <div className="mt-auto space-y-2 border-t px-2 pt-4">
+          <div>
+            <div className="truncate text-sm font-semibold text-navy">{user.name}</div>
+            <div className="text-xs text-muted-foreground">{ROLE_LABEL[user.role]}</div>
+          </div>
+          <SignOutButton />
+        </div>
+      ) : null}
     </nav>
   );
 }

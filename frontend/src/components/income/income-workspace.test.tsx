@@ -40,7 +40,8 @@ describe("IncomeWorkspace with an earlier result", () => {
     expect(row.getByText("candidate - qualifying income is determined by the underwriter")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Show working for Candidate monthly income" }));
-    expect(screen.getByText("Sum of the components counted")).toBeInTheDocument();
+    // The side panel mounts a moment after the click, so wait for it instead of reading at once.
+    expect(await screen.findByText("Sum of the components counted")).toBeInTheDocument();
   });
 
   it("shows the method, the components, the flag, the checks and the trend", async () => {
@@ -105,8 +106,8 @@ describe("IncomeWorkspace including and excluding a component", () => {
     expect(overtime.getByText(/The method said: left out/)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Show working for Candidate monthly income" }));
-    expect(screen.getByText(/5,980\.00 \+ 444\.41/)).toBeInTheDocument();
-    expect(screen.getByText(/Left out: Bonus \(228\.34\)/)).toBeInTheDocument();
+    expect(await screen.findByText(/5,980\.00 \+ 444\.41/)).toBeInTheDocument();
+    expect(await screen.findByText(/Left out: Bonus \(228\.34\)/)).toBeInTheDocument();
   });
 
   it("the decision is still there after the screen is opened again", async () => {

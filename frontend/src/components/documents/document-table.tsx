@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { DocStatusChip } from "@/components/shared/doc-status-chip";
+import { EmptyState } from "@/components/shared/empty-state";
 import { FlagChip, severityTone } from "@/components/shared/flag-chip";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
@@ -24,6 +25,8 @@ interface DocumentTableProps {
   /** URL pieces for the review link: /{pillarSlug}/{section}/{caseId}/{documentId}. */
   pillarSlug: string;
   section: string;
+  /** True when the list is narrowed to flagged documents, so an empty list means "none match". */
+  filtered?: boolean;
   /** Sends the chosen type and optional reason. Throws when it fails, so the dialog can show why. */
   onSetType: (documentId: string, type: DocumentType, reason?: string) => Promise<void>;
 }
@@ -33,15 +36,19 @@ function period(doc: DocumentSummary): string {
   return `${formatDate(doc.period_start)} to ${formatDate(doc.period_end)}`;
 }
 
-export function DocumentTable({ documents, pillarSlug, section, onSetType }: DocumentTableProps) {
+export function DocumentTable({ documents, pillarSlug, section, filtered = false, onSetType }: DocumentTableProps) {
   // The document whose type dialog is open, if any.
   const [typing, setTyping] = useState<DocumentSummary | null>(null);
 
   if (documents.length === 0) {
-    return (
-      <div className="rounded-xl border border-dashed bg-panel p-8 text-center text-sm text-muted-foreground">
-        No documents to show.
-      </div>
+    return filtered ? (
+      <EmptyState title="No documents with flagged fields">
+        Clear the filter above to see every document for this case.
+      </EmptyState>
+    ) : (
+      <EmptyState title="No documents yet">
+        Upload a file above. It is read, typed and checked, then listed here for review.
+      </EmptyState>
     );
   }
 

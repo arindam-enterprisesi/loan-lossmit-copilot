@@ -19,9 +19,53 @@ import type {
   HardshipAssessment,
   ProfileConfirmation,
 } from "@/lib/hardship-types";
+import type {
+  AssetAnalysis,
+  LoanScenario,
+  LoanScenarioInput,
+  ObligationReview,
+  TransactionReview,
+} from "@/lib/assets-types";
+import type { FeedbackRating, GuidelineAnswer, GuidelineFeedback, GuidelinePassage, GuidelineSource } from "@/lib/guidelines-types";
 import type { IncomeAnalysis, IncomeDecision } from "@/lib/income-types";
+import {
+  applyObligationReview,
+  applyTransactionReview,
+  buildDanielAssets,
+  checkScenario,
+  DEFAULT_CANDIDATE,
+  DEFAULT_OVERTIME,
+  hasAssetSeed,
+  seededScenario,
+  type AssetRun,
+} from "./assets";
+import type {
+  AnnotationRequest,
+  ConditionAddRequest,
+  ConditionDecisionRequest,
+  LmRecommendation,
+  OverrideRequest,
+  SignOffResult,
+  UnderwritingReport,
+} from "@/lib/copilot-types";
+import type { AuditPage, AuditQuery } from "@/lib/audit-types";
+import { MOCK_ACTOR, queryAudit, seedAudit, type MockAuditEvent } from "./audit";
 import { applyOverride, buildCompleteness } from "./completeness";
-import { mockDocuments } from "./data";
+import {
+  addAnnotation,
+  addCondition,
+  decideCondition,
+  overrideCondition,
+  recommendationAt,
+  rerunAgent,
+  signOff,
+  startRun,
+  underwritingAt,
+  type CopilotKind,
+  type CopilotRun,
+} from "./copilot";
+import { buildGuidelineAnswer, getMockPassage, mockSources, type AskInput } from "./guidelines";
+import { DANIEL_CASE_ID, mockCases, mockDocuments } from "./data";
 import { applyBudgetAdjustment, applyConfirmation, buildAngelaHardship, hasHardshipSeed } from "./hardship";
 import { MOCK_PAGE_IMAGES, PAYSTUB_DOC_ID, seedExtractions } from "./extraction";
 import { applyIncomeDecision, buildDanielIncome, hasIncomeSeed } from "./income";
@@ -30,7 +74,7 @@ import { applyIncomeDecision, buildDanielIncome, hasIncomeSeed } from "./income"
 export const JOB_QUEUE_MS = 600;
 export const JOB_RUN_MS = 3000;
 
-type JobKind = "document_processing" | "income_analysis" | "hardship_assessment";
+type JobKind = "document_processing" | "income_analysis" | "hardship_assessment" | "asset_analysis";
 
 interface MockJob {
   id: string;
@@ -38,8 +82,10 @@ interface MockJob {
   createdAtMs: number;
   /** Documents being read (document jobs). Empty for an income or hardship run. */
   documentIds: string[];
-  /** The case an income or hardship run belongs to. */
+  /** The case an income, hardship or asset run belongs to. */
   caseId?: string;
+  /** What an asset run read when it started: the loan scenario and the candidate income. */
+  assetRun?: AssetRun;
   finalized: boolean;
 }
 
@@ -63,6 +109,19 @@ interface StoreState {
   completeness: Map<string, ChecklistResult>;
   /** Latest hardship assessment per case, set when a run's job finishes. */
   hardship: Map<string, HardshipAssessment>;
+  /** The sample loan entered for a case. Daniel's is there from the start, as the demo seed would leave it. */
+  scenarios: Map<string, LoanScenario>;
+  /** Latest asset and liability analysis per case, with what the run read, set when a run's job finishes. */
+  assets: Map<string, { analysis: AssetAnalysis; run: AssetRun }>;
+  /** Every answer the guideline assistant gave, and the feedback on each. */
+  guidelineAnswers: Map<string, GuidelineAnswer>;
+  guidelineFeedback: Map<string, GuidelineFeedback>;
+  /** The latest agent run per feature and case ("underwriting:{case}" or "lm:{case}"), with what a reviewer did to it. */
+  copilot: Map<string, CopilotRun>;
+  /** Which of those have been run before: only the first run of a case has the demo's failed Critic. */
+  copilotRan: Set<string>;
+  /** Every event in the audit trail, oldest first. Only ever added to. */
+  audit: MockAuditEvent[];
   counter: number;
 }
 
@@ -75,6 +134,18 @@ function createState(): StoreState {
     incomes: new Map(),
     completeness: new Map(),
     hardship: new Map(),
+    scenarios: new Map(
+      [DANIEL_CASE_ID].flatMap((id) => {
+        const seeded = seededScenario(id);
+        return seeded ? [[id, seeded] as [string, LoanScenario]] : [];
+      }),
+    ),
+    assets: new Map(),
+    guidelineAnswers: new Map(),
+    guidelineFeedback: new Map(),
+    copilot: new Map(),
+    copilotRan: new Set(),
+    audit: seedAudit(),
     counter: 0,
   };
 }
@@ -96,6 +167,36 @@ const find = (caseId: string, documentId: string): DocumentSummary => {
 };
 
 const iso = (ms: number): string => new Date(ms).toISOString();
+
+interface AuditNote {
+  entityId?: string | null;
+  before?: Record<string, unknown> | null;
+  after?: Record<string, unknown> | null;
+  reason?: string | null;
+}
+
+/** Adds one event to the audit trail, as the backend does for every review action. Events are never changed or removed. */
+function logAudit(caseId: string, action: string, entityType: string, note: AuditNote, now: number): void {
+  const pillar = mockCases.find((c) => c.id === caseId)?.pillar;
+  state.audit.push({
+    id: state.audit.length + 1,
+    case_id: caseId,
+    at: iso(now),
+    actor_name: MOCK_ACTOR,
+    role: pillar === "loss_mitigation" ? "lm_specialist" : "underwriter",
+    action,
+    entity_type: entityType,
+    entity_id: note.entityId ?? null,
+    before: note.before ?? null,
+    after: note.after ?? null,
+    reason: note.reason?.trim() || null,
+  });
+}
+
+/** GET /cases/{id}/audit: the case's events, newest first, filtered and paged like the backend does. */
+export function listAuditMock(caseId: string, query: AuditQuery = {}): AuditPage {
+  return queryAudit(state.audit, caseId, query);
+}
 
 export function listDocumentsMock(caseId: string, needsReview?: boolean): DocumentSummary[] {
   return structuredClone(
@@ -185,6 +286,12 @@ function finalizeJob(job: MockJob): void {
     job.finalized = true;
     return;
   }
+  if (job.kind === "asset_analysis" && job.caseId && job.assetRun) {
+    const at = iso(job.createdAtMs + JOB_QUEUE_MS + JOB_RUN_MS);
+    state.assets.set(job.caseId, { analysis: buildDanielAssets(job.assetRun, at, newId("a")), run: job.assetRun });
+    job.finalized = true;
+    return;
+  }
   if (job.kind === "hardship_assessment" && job.caseId) {
     state.hardship.set(job.caseId, buildAngelaHardship(iso(job.createdAtMs + JOB_QUEUE_MS + JOB_RUN_MS)));
     job.finalized = true;
@@ -209,8 +316,14 @@ function finalizeJob(job: MockJob): void {
   job.finalized = true;
 }
 
-function createJob(documentIds: string[], now: number, kind: JobKind = "document_processing", caseId?: string): Job {
-  const job: MockJob = { id: newId("b"), kind, createdAtMs: now, documentIds, caseId, finalized: false };
+function createJob(
+  documentIds: string[],
+  now: number,
+  kind: JobKind = "document_processing",
+  caseId?: string,
+  assetRun?: AssetRun,
+): Job {
+  const job: MockJob = { id: newId("b"), kind, createdAtMs: now, documentIds, caseId, assetRun, finalized: false };
   state.jobs.set(job.id, job);
   return jobView(job, now);
 }
@@ -219,6 +332,7 @@ const STAGES: Record<JobKind, readonly string[]> = {
   document_processing: ["ocr", "classify", "extract", "checks"],
   income_analysis: ["gather", "calculate", "explain", "checks"],
   hardship_assessment: ["read", "compare", "budget", "checks"],
+  asset_analysis: ["read", "label", "compute", "checks"],
 };
 
 function jobView(job: MockJob, now: number): Job {
@@ -277,6 +391,7 @@ export function uploadMock(
     uploaded_at: iso(now),
   }));
   state.documents.push(...created);
+  for (const d of created) logAudit(caseId, "document.uploaded", "document", { entityId: d.id, after: { file_name: d.file_name } }, now);
   const job = createJob(
     created.map((d) => d.id),
     now,
@@ -306,6 +421,7 @@ export function setDocumentTypeMock(
     reason: reason ?? null,
     at: iso(now),
   });
+  logAudit(caseId, "document.type_set", "document", { entityId: doc.id, before: { doc_type: doc.doc_type ?? null }, after: { doc_type: docType }, reason }, now);
   doc.doc_type = docType;
   doc.type_certainty = "high";
   doc.status = "processing";
@@ -350,6 +466,7 @@ export function reviewFieldMock(
   if (review.action === "correct" && !review.value?.trim()) throw new ApiError(422, "A corrected value is required");
   if (review.action !== "confirm" && !review.reason?.trim()) throw new ApiError(422, "A reason is required");
 
+  const valueBefore = target.value;
   if (review.action === "correct") {
     target.value = review.value!.trim(); // original_value is never touched
     target.flags = []; // stands in for the backend re-running its checks, with no AI call
@@ -360,6 +477,18 @@ export function reviewFieldMock(
   target.reviewed_by = "demo.reviewer";
   target.reviewed_at = iso(now);
   target.version += 1;
+  logAudit(
+    caseId,
+    `field.${target.review_status}`,
+    "field",
+    {
+      entityId: doc.id,
+      before: { field: fieldName, value: valueBefore },
+      after: { field: fieldName, value: target.value, review_status: target.review_status },
+      reason: review.reason,
+    },
+    now,
+  );
 
   refreshDocument(doc, extraction);
   return structuredClone(target);
@@ -392,7 +521,121 @@ export function setIncomeComponentMock(
   if (!latest) throw new ApiError(404, "No income analysis yet. Run it first.");
   const updated = applyIncomeDecision(latest, componentId, decision, "demo.reviewer", iso(now));
   state.incomes.set(caseId, updated);
+  logAudit(caseId, decision.included ? "income.component_included" : "income.component_excluded", "income_component", { entityId: componentId, after: { included: decision.included }, reason: decision.reason }, now);
   return structuredClone(updated);
+}
+
+/** GET /guidelines/sources. */
+export const listGuidelineSourcesMock = (): GuidelineSource[] => mockSources();
+
+/** GET /guidelines/passages/{id}: 404 for an ID that names no passage. */
+export const getGuidelinePassageMock = (id: string): GuidelinePassage => getMockPassage(id);
+
+/**
+ * POST /guidelines/ask: answers from the loaded sources, or says no supporting passage was found.
+ * Refuses a blank question, one that is too long, or an unknown source set (422).
+ */
+export function askGuidelineMock(input: AskInput, now: number = Date.now()): GuidelineAnswer {
+  const answer = buildGuidelineAnswer(input, newId("9"), iso(now));
+  state.guidelineAnswers.set(answer.id, answer);
+  return structuredClone(answer);
+}
+
+/** POST /guidelines/answers/{id}/feedback: helpful, not helpful or wrongly cited. The latest rating on an answer stands. */
+export function sendGuidelineFeedbackMock(answerId: string, feedback: GuidelineFeedback): { answer_id: string; rating: FeedbackRating } {
+  if (!state.guidelineAnswers.has(answerId)) throw new ApiError(404, "Answer not found");
+  if (!["helpful", "not_helpful", "wrongly_cited"].includes(feedback.rating)) throw new ApiError(422, "Unknown rating");
+  state.guidelineFeedback.set(answerId, { rating: feedback.rating, ...(feedback.note?.trim() ? { note: feedback.note.trim() } : {}) });
+  return { answer_id: answerId, rating: feedback.rating };
+}
+
+/** What feedback has been recorded for an answer. Used by tests; the screens never read it. */
+export const guidelineFeedbackMock = (answerId: string): GuidelineFeedback | undefined =>
+  state.guidelineFeedback.get(answerId) ? structuredClone(state.guidelineFeedback.get(answerId)) : undefined;
+
+/** GET .../loan-scenario: 404 until one has been entered for the case. */
+export function getLoanScenarioMock(caseId: string): LoanScenario {
+  const scenario = state.scenarios.get(caseId);
+  if (!scenario) throw new ApiError(404, "No loan scenario has been entered for this case");
+  return structuredClone(scenario);
+}
+
+/** PUT .../loan-scenario: enter the sample loan by hand, or replace it. Refused with 422 if a value is not acceptable. */
+export function putLoanScenarioMock(caseId: string, input: LoanScenarioInput, now: number = Date.now()): LoanScenario {
+  if (!hasAssetSeed(caseId)) throw new ApiError(404, "Case not found");
+  const saved: LoanScenario = { ...checkScenario(input), updated_at: iso(now) };
+  state.scenarios.set(caseId, saved);
+  return structuredClone(saved);
+}
+
+/**
+ * POST .../asset-liability: queues a run. It needs the loan scenario (422 without) and bank statements
+ * (only Daniel's case has them). It reads the candidate income from the income analysis if one has been
+ * run; if not, it uses the figure in the scenario file, so the demo works in any order.
+ */
+export function runAssetsMock(caseId: string, now: number = Date.now()): Job {
+  if (!hasAssetSeed(caseId)) throw new ApiError(422, "This case has no bank statements to analyse");
+  const scenario = state.scenarios.get(caseId);
+  if (!scenario) throw new ApiError(422, "Enter the loan scenario first.");
+  const income = state.incomes.get(caseId);
+  const left = income?.components.find((c) => c.kind === "overtime" && !c.included);
+  const { updated_at: _savedAt, ...input } = scenario;
+  void _savedAt;
+  const run: AssetRun = {
+    scenario: input,
+    candidate_monthly: income?.candidate_monthly.value ?? DEFAULT_CANDIDATE,
+    overtime_monthly: income ? (left?.monthly.value ?? null) : DEFAULT_OVERTIME,
+  };
+  return createJob([], now, "asset_analysis", caseId, run);
+}
+
+/** GET .../asset-liability/latest: 404 until a run has finished. */
+export function getLatestAssetsMock(caseId: string): AssetAnalysis {
+  const latest = state.assets.get(caseId);
+  if (!latest) throw new ApiError(404, "No asset analysis yet. Run it first.");
+  return structuredClone(latest.analysis);
+}
+
+/** PATCH .../transactions/{id}: reclassify a line or mark a deposit as sourced, reason required (422). */
+export function reviewTransactionMock(
+  caseId: string,
+  transactionId: string,
+  review: TransactionReview,
+  now: number = Date.now(),
+): AssetAnalysis {
+  const latest = state.assets.get(caseId);
+  if (!latest) throw new ApiError(404, "No asset analysis yet. Run it first.");
+  const analysis = applyTransactionReview(latest.analysis, latest.run, transactionId, review, "demo.reviewer", iso(now));
+  state.assets.set(caseId, { analysis, run: latest.run });
+  logAudit(
+    caseId,
+    review.sourced === undefined ? "assets.transaction_reclassified" : review.sourced ? "assets.deposit_sourced" : "assets.deposit_unsourced",
+    "transaction",
+    { entityId: transactionId, after: review.sourced === undefined ? { category: review.category } : { sourced: review.sourced }, reason: review.reason },
+    now,
+  );
+  return structuredClone(analysis);
+}
+
+/** PATCH .../obligations/{id}: count a debt toward the DTI or leave it out, reason required (422). The ratios follow at once. */
+export function reviewObligationMock(
+  caseId: string,
+  obligationId: string,
+  review: ObligationReview,
+  now: number = Date.now(),
+): AssetAnalysis {
+  const latest = state.assets.get(caseId);
+  if (!latest) throw new ApiError(404, "No asset analysis yet. Run it first.");
+  const analysis = applyObligationReview(latest.analysis, latest.run, obligationId, review, "demo.reviewer", iso(now));
+  state.assets.set(caseId, { analysis, run: latest.run });
+  logAudit(
+    caseId,
+    review.counts_toward_dti ? "assets.obligation_included" : "assets.obligation_excluded",
+    "obligation",
+    { entityId: obligationId, after: { counts_toward_dti: review.counts_toward_dti }, reason: review.reason },
+    now,
+  );
+  return structuredClone(analysis);
 }
 
 /** POST .../hardship-assessment: queues a run. Only a case with a hardship letter can be run (422 otherwise). */
@@ -418,6 +661,13 @@ export function confirmProfileItemMock(
   if (!latest) throw new ApiError(404, "No hardship assessment yet. Run it first.");
   const updated = applyConfirmation(latest, confirmation, "demo.reviewer", iso(now));
   state.hardship.set(caseId, updated);
+  logAudit(
+    caseId,
+    "hardship.confirmed",
+    "hardship_profile",
+    { after: { [confirmation.key]: confirmation.action === "correct" ? `corrected to ${confirmation.value ?? ""}` : "confirmed" }, reason: confirmation.reason },
+    now,
+  );
   return structuredClone(updated);
 }
 
@@ -432,6 +682,13 @@ export function adjustBudgetItemMock(
   if (!latest) throw new ApiError(404, "No hardship assessment yet. Run it first.");
   const updated = applyBudgetAdjustment(latest, itemId, request, "demo.reviewer", iso(now));
   state.hardship.set(caseId, updated);
+  logAudit(
+    caseId,
+    request.amount === null ? "budget.adjustment_cleared" : "budget.line_adjusted",
+    "budget_line",
+    { entityId: itemId, after: { amount: request.amount } , reason: request.reason },
+    now,
+  );
   return structuredClone(updated);
 }
 
@@ -463,6 +720,7 @@ export function overrideCompletenessItemMock(
   if (!latest) throw new ApiError(404, "No completeness result yet. Run the checklist first.");
   const updated = applyOverride(latest, itemId, reason, "demo.reviewer", iso(now));
   state.completeness.set(caseId, updated);
+  logAudit(caseId, "completeness.item_overridden", "completeness_item", { entityId: itemId, reason }, now);
   return structuredClone(updated);
 }
 
@@ -472,4 +730,92 @@ export function pageImageUrlMock(documentId: string, page: number): string | und
   // An uploaded pay stub shows the mock pay stub page, matching the reading it was given.
   const doc = state.documents.find((d) => d.id === documentId);
   return doc?.doc_type === "pay_stub" && page === 1 ? MOCK_PAGE_IMAGES[PAYSTUB_DOC_ID][1] : undefined;
+}
+
+// ---- The agent screens: Underwriting copilot and Loss Mitigation recommendation ---------------------
+
+const copilotKey = (kind: CopilotKind, caseId: string): string => `${kind}:${caseId}`;
+
+function copilotRun(kind: CopilotKind, caseId: string): CopilotRun {
+  const run = state.copilot.get(copilotKey(kind, caseId));
+  if (!run) throw new ApiError(404, "No run yet. Start the agents first.");
+  return run;
+}
+
+/** POST .../underwriting-report or .../lm-recommendation: starts the three agents. A new run replaces the earlier one. */
+export function runCopilotMock(kind: CopilotKind, caseId: string, now: number = Date.now()): void {
+  const key = copilotKey(kind, caseId);
+  state.copilot.set(key, startRun(kind, caseId, now, !state.copilotRan.has(key)));
+  state.copilotRan.add(key);
+}
+
+/** GET .../underwriting-report/latest: the agents' progress, and the report once they are done. 404 before the first run. */
+export function getLatestUnderwritingMock(caseId: string, now: number = Date.now()): UnderwritingReport {
+  return underwritingAt(copilotRun("underwriting", caseId), now);
+}
+
+/** GET .../lm-recommendation/latest: the waterfall and the lender view at once, the report when the agents are done. */
+export function getLatestLmMock(caseId: string, now: number = Date.now()): LmRecommendation {
+  return recommendationAt(copilotRun("lm", caseId), now);
+}
+
+/** POST .../latest/agents/{agent}/rerun: runs one agent again, alone. */
+export function rerunCopilotAgentMock(kind: CopilotKind, caseId: string, agent: string, now: number = Date.now()): void {
+  rerunAgent(copilotRun(kind, caseId), agent, now);
+}
+
+/** PATCH .../latest/conditions/{id}: accept, edit or reject. Returns the report as it stands. */
+export function decideConditionMock(caseId: string, id: string, req: ConditionDecisionRequest, now: number = Date.now()): UnderwritingReport {
+  const run = copilotRun("underwriting", caseId);
+  const before = run.conditions.find((c) => c.id === id)?.decision;
+  decideCondition(run, id, req, now);
+  logAudit(
+    caseId,
+    `underwriting.condition_${req.decision}`,
+    "condition",
+    { entityId: id, before: { decision: before }, after: { decision: req.decision, edited_text: req.edited_text ?? null }, reason: req.reason },
+    now,
+  );
+  return underwritingAt(run, now);
+}
+
+/** POST .../latest/conditions: the reviewer's own condition. */
+export function addConditionMock(caseId: string, req: ConditionAddRequest, now: number = Date.now()): UnderwritingReport {
+  const run = copilotRun("underwriting", caseId);
+  addCondition(run, req, now);
+  logAudit(caseId, "underwriting.condition_added", "condition", { after: { text: req.text.trim(), priority: req.priority } }, now);
+  return underwritingAt(run, now);
+}
+
+/** PUT .../latest/conditions/{id}/override: the statuses are recomputed. Returns the recommendation as it stands. */
+export function overrideConditionMock(caseId: string, id: string, req: OverrideRequest, now: number = Date.now()): LmRecommendation {
+  const run = copilotRun("lm", caseId);
+  overrideCondition(run, id, req, now);
+  logAudit(caseId, "lm.condition_overridden", "waterfall_condition", { entityId: id, after: { condition: id, status: req.status }, reason: req.reason }, now);
+  return recommendationAt(run, now);
+}
+
+/** POST .../lm-recommendation/latest/annotations: a note on one part of the report. Returns the recommendation as it stands. */
+export function addAnnotationMock(caseId: string, req: AnnotationRequest, now: number = Date.now()): LmRecommendation {
+  const run = copilotRun("lm", caseId);
+  addAnnotation(run, req, now);
+  logAudit(caseId, "lm.annotation_added", "annotation", { after: { section: req.section, text: req.text.trim() } }, now);
+  return recommendationAt(run, now);
+}
+
+/** POST .../latest/sign-off: records that a person reviewed this version. It is not a decision. */
+export function signOffMock(kind: CopilotKind, caseId: string, note?: string, now: number = Date.now()): SignOffResult {
+  const result = signOff(copilotRun(kind, caseId), note, now);
+  logAudit(
+    caseId,
+    "report.signed_off",
+    "report",
+    {
+      before: { report_status: "in_review" },
+      after: { report_status: "signed_off", report_version: result.sign_off.report_version, kind, statement: result.sign_off.statement },
+      reason: note,
+    },
+    now,
+  );
+  return result;
 }

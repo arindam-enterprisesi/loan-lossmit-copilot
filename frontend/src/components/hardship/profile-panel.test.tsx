@@ -119,11 +119,22 @@ describe("ProfilePanel", () => {
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
   });
 
-  it("the onset is typed, not picked", () => {
+  it("the onset is typed as a month, not picked", () => {
     setup();
     fireEvent.click(screen.getByRole("button", { name: "Correct Onset" }));
-    expect(screen.getByLabelText("Correct onset")).toHaveValue("July 2026");
+    expect(screen.getByLabelText("Correct onset")).toHaveValue("2026-07");
     expect(screen.getByLabelText("Correct onset").tagName).toBe("INPUT");
+  });
+
+  it("will not send an onset that is not written YYYY-MM, and says how to write it", () => {
+    setup();
+    fireEvent.click(screen.getByRole("button", { name: "Correct Onset" }));
+    fireEvent.change(screen.getByLabelText("Correct onset"), { target: { value: "June 2026" } });
+    fireEvent.change(screen.getByLabelText("Reason (required)"), { target: { value: "Pay stub" } });
+    expect(screen.getByText("Write the month as YYYY-MM, for example 2026-07")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Save correction" })).toBeDisabled();
+    fireEvent.change(screen.getByLabelText("Correct onset"), { target: { value: "2026-06" } });
+    expect(screen.getByRole("button", { name: "Save correction" })).toBeEnabled();
   });
 
   it("keeps the window open with the message when the correction is refused", async () => {

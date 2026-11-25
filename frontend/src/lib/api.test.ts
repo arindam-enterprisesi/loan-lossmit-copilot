@@ -1,4 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { realDanielAssets, realDanielScenario } from "./assets-real-sample";
+import { realDanielIncome } from "./income-real-sample";
+import { realAngelaHardship } from "./hardship-real-sample";
 
 // api.ts reads NEXT_PUBLIC_USE_MOCKS once when it loads, so each test loads a fresh copy.
 const loadApi = async (useMocks: "true" | "false") => {
@@ -18,21 +21,51 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+describe("real mode: where a call goes, and when the session ends", () => {
+  it("the browser calls this app's own /api/proxy, never the backend directly", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(reply(200, { items: [] }));
+    vi.stubGlobal("fetch", fetchMock);
+    const { listDocuments } = await loadApi("false");
+    await listDocuments("c1");
+    expect(fetchMock.mock.calls[0][0]).toBe("/api/proxy/cases/c1/documents");
+    expect(fetchMock.mock.calls[0][1].headers?.Authorization).toBeUndefined(); // the proxy adds the token, not a script
+  });
+
+  it("a 401 sends the person to sign in again, and the call still fails with a clear message", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(reply(401, { message: "Sign in to continue." })));
+    const api = await loadApi("false");
+    const redirect = vi.spyOn(api.sessionEnded, "redirect").mockImplementation(() => {});
+    await expect(api.listDocuments("c1")).rejects.toMatchObject({ status: 401, message: "Sign in to continue." });
+    expect(redirect).toHaveBeenCalledTimes(1);
+  });
+
+  it("another error does not end the session", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(reply(403, { message: "Not allowed" })));
+    const api = await loadApi("false");
+    const redirect = vi.spyOn(api.sessionEnded, "redirect").mockImplementation(() => {});
+    await expect(api.listDocuments("c1")).rejects.toMatchObject({ status: 403 });
+    expect(redirect).not.toHaveBeenCalled();
+  });
+});
+
 describe("income analysis calls", () => {
-  it("real mode: POSTs the run and GETs the latest result from the proposed paths", async () => {
+  it("real mode: POSTs the run (the backend answers { job, analysis_id }) and GETs the latest result, translated", async () => {
     const fetchMock = vi
       .fn()
-      .mockResolvedValueOnce(reply(202, job))
-      .mockResolvedValueOnce(reply(200, { id: "a1", case_id: "c1", components: [] }));
+      .mockResolvedValueOnce(reply(202, { job, analysis_id: "a1" }))
+      .mockResolvedValueOnce(reply(200, realDanielIncome()));
     vi.stubGlobal("fetch", fetchMock);
     const { getLatestIncome, runIncomeAnalysis } = await loadApi("false");
 
     expect((await runIncomeAnalysis("c1")).id).toBe("j1");
-    expect(fetchMock.mock.calls[0][0]).toMatch(/\/cases\/c1\/income\/analysis$/);
+    expect(fetchMock.mock.calls[0][0]).toBe("/api/proxy/cases/c1/income-analysis");
     expect(fetchMock.mock.calls[0][1].method).toBe("POST");
 
-    expect((await getLatestIncome("c1")).id).toBe("a1");
-    expect(fetchMock.mock.calls[1][0]).toMatch(/\/cases\/c1\/income\/analysis\/latest$/);
+    const latest = await getLatestIncome("c1");
+    expect(fetchMock.mock.calls[1][0]).toBe("/api/proxy/cases/c1/income-analysis/latest");
+    expect(latest.case_id).toBe("c1");
+    expect(latest.candidate_monthly.value).toBe("5980.00");
+    expect(latest.components.map((c) => c.kind)).toEqual(["base_pay", "overtime", "bonus"]);
   });
 
   it("real mode: a 404 before the first run becomes an ApiError", async () => {
@@ -52,14 +85,14 @@ describe("income analysis calls", () => {
 });
 
 describe("include or exclude an income component", () => {
-  it("real mode: PATCHes the decision with a trimmed reason and returns the new analysis", async () => {
-    const fetchMock = vi.fn().mockResolvedValue(reply(200, { id: "a1", case_id: "c1", components: [] }));
+  it("real mode: PATCHes the decision with a trimmed reason and returns the new analysis, translated", async () => {
+    const fetchMock = vi.fn().mockImplementation(async () => reply(200, realDanielIncome()));
     vi.stubGlobal("fetch", fetchMock);
     const { setIncomeComponent } = await loadApi("false");
 
-    const a = await setIncomeComponent("c1", "overtime", { included: true, reason: "  Employer letter  " });
-    expect(a.id).toBe("a1");
-    expect(fetchMock.mock.calls[0][0]).toMatch(/\/cases\/c1\/income\/analysis\/components\/overtime$/);
+    const a = await setIncomeComponent("c1", "33333333-3333-4333-8333-000000000002", { included: true, reason: "  Employer letter  " });
+    expect(a.id).toBe("99999999-9999-4999-8999-000000000003");
+    expect(fetchMock.mock.calls[0][0]).toBe("/api/proxy/cases/c1/income-analysis/latest/components/33333333-3333-4333-8333-000000000002");
     expect(fetchMock.mock.calls[0][1].method).toBe("PATCH");
     expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ included: true, reason: "Employer letter" });
   });
@@ -106,33 +139,33 @@ describe("completeness calls", () => {
     await expect(getLatestCompleteness("c1")).rejects.toMatchObject({ status: 404, message: "No result yet" });
   });
 
-  it("real mode: PATCHes the override with a trimmed reason (the proposed path)", async () => {
+  it("real mode: PATCHes the override with an action and a trimmed reason", async () => {
     const fetchMock = vi.fn().mockResolvedValue(reply(200, result));
     vi.stubGlobal("fetch", fetchMock);
     const { overrideCompletenessItem } = await loadApi("false");
 
     expect((await overrideCompletenessItem("c1", "w2_two_years", "  Letter received  ")).id).toBe("r1");
-    expect(fetchMock.mock.calls[0][0]).toMatch(/\/cases\/c1\/completeness\/items\/w2_two_years$/);
+    expect(fetchMock.mock.calls[0][0]).toBe("/api/proxy/cases/c1/completeness/latest/items/w2_two_years");
     expect(fetchMock.mock.calls[0][1].method).toBe("PATCH");
-    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ reason: "Letter received" });
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ action: "override", reason: "Letter received" });
   });
 
   it("mock mode: runs for Angela and does not call the network", async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
     const { runCompleteness } = await loadApi("true");
-    const r = await runCompleteness("22222222-2222-4222-8222-222222222222", "pillar2-loss-mitigation@1");
+    const r = await runCompleteness("22222222-2222-4222-8222-222222222222", "pillar2-hardship@1");
     expect(r.overall_status).toBe("incomplete");
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });
 
 describe("hardship assessment calls", () => {
-  it("real mode: POSTs the run and GETs the latest result from the Feature Design paths", async () => {
+  it("real mode: POSTs the run (the backend answers { job }) and GETs the latest result, translated", async () => {
     const fetchMock = vi
       .fn()
-      .mockResolvedValueOnce(reply(202, job))
-      .mockResolvedValueOnce(reply(200, { id: "h1", case_id: "c1", measures: [] }));
+      .mockResolvedValueOnce(reply(202, { job }))
+      .mockResolvedValueOnce(reply(200, realAngelaHardship()));
     vi.stubGlobal("fetch", fetchMock);
     const { getLatestHardship, runHardshipAssessment } = await loadApi("false");
 
@@ -140,8 +173,12 @@ describe("hardship assessment calls", () => {
     expect(fetchMock.mock.calls[0][0]).toMatch(/\/cases\/c1\/hardship-assessment$/);
     expect(fetchMock.mock.calls[0][1].method).toBe("POST");
 
-    expect((await getLatestHardship("c1")).id).toBe("h1");
+    const latest = await getLatestHardship("c1");
     expect(fetchMock.mock.calls[1][0]).toMatch(/\/cases\/c1\/hardship-assessment\/latest$/);
+    expect(latest.id).toBe("99999999-9999-4999-8999-000000000001");
+    expect(latest.case_id).toBe("c1");
+    expect(latest.profile.map((p) => p.value_label)).toEqual(["Reduction in income", "July 2026", "Unknown", "Keep the home"]);
+    expect(latest.measures.find((m) => m.id === "surplus")?.value).toBe("-280.00");
   });
 
   it("real mode: a 404 before the first run becomes an ApiError", async () => {
@@ -150,34 +187,35 @@ describe("hardship assessment calls", () => {
     await expect(getLatestHardship("c1")).rejects.toMatchObject({ status: 404, message: "No assessment yet" });
   });
 
-  it("real mode: PUTs a confirmation, and a correction with a trimmed value and reason", async () => {
-    const fetchMock = vi.fn().mockImplementation(async () => reply(200, { id: "h1" })); // a fresh body each call
+  it("real mode: PUTs a confirmation naming the item, and a correction with a trimmed value and reason", async () => {
+    const fetchMock = vi.fn().mockImplementation(async () => reply(200, realAngelaHardship())); // a fresh body each call
     vi.stubGlobal("fetch", fetchMock);
     const { confirmProfileItem } = await loadApi("false");
 
     await confirmProfileItem("c1", { key: "intent", action: "confirm" });
     expect(fetchMock.mock.calls[0][0]).toMatch(/\/cases\/c1\/hardship-assessment\/latest\/confirmations$/);
     expect(fetchMock.mock.calls[0][1].method).toBe("PUT");
-    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ key: "intent", action: "confirm" });
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ intent: {} });
 
     await confirmProfileItem("c1", { key: "duration", action: "correct", value: " long_term ", reason: "  Letter from employer  " });
     expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual({
-      key: "duration",
-      action: "correct",
-      value: "long_term",
-      reason: "Letter from employer",
+      duration: { value: "long_term", reason: "Letter from employer" },
     });
   });
 
-  it("real mode: PATCHes a budget adjustment with a trimmed amount and reason", async () => {
-    const fetchMock = vi.fn().mockResolvedValue(reply(200, { id: "h1" }));
+  it("real mode: PATCHes a budget line with the adjusted amount as trimmed text, and a trimmed reason", async () => {
+    const fetchMock = vi.fn().mockImplementation(async () => reply(200, realAngelaHardship()));
     vi.stubGlobal("fetch", fetchMock);
     const { adjustBudgetItem } = await loadApi("false");
 
-    expect((await adjustBudgetItem("c1", "other", { amount: " 200.00 ", reason: "  One-off repair  " })).id).toBe("h1");
-    expect(fetchMock.mock.calls[0][0]).toMatch(/\/cases\/c1\/hardship-assessment\/latest\/budget-items\/other$/);
+    const result = await adjustBudgetItem("c1", "44444444-4444-4444-8444-000000000005", {
+      amount: " 200.00 ",
+      reason: "  One-off repair  ",
+    });
+    expect(result.budget.lines).toHaveLength(5); // the answer is translated too
+    expect(fetchMock.mock.calls[0][0]).toMatch(/\/cases\/c1\/hardship-assessment\/latest\/budget\/44444444-4444-4444-8444-000000000005$/);
     expect(fetchMock.mock.calls[0][1].method).toBe("PATCH");
-    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ amount: "200.00", reason: "One-off repair" });
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ adjusted_amount: "200.00", reason: "One-off repair" });
   });
 
   it("real mode: a 422 for a missing reason becomes an ApiError", async () => {
@@ -193,6 +231,206 @@ describe("hardship assessment calls", () => {
     const started = await runHardshipAssessment("22222222-2222-4222-8222-222222222222");
     expect(started.kind).toBe("hardship_assessment");
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("asset and liability calls", () => {
+  const caseId = "11111111-1111-4111-8111-111111111111";
+
+  it("real mode: GETs the loan scenario, and PUTs exactly the six fields as trimmed text", async () => {
+    const fetchMock = vi.fn().mockImplementation(async () => reply(200, realDanielScenario()));
+    vi.stubGlobal("fetch", fetchMock);
+    const { getLoanScenario, putLoanScenario } = await loadApi("false");
+
+    expect((await getLoanScenario(caseId)).funds_to_close).toBe("36500.00");
+    expect(fetchMock.mock.calls[0][0]).toBe(`/api/proxy/cases/${caseId}/loan-scenario`);
+
+    await putLoanScenario(caseId, {
+      purpose: " purchase ",
+      occupancy: "primary residence",
+      property_value: " 400000.00 ",
+      loan_amount: "360000.00",
+      proposed_housing_payment: "1980.00",
+      funds_to_close: "36500.00",
+    });
+    expect(fetchMock.mock.calls[1][1].method).toBe("PUT");
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual({
+      purpose: "purchase",
+      occupancy: "primary residence",
+      property_value: "400000.00",
+      loan_amount: "360000.00",
+      proposed_housing_payment: "1980.00",
+      funds_to_close: "36500.00",
+    });
+  });
+
+  it("real mode: a 404 for a case with no scenario becomes an ApiError, and a 422 keeps the backend's message", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(reply(404, { message: "No loan scenario has been entered for this case" })));
+    const { getLoanScenario } = await loadApi("false");
+    await expect(getLoanScenario(caseId)).rejects.toMatchObject({ status: 404 });
+
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(reply(422, { message: "property_value must be greater than 0" })));
+    const api = await loadApi("false");
+    await expect(
+      api.putLoanScenario(caseId, { purpose: "p", occupancy: "o", property_value: "0", loan_amount: "0", proposed_housing_payment: "0", funds_to_close: "0" }),
+    ).rejects.toMatchObject({ status: 422, message: "property_value must be greater than 0" });
+  });
+
+  it("real mode: POSTs the run (the backend answers { job, analysis_id }) and GETs the latest result, translated", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(reply(202, { job, analysis_id: "a1" }))
+      .mockResolvedValueOnce(reply(200, realDanielAssets()));
+    vi.stubGlobal("fetch", fetchMock);
+    const { getLatestAssetAnalysis, runAssetAnalysis } = await loadApi("false");
+
+    expect((await runAssetAnalysis(caseId)).id).toBe("j1");
+    expect(fetchMock.mock.calls[0][0]).toBe(`/api/proxy/cases/${caseId}/asset-liability`);
+    expect(fetchMock.mock.calls[0][1].method).toBe("POST");
+
+    const latest = await getLatestAssetAnalysis(caseId);
+    expect(fetchMock.mock.calls[1][0]).toBe(`/api/proxy/cases/${caseId}/asset-liability/latest`);
+    expect(latest.case_id).toBe(caseId);
+    expect([latest.documented_assets?.value, latest.dti?.value, latest.dti?.unit]).toEqual(["9226.32", "44.70", "percent"]);
+  });
+
+  it("real mode: PATCHes a transaction with a category, or with sourced, and a trimmed reason", async () => {
+    const fetchMock = vi.fn().mockImplementation(async () => reply(200, realDanielAssets()));
+    vi.stubGlobal("fetch", fetchMock);
+    const { reviewTransaction } = await loadApi("false");
+
+    const result = await reviewTransaction(caseId, "t-1", { category: "refund", reason: "  Returned item  " });
+    expect(result.obligations).toHaveLength(3); // the answer is translated too
+    expect(fetchMock.mock.calls[0][0]).toBe(`/api/proxy/cases/${caseId}/asset-liability/latest/transactions/t-1`);
+    expect(fetchMock.mock.calls[0][1].method).toBe("PATCH");
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ category: "refund", reason: "Returned item" });
+
+    await reviewTransaction(caseId, "t-2", { sourced: true, reason: "Gift letter" });
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual({ sourced: true, reason: "Gift letter" });
+  });
+
+  it("real mode: PATCHes an obligation with the choice and a trimmed reason", async () => {
+    const fetchMock = vi.fn().mockImplementation(async () => reply(200, realDanielAssets()));
+    vi.stubGlobal("fetch", fetchMock);
+    const { reviewObligation } = await loadApi("false");
+
+    await reviewObligation(caseId, "o-1", { counts_toward_dti: false, reason: "  Deferred  " });
+    expect(fetchMock.mock.calls[0][0]).toBe(`/api/proxy/cases/${caseId}/asset-liability/latest/obligations/o-1`);
+    expect(fetchMock.mock.calls[0][1].method).toBe("PATCH");
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ counts_toward_dti: false, reason: "Deferred" });
+  });
+
+  it("mock mode: reads Daniel's scenario, runs, and does not call the network", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const { getLoanScenario, runAssetAnalysis } = await loadApi("true");
+    expect((await getLoanScenario(caseId)).purpose).toBe("purchase");
+    expect((await runAssetAnalysis(caseId)).kind).toBe("asset_analysis");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("guideline calls", () => {
+  const answer = {
+    id: "a1",
+    question: "How is overtime income evaluated?",
+    source_set: "all",
+    case_id: null,
+    asked_at: "2026-11-23T09:00:00Z",
+    status: "answered",
+    sentences: [],
+    citations: [],
+    passages: [],
+    comparison: null,
+    facts_to_check: [],
+    notice: null,
+    removed_sentences: 0,
+  };
+
+  it("real mode: GETs the sources and a passage by ID, translated (the backend sends no page or version)", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(reply(200, { items: [{ id: "reg-x-1024-41", title: "12 CFR 1024.41", kind: "regulation", label: "illustrative", passage_count: 3 }] }))
+      .mockResolvedValueOnce(
+        reply(200, { id: "reg-x-1024-41.b", source_id: "reg-x-1024-41", source_title: "12 CFR 1024.41", heading: "b", text: "t", label: "illustrative", notice: "Seeded sample" }),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+    const { getGuidelinePassage, listGuidelineSources } = await loadApi("false");
+
+    expect((await listGuidelineSources())[0]).toMatchObject({ id: "reg-x-1024-41", label: "illustrative", passage_count: 3 });
+    expect(fetchMock.mock.calls[0][0]).toBe("/api/proxy/guidelines/sources");
+
+    const p = await getGuidelinePassage("reg-x-1024-41.b");
+    expect(fetchMock.mock.calls[1][0]).toBe("/api/proxy/guidelines/passages/reg-x-1024-41.b");
+    expect(p).toMatchObject({ page: null, version: null, notice: "Seeded sample" });
+  });
+
+  it("real mode: a passage ID is put in the address safely, and a 404 becomes an ApiError", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(reply(404, { message: "Passage not found" }));
+    vi.stubGlobal("fetch", fetchMock);
+    const { getGuidelinePassage } = await loadApi("false");
+    await expect(getGuidelinePassage("a/b c")).rejects.toMatchObject({ status: 404, message: "Passage not found" });
+    expect(fetchMock.mock.calls[0][0]).toBe("/api/proxy/guidelines/passages/a%2Fb%20c");
+  });
+
+  it("real mode: POSTs the question with the source set and the case, and trims the question", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(reply(200, answer));
+    vi.stubGlobal("fetch", fetchMock);
+    const { askGuideline } = await loadApi("false");
+    const result = await askGuideline("  How is overtime income evaluated?  ", "guidelines", "c1");
+    expect(result.id).toBe("a1");
+    expect(fetchMock.mock.calls[0][0]).toBe("/api/proxy/guidelines/ask");
+    expect(fetchMock.mock.calls[0][1].method).toBe("POST");
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ question: "How is overtime income evaluated?", source_set: "guidelines", case_id: "c1" });
+  });
+
+  it("real mode: a backend without the question endpoint gets a plain message, not a raw 404", async () => {
+    for (const status of [404, 405]) {
+      vi.stubGlobal("fetch", vi.fn().mockResolvedValue(reply(status, { detail: "Not Found" })));
+      const { askGuideline } = await loadApi("false");
+      await expect(askGuideline("q", "all", null)).rejects.toMatchObject({
+        status,
+        message: expect.stringContaining("not available on this backend yet"),
+      });
+    }
+  });
+
+  it("real mode: another error keeps the backend's message", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(reply(422, { message: "A question can be at most 1000 characters" })));
+    const { askGuideline } = await loadApi("false");
+    await expect(askGuideline("q", "all", null)).rejects.toMatchObject({ status: 422, message: "A question can be at most 1000 characters" });
+  });
+
+  it("real mode: POSTs feedback with a trimmed note, or none", async () => {
+    const fetchMock = vi.fn().mockImplementation(async () => reply(200, { ok: true }));
+    vi.stubGlobal("fetch", fetchMock);
+    const { sendGuidelineFeedback } = await loadApi("false");
+    await sendGuidelineFeedback("a1", "wrongly_cited", "  Marker 2 is the wrong section  ");
+    expect(fetchMock.mock.calls[0][0]).toBe("/api/proxy/guidelines/answers/a1/feedback");
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ rating: "wrongly_cited", note: "Marker 2 is the wrong section" });
+    await sendGuidelineFeedback("a1", "helpful");
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual({ rating: "helpful" });
+  });
+
+  it("mock mode: answers and records feedback without the network", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const { askGuideline, getGuidelinePassage, sendGuidelineFeedback } = await loadApi("true");
+    const a = await askGuideline("How is overtime income evaluated?", "all", null);
+    expect(a.status).toBe("answered");
+    await expect(sendGuidelineFeedback(a.id, "helpful")).resolves.toBeUndefined();
+    expect((await getGuidelinePassage(a.citations[0].passage_id)).label).toBe("authoritative");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("clearing a budget adjustment", () => {
+  it("real mode: sends a null adjusted amount with the reason", async () => {
+    const fetchMock = vi.fn().mockImplementation(async () => reply(200, realAngelaHardship()));
+    vi.stubGlobal("fetch", fetchMock);
+    const { adjustBudgetItem } = await loadApi("false");
+    await adjustBudgetItem("c1", "44444444-4444-4444-8444-000000000005", { amount: null, reason: "  Not a one-off after all  " });
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ adjusted_amount: null, reason: "Not a one-off after all" });
   });
 });
 

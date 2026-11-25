@@ -17,8 +17,14 @@ export interface LetterLine {
 }
 
 export interface HardshipLetter {
+  /** The letter's document, or an empty string when the backend did not say which one it is. */
   document_id: string;
   lines: LetterLine[];
+  /**
+   * True when `lines` holds only the quoted lines because the backend does not return the whole
+   * letter yet. The screen says so instead of pretending it is the full letter.
+   */
+  partial?: boolean;
 }
 
 export type ProfileKey = "primary_reason" | "onset" | "duration" | "intent";
@@ -50,14 +56,14 @@ export interface ProfileItem {
   key: ProfileKey;
   /** "Primary reason", "Onset", "Duration", "Intent". */
   label: string;
-  /** The category or text as stored, e.g. "reduction_in_income" or "July 2026". */
+  /** The category or month as stored, e.g. "reduction_in_income" or "2026-07". */
   value: string;
   /** What the screen shows, e.g. "Reduction in income". */
   value_label: string;
   quote: ProfileQuote | null;
   /** True when the quote is an exact piece of its cited lines (checked in code). */
   quote_verified: boolean;
-  /** The allowed values, or null when the answer is free text (onset). */
+  /** The allowed values, or null when the answer is typed (the onset, a month written YYYY-MM). */
   options: ProfileOption[] | null;
   review: ProfileReview | null;
 }
@@ -94,6 +100,11 @@ export interface BudgetLine {
   observed: string;
   /** observed minus stated, e.g. "210.00" or "-5.00". */
   difference: string;
+  /**
+   * True when `difference` has no sign (the real backend sends the gap as a positive amount). The
+   * screen then shows it as it came and does not add a plus sign it cannot know is right.
+   */
+  difference_unsigned?: boolean;
   flagged: boolean;
   /** A template sentence, e.g. "Observed 'other' spending 410.00 against 200.00 stated — ask the borrower". */
   flag_message: string | null;
@@ -138,6 +149,11 @@ export interface HardshipAssessment {
   checks: ConsistencyCheck[];
   budget: Budget;
   measures: Measure[];
+  /**
+   * Set by the real backend when the budget has not been worked out for this reading yet, e.g. "The
+   * budget has not been computed for this reading yet." The budget and measures are empty then.
+   */
+  budget_note?: string | null;
 }
 
 /**
@@ -156,6 +172,7 @@ export interface ProfileConfirmation {
  * expense counts each month (for example, marking a one-off spend). The reason is required.
  */
 export interface BudgetAdjustmentRequest {
-  amount: string;
+  /** The amount to count each month, or null to clear an earlier adjustment (the documents' amount counts again). */
+  amount: string | null;
   reason: string;
 }

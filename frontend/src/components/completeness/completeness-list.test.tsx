@@ -5,7 +5,7 @@ import { ANGELA_CASE_ID, DANIEL_CASE_ID } from "@/mocks/data";
 import { CompletenessList } from "./completeness-list";
 
 const daniel = () => buildCompleteness(DANIEL_CASE_ID, "pillar1-wage-earner@1", "2026-11-20T09:00:00.000Z", "c1");
-const angela = () => buildCompleteness(ANGELA_CASE_ID, "pillar2-loss-mitigation@1", "2026-11-20T09:00:00.000Z", "c2");
+const angela = () => buildCompleteness(ANGELA_CASE_ID, "pillar2-hardship@1", "2026-11-20T09:00:00.000Z", "c2");
 
 const names = {
   "d1000000-0000-4000-8000-000000000001": "reyes_paystub_2026-09.pdf",

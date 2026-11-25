@@ -5,9 +5,12 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { PageHeader } from "@/components/layout/page-header";
 import { DocStatusChip } from "@/components/shared/doc-status-chip";
+import { EmptyState } from "@/components/shared/empty-state";
+import { ErrorNotice } from "@/components/shared/error-notice";
 import { FlagChip, severityTone } from "@/components/shared/flag-chip";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
+import { SplitSkeleton } from "@/components/shared/skeletons";
+import { useToast } from "@/components/shared/toast";
 import { getExtraction, listDocuments, reviewField, setDocumentType } from "@/lib/api";
 import { ApiError, isEditConflict } from "@/lib/api-error";
 import { docTypeLabel, hasOpenFlags, sortFlaggedFirst } from "@/lib/documents";
@@ -28,10 +31,12 @@ interface ReviewWorkspaceProps {
   backHref: string;
 }
 
-type Notice = { kind: "conflict" } | { kind: "error"; message: string };
+/** A field was changed by someone else since it was opened. Other failures are toasts. */
+type Notice = { kind: "conflict" };
 
 /** Review screen: page image with the cited box on the left, extracted fields on the right. */
 export function ReviewWorkspace({ caseId, documentId, backHref }: ReviewWorkspaceProps) {
+  const toast = useToast();
   const [doc, setDoc] = useState<DocumentSummary | null>(null);
   const [extraction, setExtraction] = useState<Extraction | null>(null);
   const [selectedName, setSelectedName] = useState<string | null>(null);
@@ -39,6 +44,8 @@ export function ReviewWorkspace({ caseId, documentId, backHref }: ReviewWorkspac
   // The page being looked at. Picking a field on another page jumps here; the arrows change it too.
   const [viewPage, setViewPage] = useState<number | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  // The document exists but has nothing to review yet: an empty state, not an error.
+  const [nothingYet, setNothingYet] = useState(false);
   const [notice, setNotice] = useState<Notice | null>(null);
   const [typeOpen, setTypeOpen] = useState(false);
   // Set while the document is being read again after its type changed.
@@ -53,15 +60,16 @@ export function ReviewWorkspace({ caseId, documentId, backHref }: ReviewWorkspac
       setSelectedName((current) => current ?? first?.name ?? null);
       setViewPage((current) => current ?? first?.evidence?.page ?? 1);
       setLoadError(null);
+      setNothingYet(false);
       setNotice(null);
     } catch (e) {
-      setLoadError(
-        e instanceof ApiError && e.status === 404
-          ? "There is nothing to review for this document yet."
-          : e instanceof Error
-            ? e.message
-            : "Could not load the document.",
-      );
+      if (e instanceof ApiError && e.status === 404) {
+        setLoadError(null);
+        setNothingYet(true);
+      } else {
+        setNothingYet(false);
+        setLoadError(e instanceof Error ? e.message : "Could not load the document.");
+      }
     }
   }, [caseId, documentId]);
 
@@ -102,11 +110,16 @@ export function ReviewWorkspace({ caseId, documentId, backHref }: ReviewWorkspac
       setDoc(docs.find((d) => d.id === documentId) ?? null);
       return true;
     } catch (e) {
-      setNotice(
-        isEditConflict(e)
-          ? { kind: "conflict" }
-          : { kind: "error", message: e instanceof Error ? e.message : "The change could not be saved." },
-      );
+      if (isEditConflict(e)) {
+        setNotice({ kind: "conflict" });
+      } else {
+        // The form keeps what was typed, so "Try again" sends the same review.
+        toast.error(e instanceof Error ? e.message : "The change could not be saved.", {
+          retry: () => {
+            void onReview(fieldName, review);
+          },
+        });
+      }
       return false;
     }
   };
@@ -124,13 +137,22 @@ export function ReviewWorkspace({ caseId, documentId, backHref }: ReviewWorkspac
     </Link>
   );
 
+  if (nothingYet) {
+    return (
+      <>
+        <PageHeader title="Review document" actions={backLink} />
+        <EmptyState title="Nothing to review yet" action={<Button variant="outline" size="sm" onClick={load}>Check again</Button>}>
+          There is nothing to review for this document yet. It appears here once it has been read.
+        </EmptyState>
+      </>
+    );
+  }
+
   if (loadError) {
     return (
       <>
         <PageHeader title="Review document" actions={backLink} />
-        <p role="alert" className="rounded-xl border border-dashed bg-panel p-10 text-center text-sm text-muted-foreground">
-          {loadError}
-        </p>
+        <ErrorNotice message={loadError} onRetry={load} />
       </>
     );
   }
@@ -139,7 +161,7 @@ export function ReviewWorkspace({ caseId, documentId, backHref }: ReviewWorkspac
     return (
       <>
         <PageHeader title="Review document" actions={backLink} />
-        <Skeleton className="h-96 w-full" />
+        <SplitSkeleton label="Loading the document" />
       </>
     );
   }
@@ -206,15 +228,11 @@ export function ReviewWorkspace({ caseId, documentId, backHref }: ReviewWorkspac
           className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-danger/40 bg-danger/10 px-4 py-3 text-sm text-navy"
         >
           <span>
-            {notice.kind === "conflict"
-              ? "This value changed since you opened it. Reload to see the latest before changing it."
-              : notice.message}
+            This value changed since you opened it. Reload to see the latest before changing it.
           </span>
-          {notice.kind === "conflict" ? (
-            <Button size="sm" variant="outline" onClick={load}>
-              Reload
-            </Button>
-          ) : null}
+          <Button size="sm" variant="outline" onClick={load}>
+            Reload
+          </Button>
         </div>
       ) : null}
 

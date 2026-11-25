@@ -69,12 +69,46 @@ describe("Angela's mock hardship assessment: the letter and the profile", () => 
     expect(assessment().profile.every((p) => p.review === null)).toBe(true);
   });
 
-  it("allows a list of values for the reason, the duration and the intent, and free text for the onset", () => {
+  it("allows a list of values for the reason, the duration and the intent, and a typed month for the onset", () => {
     const a = assessment();
     expect(profile(a, "primary_reason").options).toHaveLength(9);
     expect(profile(a, "duration").options?.map((o) => o.value)).toEqual(["temporary", "long_term", "unknown"]);
     expect(profile(a, "intent").options?.map((o) => o.value)).toEqual(["keep", "sell", "unsure"]);
     expect(profile(a, "onset").options).toBeNull();
+  });
+});
+
+describe("clearing a budget adjustment", () => {
+  const adjusted = () => adjust(assessment(), "200.00");
+
+  it("puts the documents' amount back, and the surplus and the flags with it", () => {
+    const cleared = applyBudgetAdjustment(adjusted(), "other", { amount: null, reason: "Not a one-off after all" }, "demo.reviewer", AT);
+    const other = cleared.budget.lines.find((l) => l.id === "other")!;
+    expect(other).toMatchObject({ observed: "410.00", adjustment: null, flagged: true, difference: "210.00" });
+    expect(cleared.measures.find((m) => m.id === "surplus")).toMatchObject({ value: "-280.00", flagged: true });
+    expect(cleared.budget.observed_total).toBe("3630.00");
+    expect(cleared.checks.find((c) => c.id === "spending")?.status).toBe("flagged");
+  });
+
+  it("can be adjusted again afterwards, and keeps the documents' amount as the one to restore", () => {
+    const cleared = applyBudgetAdjustment(adjusted(), "other", { amount: null, reason: "r" }, "u", AT);
+    const again = applyBudgetAdjustment(cleared, "other", { amount: "300.00", reason: "r2" }, "u", AT);
+    expect(again.budget.lines.find((l) => l.id === "other")?.adjustment?.original_observed).toBe("410.00");
+  });
+
+  it("refuses to clear nothing (422), a missing or blank reason (422), and an unknown item (404)", () => {
+    const refused = (a: ReturnType<typeof assessment>, id: string, reason: string) =>
+      expect(() => applyBudgetAdjustment(a, id, { amount: null, reason }, "u", AT));
+    refused(assessment(), "other", "r").toThrow(expect.objectContaining({ status: 422, message: "There is no adjustment to clear" }));
+    refused(adjusted(), "other", "").toThrow(expect.objectContaining({ status: 422 }));
+    refused(adjusted(), "other", "   ").toThrow(expect.objectContaining({ status: 422 }));
+    refused(adjusted(), "nope", "r").toThrow(expect.objectContaining({ status: 404 }));
+  });
+
+  it("does not change the assessment it was given", () => {
+    const before = adjusted();
+    applyBudgetAdjustment(before, "other", { amount: null, reason: "r" }, "u", AT);
+    expect(before.budget.lines.find((l) => l.id === "other")?.observed).toBe("200.00");
   });
 });
 
@@ -215,14 +249,23 @@ describe("confirming and correcting a profile item", () => {
     expect(profile(a, "duration").quote?.text).toContain("I do not know whether my hours will return"); // quote untouched
   });
 
-  it("the onset is free text", () => {
+  it("the onset is a month written YYYY-MM, shown as a month name", () => {
     const a = applyConfirmation(
       assessment(),
-      { key: "onset", action: "correct", value: "June 2026", reason: "Pay stub shows the cut from June" },
+      { key: "onset", action: "correct", value: "2026-06", reason: "Pay stub shows the cut from June" },
       "u",
       AT,
     );
-    expect(profile(a, "onset")).toMatchObject({ value: "June 2026", value_label: "June 2026" });
+    expect(profile(a, "onset")).toMatchObject({ value: "2026-06", value_label: "June 2026" });
+    expect(profile(a, "onset").review?.original_label).toBe("July 2026");
+  });
+
+  it("refuses an onset that is not a month written YYYY-MM (422), as the backend does", () => {
+    for (const value of ["June 2026", "2026-13", "2026-6", "26-06"]) {
+      expect(() =>
+        applyConfirmation(assessment(), { key: "onset", action: "correct", value, reason: "r" }, "u", AT),
+      ).toThrow(expect.objectContaining({ status: 422 }));
+    }
   });
 
   it("correcting twice, or confirming then correcting, still remembers what the letter said", () => {

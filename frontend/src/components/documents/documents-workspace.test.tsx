@@ -31,7 +31,7 @@ describe("DocumentsWorkspace with the completeness panel", () => {
       />,
     );
     fireEvent.click(await screen.findByRole("button", { name: "Run checklist" }));
-    expect(await screen.findByText(/pillar2-loss-mitigation@1/)).toBeInTheDocument();
+    expect(await screen.findByText(/pillar2-hardship@1/)).toBeInTheDocument();
     expect(screen.getByText("August 2026 bank statement")).toBeInTheDocument();
   });
 
