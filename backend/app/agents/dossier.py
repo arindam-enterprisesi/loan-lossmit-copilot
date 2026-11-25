@@ -21,6 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.enums import AnalysisFeature, AnalysisStatus, FlagStatus
 from app.db.models import AnalysisRun, Calculation, Case, Flag
 from app.llm.checks import numbers_in
+from app.llm.tasks import clean_text
 from app.services.completeness_runs import latest_view
 
 UNDERWRITING_FEATURES = (AnalysisFeature.INCOME, AnalysisFeature.ASSETS, AnalysisFeature.CREDIT)
@@ -77,15 +78,17 @@ class Dossier:
         return numbers_in(*texts)
 
     def render(self) -> str:
-        """The dossier as the agents see it: one line per item, refs first."""
-        rows = [
-            f"- {f.ref} | {f.label} | {f.value}"
-            + (f" | {f.working}" if f.working and f.working != f.value else "")
-            for f in self.facts
-        ]
+        """The dossier as the agents see it: one line per item, refs first. Document text can
+        reach a flag message, so every value is flattened and cannot close its tag (rule 5)."""
+        rows = []
+        for f in self.facts:
+            line = f"- {f.ref} | {f.label} | {f.value}"
+            if f.working and f.working != f.value:
+                line += f" | {f.working}"
+            rows.append(clean_text(line))
         for g in self.flags:
-            rows += [f"- flag {g.code} ({g.severity}) | {m}" for m in g.messages]
-        rows += [f"- {f.ref} | {f.label} | {f.value}" for f in self.gaps]
+            rows += [clean_text(f"- flag {g.code} ({g.severity}) | {m}") for m in g.messages]
+        rows += [clean_text(f"- {f.ref} | {f.label} | {f.value}") for f in self.gaps]
         return "\n".join(rows)
 
 

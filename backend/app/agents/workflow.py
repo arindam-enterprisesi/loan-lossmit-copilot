@@ -33,6 +33,7 @@ from app.db.enums import AgentName, AgentRunStatus
 from app.db.models import AnalysisRun
 from app.llm.checks import check_figures
 from app.llm.gateway import Gateway, get_gateway
+from app.llm.tasks import clean_text
 from app.prompts.schemas.reports import CriticVerdict
 from app.rag.answer import ask
 from app.rag.store import RagStore, get_rag_store
@@ -159,12 +160,14 @@ def render_guidance(research_output: dict[str, Any] | None) -> str:
     if not research_output or not research_output.get("references"):
         return "(no guidance found)"
     rows = [
-        f"- passage {r['passage_id']} | {r.get('source') or 'source not given'} | "
-        f"{r.get('label') or 'label unknown'} | for {', '.join(r['for'])}: {r['summary']}"
+        clean_text(
+            f"- passage {r['passage_id']} | {r.get('source') or 'source not given'} | "
+            f"{r.get('label') or 'label unknown'} | for {', '.join(r['for'])}: {r['summary']}"
+        )
         for r in research_output["references"]
     ]
     if research_output.get("facts_to_check"):
-        rows += [f"- fact to check: {f}" for f in research_output["facts_to_check"]]
+        rows += [clean_text(f"- fact to check: {f}") for f in research_output["facts_to_check"]]
     return "\n".join(rows)
 
 

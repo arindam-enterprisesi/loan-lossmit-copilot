@@ -34,6 +34,7 @@ from app.agents.workflow import (
 from app.db.enums import AgentName, AgentRunStatus, ReportKind, Role
 from app.db.models import AgentRun, AnalysisRun, Report
 from app.llm.gateway import Gateway
+from app.llm.tasks import clean_text
 from app.prompts.schemas.reports import LmDraft
 from app.rag.case_facts import facts_for_case
 from app.rag.store import RagStore, get_rag_store
@@ -65,7 +66,7 @@ def render_waterfall(options: list[Any]) -> tuple[str, list[str]]:
             )
             if o.status.value != "not_reached" and c.get("passage_id"):
                 passages.append(str(c["passage_id"]))
-    return "\n".join(rows), list(dict.fromkeys(passages))
+    return "\n".join(clean_text(r) for r in rows), list(dict.fromkeys(passages))
 
 
 def render_hardship(profile: Any) -> str:
@@ -77,7 +78,7 @@ def render_hardship(profile: Any) -> str:
         "duration": profile.duration,
         "intent": profile.intent,
     }
-    rows = [f"- {k}: {json.dumps(v, ensure_ascii=False)}" for k, v in parts.items()]
+    rows = [clean_text(f"- {k}: {json.dumps(v, ensure_ascii=False)}") for k, v in parts.items()]
     rows.append(f"- confirmed by a person: {'yes' if profile.confirmed_at else 'no'}")
     return "\n".join(rows)
 
