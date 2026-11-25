@@ -4,32 +4,44 @@ A demo copilot for US mortgage professionals: loan processing and underwriting (
 
 Read `CLAUDE.md` first. The functional source of truth is `docs/feature-design.md`.
 
-## Start
+## Run the demo
 
-```bash
-cp .env.example .env      # add your own keys
-docker compose up         # web, api, worker, postgres+pgvector, redis
-```
+Five steps from a clean clone. They are the real `Makefile` targets (on Windows `make` is not
+installed by default: `winget install GnuWin32.Make`, or run the command beside each step).
 
-API on :8000 (`/health`), web placeholder on :3000. Optional `make` shortcuts (on Windows, `make` is not installed by default: `winget install GnuWin32.Make`, or run the commands from the `Makefile` directly):
+| Step | Command | Does | Measured |
+| --- | --- | --- | --- |
+| 1 | `cp .env.example .env` | your settings; add keys for a model provider, and `S3_BUCKET` plus AWS credentials to upload documents | seconds |
+| 2 | `make up` (`docker compose up -d --build`) | web, api, worker, postgres with pgvector, redis | first build: minutes, not timed here |
+| 3 | `make migrate` (`docker compose exec api alembic upgrade head`) | the schema, migrations 0001 to 0009 | not timed here |
+| 4 | `make data` (`cd backend && uv run python ../data/synthetic/generate.py`) | renders the two borrowers' documents into `data/synthetic/rendered/` | 7 s |
+| 5 | `make reset-demo ARGS="--upload --fake-reader"` | empties the local database and files, seeds the demo, uploads and reads every document | 30 s without `--upload` |
 
-| Command | Runs |
-| --- | --- |
-| `make up` / `make down` | `docker compose up -d --build` / `docker compose down` |
-| `make migrate` | `alembic upgrade head` inside the api container |
-| `make seed` | seed script (a stub until the synthetic data task lands) |
-| `make test` | `cd backend && uv run pytest` |
-| `make reset-demo` | empties the local database and stored files, then rebuilds the demo (see *Demo reset*) |
+Measured on 24 Nov 2026 from a fresh `git clone` (2 s) and `uv sync` (13 s with a warm cache): steps 4
+and 5 as above, step 5 without `--upload` against a scratch database. Steps 2 and 3 need the Docker
+images, and step 5 with `--upload` needs S3, so they are not timed here.
 
-First run: `docker compose exec api alembic upgrade head` then `docker compose exec api python -m app.db.seed` (`make migrate`, `make seed`). The seed creates three demo users, all with the password from `DEMO_PASSWORD` (default `demo`), and two empty cases:
+`ARGS` chooses how the demo is read: `--upload --fake-reader` reads the documents with the
+rule-based reader (no model provider needed: it reads the generated pay stub, bank statement, credit
+report, mortgage statement and application, so the budget, the credit analysis and DTI 44.70% all
+show); `--upload` alone uses a model provider (`PIPELINE_LLM=auto`, see *Document pipeline*); an empty
+`ARGS=` seeds the users, cases and sample reports only and needs no S3.
+
+API on :8000 (`/health`, docs at http://localhost:8000/docs), web placeholder on :3000. The seed
+creates three demo users, all with the password from `DEMO_PASSWORD` (default `demo`), and two cases:
 
 | Username | Role | Sees |
 | --- | --- | --- |
 | `underwriter` | underwriter | Pillar 1 (`underwriting`) cases, e.g. Daniel Reyes |
 | `lm_specialist` | lm_specialist | Pillar 2 (`loss_mitigation`) cases, e.g. Angela Whitfield |
-| `admin` | admin | both |
+| `admin` | admin | both, read only: the administrator makes no case decisions |
 
-Log in with `POST /api/v1/auth/login` (`{"username", "password"}`) and send the token as `Authorization: Bearer <token>`. Interactive docs: http://localhost:8000/docs.
+Log in with `POST /api/v1/auth/login` (`{"username", "password"}`) and send the token as
+`Authorization: Bearer <token>`. `make seed` (`python -m app.db.seed`) adds only the users and the
+two empty cases, without the reset.
+
+Other `make` targets: `make down` (`docker compose down`), `make test` (`cd backend && uv run pytest`).
+`docs/handover-abhay.md` says how to run and test each module.
 
 Backend checks:
 
@@ -37,11 +49,14 @@ Backend checks:
 docker compose up -d postgres      # tests/db builds a throwaway database with the real migration
 cd backend
 uv sync
+uv run ruff check . && uv run ruff format --check . && uv run mypy app
 uv run pytest                      # tests/db skips (locally) if Postgres is not running
 uv run python -m app.llm.smoke --provider all   # real calls on each provider with a key in .env
 ```
 
-`TEST_DATABASE_URL` (default: the compose Postgres) must point at a server where the user can create databases.
+`TEST_DATABASE_URL` (default: the compose Postgres) must point at a server where the user can create
+databases. The golden tests (`backend/tests/golden`) check every worked example of the Feature Design
+to the cent and must stay green.
 
 ## Synthetic data
 
@@ -77,11 +92,96 @@ The worker takes each uploaded document through five stages, each safe to run tw
 
 **Page images.** `GET /api/v1/cases/{id}/documents/{doc}/pages/{n}` returns `{page, url, expires_at, width, height}`: a 5-minute link to the stored page image and its size in pixels. Evidence boxes are fractions of that image (0 to 1, origin top left), so a viewer multiplies by `width` and `height`. A hidden case, unknown document or page that is not there is a 404; storage down is a 503. If the frontend reads the image with `fetch` or a canvas instead of an `<img>` tag, the S3 bucket needs its own CORS rule in AWS.
 
-**Hardship profile (read side).** `GET /api/v1/cases/{id}/hardship-assessment/latest` returns the borrower's letter read into a profile: primary and other reasons, onset, duration, intent, a timeline and the enclosed documents, each with its quote, the line IDs it came from and `verified` (code found the quote in those lines). A quote that fails the check also raises a flag. Until a model provider is used for it, the profile is a seeded sample (`source: seeded_sample`, the Feature Design 7.8 reading in `app/db/demo/angela_hardship_profile.json`), checked in code against the letter's lines; running a reading, confirming values and the budget come later. The table is `hardship_profiles` (migration 0006).
+**Hardship profile (read side).** `GET /api/v1/cases/{id}/hardship-assessment/latest` returns the borrower's letter read into a profile: primary and other reasons, onset, duration, intent, a timeline and the enclosed documents, each with its quote, the line IDs it came from and `verified` (code found the quote in those lines). A quote that fails the check also raises a flag. Until a model provider is used for it, the profile is a seeded sample (`source: seeded_sample`, the Feature Design 7.8 reading in `app/db/demo/angela_hardship_profile.json`), checked in code against the letter's lines; reading the letter, confirming values and the budget are in the next section. The table is `hardship_profiles` (migration 0006).
+
+## Assets, liabilities and DTI (Feature 3)
+
+`PUT/GET /api/v1/cases/{id}/loan-scenario` takes the sample loan by hand (nothing is priced).
+`POST .../asset-liability` queues a run (poll `GET /jobs/{id}`), `GET .../asset-liability/latest` reads
+it, and `PATCH .../asset-liability/latest/transactions/{id}` and `.../obligations/{id}` reclassify a
+line, mark a deposit sourced, or include or exclude a debt, each with a reason, recalculating at once
+with no model call. The statement lines are labelled once (`app/services/transaction_labels.py`: the
+model through `app.llm.tasks.label_transactions`, or `FakeLabeller` with `PIPELINE_LLM=fake`); after
+that everything is plain code in `app/services/assets.py` (all `Decimal`, every figure a row in
+`calculations` with working and evidence): payroll matches, large deposits, recurring debts reconciled
+with the credit report's liabilities, documented assets against the funds needed, front-end ratio,
+DTI (and with overtime), LTV and `what_if` for the agents. Daniel's worked example: assets 9,226.32,
+shortfall 27,273.68, obligations 693.00, front-end 33.11%, DTI 44.70%, LTV 90.00%.
+
+## Credit report analysis (Feature 4)
+
+`POST /api/v1/cases/{id}/credit-analysis` (poll the job) and `GET .../credit-analysis/latest`. No model
+is called: the pipeline already read the report into fields (`score_NNN_*`, `tradeline_NNN_*`,
+`inquiry_NNN_*`), and `app/services/credit.py` computes the representative score (the middle of three,
+the lower of two), utilization per revolving account and in total, late payments by severity within
+the 24-month lookback and the months since the last one, inquiries matched to a new account, the
+derogatory list and the monthly payments by account type, each with its working and the report lines
+it came from. Flags (`CR-W101` and so on) are templates and the summary is a template filled from the
+stored results. Daniel's report: score 705, Northgate 36.75%, total revolving 28.00%, payments 693.00.
+The tables are `credit_scores`, `tradelines` and `credit_inquiries` (migration 0009).
+
+## Hardship reading, confirmations and the budget (Feature 7)
+
+`POST /api/v1/cases/{id}/hardship-assessment` queues a reading of the letter (the model, behind a
+`HardshipReader`; the seeded sample stays as history) and builds the budget from the case's
+documents, which is plain code (`app/services/budget.py`). `PUT .../hardship-assessment/latest/confirmations`
+confirms or corrects the reason, onset, duration and intent with a reason: the reading is never
+overwritten, the confirmation sits beside it labelled "reviewer-confirmed", and only the loss
+mitigation specialist may do it. `PATCH .../latest/budget/{line_id}` counts a different observed amount
+for a line (a one-off), with a reason. The budget has a stated side (the application) and an observed
+side (the statements: per line, the latest statement month with a debit in it), the surplus or deficit
+on both, the housing ratio, arrears, liquid assets, and consistency checks. Angela's worked example:
+income 4,200.00, expenses 3,420.00 stated and 3,630.00 observed, deficits 70.00 and 280.00, housing
+40.95%, arrears 5,160.00.
+
+## Loss mitigation rules and the lender view (Feature 8)
+
+`POST /api/v1/cases/{id}/lm-recommendation` (specialist only, poll the job) applies the investor's
+rule set in code and stores a new run; `GET .../lm-recommendation/latest` shows the waterfall (each
+option with its status, its conditions, the values used and the passage cited), the lender view with
+its working, the rule set with its "illustrative" banner, any overrides and the report once the agents
+have written one. The rule set is `backend/config/rule_sets/sample_investor_a_v1.yaml` (versioned and
+labelled; every number a quoted string); `app/services/rules_engine.py` evaluates it. A judgement
+nobody has confirmed (hardship duration, intent to keep the home) is reported as needing confirmation
+and never used; the waterfall stops at the first option whose conditions are met (`met` says the
+conditions are met and nothing more). `PUT .../latest/conditions/{id}/override` changes a condition
+with a reason and the statuses recompute, with the rules' own answer beside it; overrides carry to the
+next evaluation. Angela's worked example: modification conditions met (target payment 1,470.00 below
+1,720.00), foreclosure loss 16,310.00, modification cost 13,893.00, advantage 2,417.00. Months
+delinquent comes from `loan_records`, the simulated servicing record that `make reset-demo` seeds.
+
+## Reports, review, sign-off, audit and guidelines
+
+`GET .../underwriting-report/latest` and `.../lm-recommendation/latest` read the newest report with its
+findings, conditions and agent runs; `app/services/report_writer.py` is how Arindam's agents write
+them. Until the agents run, a seeded sample fills them and every response says `seeded_sample`. The
+underwriter accepts, edits or rejects each condition (the agents' text stays beside the edit) or adds
+their own, and signs off; the loss mitigation specialist overrides conditions and signs off. A
+sign-off records that a person reviewed a version of the report: "Records a review. Not a decision."
+The recommendation's sign-off needs a report on the newest evaluation (409 `no_report` otherwise).
+`GET .../audit` lists a case's events newest first (filters `action`, `entity_type`, paging with
+`before`); `GET /api/v1/guidelines/sources` and `/guidelines/passages/{id}` read the cited passages
+(a small seeded set until the retrieval loader exists).
+
+## API tests
+
+`backend/tests/db/test_endpoint_matrix.py` holds every endpoint to the same four rules (no token is a
+401, a role that may not act is a 403, the other pillar's case is a 404, an invalid body is a 422) and
+fails if an endpoint is added without a row. `backend/tests/db/test_demo_stories.py` runs both demo
+stories through the HTTP API only, upload to sign-off, with the rule-based reader and stubs standing
+in for the models and the agents.
 
 ## Demo reset
 
-`make reset-demo` (`cd backend && uv run python -m app.db.reset_demo --yes --upload`) puts the demo back to a clean state: it undoes and redoes the migrations (which also clears the append-only audit history), removes the stored files, seeds the three users, both cases with their profiles and Angela's hardship profile, then uploads and reads every demo document in the same process, with no worker. Run `make data` first and have S3 set up in `.env`. `--fake-reader` reads with the rule-based reader when no model provider works; leave `--upload` off to skip the documents. It needs `--yes` and refuses any database that is not local, because it empties the database it is pointed at.
+`make reset-demo` (`cd backend && uv run python -m app.db.reset_demo --yes --upload`) puts the demo
+back to a clean state: it undoes and redoes the migrations (which also clears the append-only audit
+history), removes the stored files, seeds the three users, both cases with their profiles, Angela's
+simulated loan record and hardship profile, and the sample reports to review (labelled
+`seeded_sample`), then uploads and reads every demo document in the same process, with no worker, and
+builds Angela's budget. Run `make data` first and have S3 set up in `.env`. `--fake-reader` reads
+with the rule-based reader when no model provider works; leave `--upload` off to skip the documents.
+It needs `--yes` and refuses any database that is not local, because it empties the database it is
+pointed at.
 
 ## Layout
 

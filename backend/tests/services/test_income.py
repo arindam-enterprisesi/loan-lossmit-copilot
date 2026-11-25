@@ -173,7 +173,7 @@ def test_each_component_has_its_working_and_the_fields_it_came_from() -> None:
     assert parts["overtime"].calc.working == "3,897.10 x 26 / (19 x 12) = 444.41"
     assert parts["bonus"].calc.working == "2,002.40 x 26 / (19 x 12) = 228.34"
     for part in parts.values():
-        assert part.calc.config_version == "income_method@2026-11-19.1, thresholds@2026-11-24.1"
+        assert part.calc.config_version == "income_method@2026-11-19.1, thresholds@2026-11-24.2"
         assert part.calc.evidence and all(
             {"document_id", "field", "line_ids"} <= set(e) for e in part.calc.evidence
         )

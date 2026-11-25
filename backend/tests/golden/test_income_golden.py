@@ -56,7 +56,7 @@ def test_daniels_base_pay_is_5980_00_a_month() -> None:
     assert calc.value == D("5980.00")
     assert (calc.name, calc.unit) == ("base_pay_monthly", "usd")
     assert calc.working == "34.50 x 80.00 x 26 / 12 = 5,980.00"
-    assert calc.config_version == "income_method@2026-11-19.1, thresholds@2026-11-24.1"
+    assert calc.config_version == "income_method@2026-11-19.1, thresholds@2026-11-24.2"
 
 
 def test_daniels_overtime_and_bonus_year_to_date_averages() -> None:

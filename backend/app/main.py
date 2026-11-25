@@ -15,6 +15,7 @@ from app.api.routers import (
     auth,
     cases,
     completeness,
+    credit_analysis,
     documents,
     guidelines,
     hardship,
@@ -66,6 +67,7 @@ app.include_router(cases.router, prefix=API_PREFIX)
 app.include_router(documents.router, prefix=API_PREFIX)
 app.include_router(jobs.router, prefix=API_PREFIX)
 app.include_router(income.router, prefix=API_PREFIX)
+app.include_router(credit_analysis.router, prefix=API_PREFIX)
 app.include_router(asset_liability.router, prefix=API_PREFIX)
 app.include_router(underwriting.router, prefix=API_PREFIX)
 app.include_router(lm_recommendation.router, prefix=API_PREFIX)

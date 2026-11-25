@@ -47,7 +47,7 @@ def test_every_file_is_versioned_labelled_and_sourced() -> None:
         assert part.version and part.label in {"illustrative", "authoritative"} and part.source
     assert (CFG.income.version, CFG.thresholds.version, CFG.checklists.version) == (
         "2026-11-19.1",
-        "2026-11-24.1",  # the assets and budget settings were added on D6
+        "2026-11-24.2",  # the credit report settings were added on D7
         "2026-11-19.1",
     )
 
@@ -70,9 +70,9 @@ def _settings(node: object) -> list[Setting[Any]]:
 
 def test_every_single_setting_carries_a_label_and_a_source() -> None:
     settings = _settings(CFG.income) + _settings(CFG.thresholds) + _settings(CFG.checklists)
-    # 8 in the income method, 15 thresholds (3 for income, 12 for assets and the budget), 7
-    # checklist parameters.
-    assert len(settings) == 31
+    # 8 in the income method, 20 thresholds (3 for income, 12 for assets and the budget, 5 for
+    # credit), 7 checklist parameters.
+    assert len(settings) == 36
     assert {s.label for s in settings} == {"illustrative"}  # nothing is claimed authoritative
     assert all(s.source.strip() for s in settings)
 
@@ -320,7 +320,7 @@ def test_a_run_records_each_file_it_used_with_a_hash_of_its_bytes() -> None:
     uses = CFG.uses()
     assert [(u.kind, u.name, u.version, u.label) for u in uses] == [
         ("income_method", "income_method", "2026-11-19.1", "illustrative"),
-        ("thresholds", "thresholds", "2026-11-24.1", "illustrative"),
+        ("thresholds", "thresholds", "2026-11-24.2", "illustrative"),
     ]
     assert all(re.fullmatch(r"[0-9a-f]{64}", u.content_hash) for u in uses)
     snapshot = AnalysisConfig.snapshot(uses)
@@ -350,7 +350,7 @@ def test_editing_a_file_changes_its_hash_even_when_the_version_is_not_bumped(
 
 def test_calc_version_names_the_files_a_figure_used() -> None:
     assert CFG.calc_version("income_method", "thresholds") == (
-        "income_method@2026-11-19.1, thresholds@2026-11-24.1"
+        "income_method@2026-11-19.1, thresholds@2026-11-24.2"
     )
 
 

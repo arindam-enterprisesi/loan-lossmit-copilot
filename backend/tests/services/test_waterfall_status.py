@@ -10,7 +10,12 @@ import json
 from pathlib import Path
 from typing import Any
 
-from app.services.waterfall_status import effective_status, option_status, recompute
+from app.services.waterfall_status import (
+    effective_status,
+    option_status,
+    override_summary,
+    recompute,
+)
 
 SEED = Path(__file__).resolve().parents[2] / "app" / "db" / "demo" / "angela_lm_recommendation.json"
 
@@ -58,6 +63,36 @@ def test_a_derived_condition_follows_the_options_before_it() -> None:
 
     assert unmet[1][1][0]["status"] == "met" and unmet[1][0] == "not_evaluable"
     assert met[1][1][0]["status"] == "not_reached" and met[1][0] == "not_reached"
+
+
+def test_a_derived_condition_waits_while_an_earlier_option_is_undecided() -> None:
+    """Nobody can say that no earlier option is met while one still needs a confirmation or cannot
+    be evaluated; a met earlier option still makes it not reached."""
+    later = [cond("met", derived=True), cond("met")]
+
+    waiting = recompute([[cond("needs_confirmation")], later])
+    unknown = recompute([[cond("not_evaluable")], later])
+    both = recompute([[cond("needs_confirmation")], [cond("not_evaluable")], later])
+    decided = recompute([[cond("not_met")], [cond("not_met")], later])
+
+    assert waiting[1][1][0]["status"] == "needs_confirmation"
+    assert waiting[1][0] == "needs_confirmation"
+    assert unknown[1][1][0]["status"] == "not_evaluable" and unknown[1][0] == "not_evaluable"
+    assert both[2][1][0]["status"] == "needs_confirmation"  # a confirmation outranks the unknown
+    assert decided[2][1][0]["status"] == "met" and decided[2][0] == "met"
+
+
+def test_the_summary_of_overrides_names_the_latest_one() -> None:
+    first = {"status": "met", "reason": "a", "by": "u1", "at": "2026-11-24T09:00:00+00:00"}
+    second = {"status": "not_met", "reason": "b", "by": "u2", "at": "2026-11-24T10:00:00+00:00"}
+    conditions = [
+        {"id": "x", "status": "not_met", "override": first},
+        {"id": "y", "status": "met", "override": second},
+        {"id": "z", "status": "met"},
+    ]
+
+    assert override_summary(conditions) == (True, "b", "u2", "2026-11-24T10:00:00+00:00")
+    assert override_summary([{"id": "z", "status": "met"}]) == (False, None, None, None)
 
 
 def test_recomputing_never_changes_what_it_was_given() -> None:

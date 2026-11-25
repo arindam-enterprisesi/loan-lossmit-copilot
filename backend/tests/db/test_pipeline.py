@@ -41,7 +41,8 @@ ANGELA = case_id("Angela Whitfield — hardship")
 STUB = "daniel_reyes/pay_stub_2026-09-27.pdf"
 AUGUST = "daniel_reyes/bank_statement_2026-08.pdf"
 SEPTEMBER = "daniel_reyes/bank_statement_2026-09.pdf"
-CREDIT_REPORT = "daniel_reyes/credit_report_2026-10-12.pdf"  # classified here, read by Feature 4
+CREDIT_REPORT = "daniel_reyes/credit_report_2026-10-12.pdf"
+HARDSHIP_LETTER = "angela_whitfield/hardship_letter.pdf"  # read by the hardship task
 ANGELA_JULY = "angela_whitfield/bank_statement_2026-07.pdf"
 CONFIG = get_ingestion_config().model_copy(update={"render_dpi": 50})
 NET_PAY_MESSAGE = "Gross 3,070.50 minus deductions 1,036.89 is 2,033.61, not 2,083.61."
@@ -343,15 +344,44 @@ async def test_a_type_nobody_can_read_yet_says_so(
     session_factory: async_sessionmaker[AsyncSession],
     rendered: Rendered,
 ) -> None:
+    # The hardship letter's facts are read by the hardship task, not by the field extractor.
+    body = await upload_files(
+        docs_client, rendered, [HARDSHIP_LETTER], case=ANGELA, role=Role.LM_SPECIALIST
+    )
+    [doc] = body["documents"]
+    await run(body, s3_storage, session_factory)
+
+    d = await document(session, doc["id"])
+    assert (d.status, d.doc_type, d.summary) == ("needs_review", "hardship_letter", None)
+    [flag] = await flags_of(session, doc["id"])
+    assert (flag.code, flag.message) == ("DI-W604", "No fields were extracted from this document.")
+    assert await rows(session, "SELECT 1 FROM fields WHERE document_id = :d", d=doc["id"]) == []
+
+
+async def test_the_credit_report_is_read_into_scores_tradelines_and_inquiries(
+    docs_client: httpx.AsyncClient,
+    session: AsyncSession,
+    s3_storage: Storage,
+    session_factory: async_sessionmaker[AsyncSession],
+    rendered: Rendered,
+) -> None:
     body = await upload_files(docs_client, rendered, [CREDIT_REPORT])
     [doc] = body["documents"]
     await run(body, s3_storage, session_factory)
 
     d = await document(session, doc["id"])
-    assert (d.status, d.doc_type, d.summary) == ("needs_review", "credit_report", None)
-    [flag] = await flags_of(session, doc["id"])
-    assert (flag.code, flag.message) == ("DI-W604", "No fields were extracted from this document.")
-    assert await rows(session, "SELECT 1 FROM fields WHERE document_id = :d", d=doc["id"]) == []
+    assert (d.status, d.doc_type, d.borrower) == ("reviewed", "credit_report", "Daniel Reyes")
+    names = {
+        r.name
+        for r in await rows(session, "SELECT name FROM fields WHERE document_id = :d", d=doc["id"])
+    }
+    assert {
+        "report_date",
+        "score_003_value",
+        "tradeline_005_monthly_payment",
+        "inquiry_002_date",
+    } <= names
+    assert await flags_of(session, doc["id"]) == []
 
 
 async def test_an_unrecognised_document_waits_for_a_person_to_choose(

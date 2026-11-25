@@ -150,7 +150,13 @@ class ThresholdsConfig(_Strict):
     pay_vs_hours_points: Setting[Decimal]
     budget_categories: Setting[list[str]]
     budget_category_map: Setting[dict[str, str]]
-    # Flag messages for the asset and budget checks: templates, filled in by code (rule 3).
+    # The credit report (Feature Design 4.3 and 4.5).
+    credit_score_method: Setting[Literal["middle_of_three_lower_of_two"]]
+    credit_late_lookback_months: Setting[int]
+    credit_inquiry_window_days: Setting[int]
+    credit_inquiry_match_days: Setting[int]
+    credit_utilization_review_level: Setting[Decimal]
+    # Flag messages for the asset, budget and credit checks: templates, filled in by code (rule 3).
     flags: dict[str, FlagTemplate]
 
     def flag(self, code: str, **values: object) -> tuple[str, str]:
@@ -182,6 +188,15 @@ class ThresholdsConfig(_Strict):
             raise ValueError("dti_review_level is a share between 0 and 1")
         if not Decimal(0) <= self.stated_vs_observed_share.value <= Decimal(1):
             raise ValueError("stated_vs_observed_share is a share between 0 and 1")
+        if not Decimal(0) < self.credit_utilization_review_level.value <= Decimal(1):
+            raise ValueError("credit_utilization_review_level is a share between 0 and 1")
+        for name in (
+            "credit_late_lookback_months",
+            "credit_inquiry_window_days",
+            "credit_inquiry_match_days",
+        ):
+            if getattr(self, name).value < 0:
+                raise ValueError(f"{name} cannot be negative")
         lines = self.budget_categories.value
         if len(set(lines)) != len(lines):
             raise ValueError("budget_categories must be unique")
@@ -298,7 +313,7 @@ class ChecklistsConfig(_Strict):
 class ConfigUse:
     """One settings file as a run used it: recorded in ``config_versions`` and on the run."""
 
-    kind: Literal["income_method", "thresholds", "checklist"]
+    kind: Literal["income_method", "thresholds", "checklist", "rule_set"]
     name: str
     version: str
     label: str

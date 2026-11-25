@@ -9,6 +9,7 @@ from app.db.models.analysis import (
 )
 from app.db.models.audit import AppendOnlyError, AuditEvent
 from app.db.models.cases import Case
+from app.db.models.credit import CreditInquiry, CreditScore, Tradeline
 from app.db.models.documents import Document, Line, Page
 from app.db.models.features import (
     BudgetLine,
@@ -36,6 +37,8 @@ __all__ = [
     "CompletenessResult",
     "Condition",
     "ConfigVersion",
+    "CreditInquiry",
+    "CreditScore",
     "Document",
     "ExtractionRun",
     "Field",
@@ -52,6 +55,7 @@ __all__ = [
     "Page",
     "Report",
     "SignOff",
+    "Tradeline",
     "Transaction",
     "User",
     "WaterfallResult",
