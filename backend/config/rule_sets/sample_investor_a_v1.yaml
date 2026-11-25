@@ -1,0 +1,153 @@
+# Sample Investor A, version 1 (Feature Design 8.3). Invented for the demo: not an actual investor's
+# requirements. Code reads this file and evaluates each condition in order (services/rules_engine.py);
+# no model ever evaluates a condition.
+#
+# Every number is a quoted string so that YAML never turns it into a float (CLAUDE.md rule 1).
+# Every setting carries a label and a source (rule 4). Bump `version` whenever a value changes.
+#
+# A condition names an evaluator (`kind`) that the engine implements, the setting it uses (if any),
+# the text to show (`label`, `expression`) and the passage of the sample guide it cites
+# (`passage_id`, which opens at GET /guidelines/passages/{id}).
+
+version: "1"
+name: Sample Investor A
+label: illustrative
+source: Feature Design 8.3. Invented for the demo.
+banner: "Illustrative: not an actual investor's requirements."
+
+settings:
+  surplus_basis:
+    value: stated
+    label: illustrative
+    source: Feature Design 8.3 and 8.8 use the monthly surplus of the stated budget (-70.00 for the sample).
+  repayment_plan_months:
+    value: "6"
+    label: illustrative
+    source: Feature Design 8.3, repayment plan (surplus at least arrears divided by 6).
+  deferral_minimum_surplus:
+    value: "0.00"
+    label: illustrative
+    source: Feature Design 8.3, payment deferral (surplus of zero or more).
+  max_months_delinquent:
+    value: "6"
+    label: illustrative
+    source: Feature Design 8.3, payment deferral (6 or fewer months delinquent).
+  target_payment_pct:
+    value: "35"
+    label: illustrative
+    source: Feature Design 8.3, loan modification (35% of documented gross monthly income).
+
+# Lender view (Feature Design 8.3). A simplified comparison with foreclosure, not an investor's model.
+lender_view:
+  property_value:
+    value: "265000.00"
+    label: illustrative
+    source: Feature Design 8.3 lender view settings.
+  liquidation_discount_pct:
+    value: "15"
+    label: illustrative
+    source: Feature Design 8.3 lender view settings.
+  foreclosure_and_carrying_costs:
+    value: "24000.00"
+    label: illustrative
+    source: Feature Design 8.3 lender view settings.
+  horizon_months:
+    value: "36"
+    label: illustrative
+    source: Feature Design 8.3 lender view settings.
+  redefault_chance_pct:
+    value: "30"
+    label: illustrative
+    source: Feature Design 8.3 lender view settings.
+
+# Options in waterfall order. The waterfall stops at the first option whose conditions are all met.
+options:
+  - option: repayment_plan
+    conditions:
+      - id: repayment_plan.hardship_resolved
+        kind: hardship_resolved
+        label: Hardship resolved (confirmed)
+        expression: hardship.duration == resolved
+        passage_id: sample-investor-a-v1.repayment-plan.1
+      - id: repayment_plan.surplus
+        kind: surplus_at_least_arrears_share
+        setting: repayment_plan_months
+        label: Monthly surplus at least arrears / 6
+        expression: surplus >= arrears / 6
+        passage_id: sample-investor-a-v1.repayment-plan.2
+
+  - option: forbearance
+    conditions:
+      - id: forbearance.hardship_temporary
+        kind: duration_is
+        allowed: [temporary]
+        label: Hardship temporary (confirmed)
+        expression: hardship.duration == temporary
+        passage_id: sample-investor-a-v1.forbearance.1
+
+  - option: payment_deferral
+    conditions:
+      - id: payment_deferral.hardship_resolved
+        kind: hardship_resolved
+        label: Hardship resolved (confirmed)
+        expression: hardship.duration == resolved
+        passage_id: sample-investor-a-v1.payment-deferral.1
+      - id: payment_deferral.surplus
+        kind: surplus_at_least
+        setting: deferral_minimum_surplus
+        label: Surplus at the contractual payment of zero or more
+        expression: surplus >= 0
+        passage_id: sample-investor-a-v1.payment-deferral.2
+      - id: payment_deferral.months_delinquent
+        kind: months_delinquent_at_most
+        setting: max_months_delinquent
+        label: 6 or fewer months delinquent
+        expression: months_delinquent <= 6
+        passage_id: sample-investor-a-v1.payment-deferral.3
+
+  - option: loan_modification
+    conditions:
+      - id: loan_modification.hardship_long_term
+        kind: duration_is
+        allowed: [long_term, unknown]
+        label: Hardship long-term or unknown (confirmed)
+        expression: hardship.duration in (long_term, unknown)
+        passage_id: sample-investor-a-v1.loan-modification.1
+      - id: loan_modification.intent
+        kind: intent_is
+        allowed: [keep]
+        label: Intent to keep the home (confirmed)
+        expression: hardship.intent == keep
+        passage_id: sample-investor-a-v1.loan-modification.2
+      - id: loan_modification.target_payment
+        kind: target_payment_below_contractual
+        setting: target_payment_pct
+        label: Target payment of 35% of documented gross monthly income is below the contractual payment
+        expression: 0.35 * gross_monthly_income < contractual_payment
+        passage_id: sample-investor-a-v1.loan-modification.3
+
+  - option: short_sale
+    conditions:
+      - id: short_sale.reached
+        kind: no_earlier_option_met
+        label: No earlier option's conditions are met
+        expression: no earlier option met
+        passage_id: sample-investor-a-v1.order.1
+      - id: short_sale.rules
+        kind: none_defined
+        label: The sample rule set defines no further conditions for this option
+        expression: none defined
+        passage_id: sample-investor-a-v1.order.1
+
+  - option: deed_in_lieu
+    conditions:
+      - id: deed_in_lieu.reached
+        kind: no_earlier_option_met
+        label: No earlier option's conditions are met
+        expression: no earlier option met
+        passage_id: sample-investor-a-v1.order.1
+      - id: deed_in_lieu.rules
+        kind: none_defined
+        label: The sample rule set defines no further conditions for this option
+        expression: none defined
+        passage_id: sample-investor-a-v1.order.1

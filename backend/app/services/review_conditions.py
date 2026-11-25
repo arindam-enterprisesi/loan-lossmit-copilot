@@ -32,7 +32,7 @@ from app.db.enums import (
 from app.db.models import Condition, Report, SignOff, WaterfallResult
 from app.services import audit, reports
 from app.services.security import CurrentUser
-from app.services.waterfall_status import effective_status, recompute
+from app.services.waterfall_status import effective_status, override_summary, recompute
 
 SIGN_OFF_STATEMENT = "Records a review. Not a decision."
 REVIEWER_FOR: dict[ReportKind, Role] = {
@@ -62,6 +62,27 @@ async def _latest(session: AsyncSession, case_id: uuid.UUID, kind: ReportKind) -
     report = await reports.latest_report(session, case_id, kind)
     if report is None:
         raise ReviewError(404, "not_found", "No report has been made for this case")
+    return report
+
+
+async def _reviewable_report(session: AsyncSession, case_id: uuid.UUID, kind: ReportKind) -> Report:
+    """The report a sign-off is about. For the recommendation it must belong to the newest
+    evaluation: an older run's report (such as the seeded sample) says nothing about the waterfall
+    the reviewer is looking at, and the rules alone do not write a report (the agents do)."""
+    if kind != ReportKind.LM_RECOMMENDATION:
+        return await _latest(session, case_id, kind)
+    run = await reports.latest_waterfall_run(session, case_id)
+    if run is None:
+        raise ReviewError(404, "not_found", "No recommendation has been made for this case")
+    report = await session.scalar(
+        sa.select(Report).where(Report.run_id == run.id).order_by(Report.version.desc()).limit(1)
+    )
+    if report is None:
+        raise ReviewError(
+            409,
+            "no_report",
+            "The newest evaluation has no report yet, so there is nothing to record a review of.",
+        )
     return report
 
 
@@ -250,15 +271,10 @@ async def override_condition(
     for row, (new_status, conditions) in zip(rows, plan, strict=True):
         row.status = WaterfallStatus(new_status)
         row.conditions = conditions
-        marked = [c["override"] for c in conditions if c.get("override")]
-        row.overridden = bool(marked)
-        if marked:
-            last = max(marked, key=lambda o: o["at"])
-            row.override_reason = last["reason"]
-            row.overridden_by = uuid.UUID(last["by"])
-            row.overridden_at = datetime.fromisoformat(last["at"])
-        else:
-            row.override_reason = row.overridden_by = row.overridden_at = None
+        row.overridden, latest_reason, by, at = override_summary(conditions)
+        row.override_reason = latest_reason
+        row.overridden_by = uuid.UUID(by) if by else None
+        row.overridden_at = datetime.fromisoformat(at) if at else None
     await session.flush()
     report = await session.scalar(
         sa.select(Report).where(Report.run_id == run.id).order_by(Report.version.desc()).limit(1)
@@ -303,7 +319,7 @@ async def sign_off(
 ) -> tuple[SignOff, dict[str, Any]]:
     """Record that this person reviewed the newest version of the report. Not a decision."""
     _check_role(user, kind)
-    report = await _latest(session, case_id, kind)
+    report = await _reviewable_report(session, case_id, kind)
     actor = uuid.UUID(user.id)
     already = await session.scalar(
         sa.select(SignOff.id).where(

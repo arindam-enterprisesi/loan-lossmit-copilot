@@ -16,6 +16,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 from app.api.schemas.assets import CalcOut, calc_from_row
 from app.api.schemas.income import exact
+from app.api.schemas.jobs import JobOut
 from app.db.enums import (
     AgentName,
     AgentRunStatus,
@@ -137,6 +138,10 @@ class WaterfallConditionOut(BaseModel):
     values: dict[str, Any]
     passage_id: str | None
     derived: bool
+    # Why a condition could not be decided (what is missing, or what a person must confirm), and
+    # where each value was read: a document line, a stored calculation or the loan record.
+    note: str | None = None
+    evidence: list[dict[str, Any]] = Field(default_factory=list)
     # What the rules found, and what counts now (the override, when there is one).
     status: WaterfallStatus
     effective_status: WaterfallStatus
@@ -169,6 +174,10 @@ class RuleSetOut(BaseModel):
     version: str
     label: str
     banner: str | None
+
+
+class RecommendationRunAccepted(BaseModel):
+    job: JobOut
 
 
 class LmRecommendationOut(BaseModel):
@@ -341,6 +350,8 @@ def _condition_result(c: dict[str, Any]) -> WaterfallConditionOut:
         values=c.get("values", {}),
         passage_id=c.get("passage_id"),
         derived=bool(c.get("derived")),
+        note=c.get("note"),
+        evidence=c.get("evidence", []),
         status=WaterfallStatus(c["status"]),
         effective_status=WaterfallStatus(effective_status(c)),
         override=(
@@ -385,7 +396,8 @@ def recommendation_from_view(view: WaterfallView) -> LmRecommendationOut:
                 name=rule_set["name"],
                 version=rule_set["version"],
                 label=rule_set["label"],
-                banner=ILLUSTRATIVE_BANNER if rule_set["label"] == "illustrative" else None,
+                banner=rule_set.get("banner")
+                or (ILLUSTRATIVE_BANNER if rule_set["label"] == "illustrative" else None),
             )
             if rule_set
             else None

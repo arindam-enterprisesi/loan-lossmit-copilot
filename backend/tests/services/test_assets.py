@@ -620,7 +620,7 @@ def test_every_figure_has_its_formula_working_inputs_and_the_settings_version() 
     for calc in outcome.calcs:
         assert isinstance(calc.value, D)  # never a float (rule 1)
         assert calc.formula and calc.working and calc.inputs
-        assert calc.config_version == "thresholds@2026-11-24.1"
+        assert calc.config_version == "thresholds@2026-11-24.2"
 
 
 def test_the_assets_figure_points_at_the_statement_line_it_came_from() -> None:

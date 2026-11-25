@@ -909,7 +909,78 @@ were reserved; they now hold real shapes, and the response gains `checks`, `budg
 - **Flag codes `HB-W101` to `W105` and `HB-I101`** are in `backend/config/thresholds.yaml` with their
   message templates.
 
-## 8. For you, not the contract
+## 8. Loss mitigation recommendation: apply the rules (Feature Design 8.4, 8.7; D7)
+
+`GET .../lm-recommendation/latest`, the override and the sign-off are in section 6. This adds the
+endpoint that makes the waterfall, and two fields on each condition.
+
+```yaml
+  /cases/{case_id}/lm-recommendation:
+    post:      # runLmRecommendation; loss mitigation specialist only (admin and underwriter 403); 202 {job}; 404, 503
+      # No body. Applies the rule set in code and calls no model. Poll GET /jobs/{id}, then read /latest.
+```
+
+- **A run exists only when it is complete**, so `/latest` is never an empty waterfall of a run still
+  to be made (404 until the first one). The newest run is the one shown; earlier runs, such as the
+  seeded sample, are history.
+- **`report` is null** on a rules-only run. Your graph writes the report with `report_writer` into
+  the same run (`run_recommendation_rules(session, case_id, user_id=..., job_id=...)` is the
+  function for its step 4; it flushes and the caller commits).
+- **Sign-off needs a report on the newest run:** `POST .../latest/sign-off` returns **409
+  `no_report`** until one exists, so an older run's report (the seeded sample) is never signed off
+  for a newer waterfall.
+- **Each condition gains `note` and `evidence`:**
+
+```yaml
+    WaterfallCondition:
+      properties:
+        note: {type: [string, "null"], description: Why it could not be decided, or what a person must confirm}
+        evidence:
+          type: array
+          items: {type: object, description: "A document line {document_id, field, line_ids}, a stored calculation {calculation_id, name}, a hardship item {hardship_profile_id, item, line_ids}, or the loan record {loan_record_id, field}"}
+```
+
+- **Statuses:** `needs_confirmation` means a judgement (hardship duration, intent) was read from the
+  letter and nobody has confirmed it, so the rules do not use it. `not_evaluable` means something is
+  missing, and `note` says what. The "no earlier option's conditions are met" condition is
+  `needs_confirmation` or `not_evaluable` while an earlier option is, and `not_reached` once one is
+  met.
+- **Overrides carry to a new run** by condition id, with the rules' own status beside them. An
+  override the rules have since caught up with is dropped.
+
+## 9. Credit report analysis (Feature Design 4.7; D7)
+
+Same pattern as income and assets: a background job, then a read. No model is called (the only AI
+use is the extraction that reads the report). The report is simulated and every response says so.
+
+```yaml
+  /cases/{case_id}/credit-analysis:
+    post:      # runCreditAnalysis; 202 {job, analysis_id}; 404, 503
+  /cases/{case_id}/credit-analysis/latest:
+    get:       # getLatestCreditAnalysis; 200 CreditAnalysis; 401, 404
+```
+
+`CreditAnalysis` (the field lists are in `backend/app/api/schemas/credit.py`):
+
+- `tag` ("Sample credit report (simulated)...") and `note` (it flags and decides nothing), `status`,
+  `config_versions`.
+- `alerts` first (fraud alert, freeze, consumer statement), then `scores` (each with `bureau`,
+  `score`, `is_representative`, `line_ids`) and `representative {score, bureau, method,
+  calculation}`.
+- `tradelines`: the report's fields plus `utilization` (a figure with its working, revolving
+  accounts only), `utilization_over_review_level`, `months_since_last_late`, `late_in_lookback`,
+  `derogatory` and `line_ids`.
+- `total_revolving_utilization`, `monthly_payments` (total and by account type; Feature 3 reads the
+  tradelines directly), `inquiries` (`matched_account` is null for "no new account found"),
+  `derogatory`, `flags` and `summary` (a template filled from the stored results), and every
+  `calculations` entry with its working and evidence.
+- **Flag codes** (labels of mine, in `backend/config/thresholds.yaml`): `CR-W101` utilization above
+  the review level, `W102` late payment within the lookback, `W103` inquiry with no matching account,
+  `W104` past due, `W105` alerts, `CR-I101` cannot compute, `CR-I102` inquiry matched to a new
+  account.
+- **Not built:** `PATCH .../latest/items/{item}` (annotations), listed in Feature Design 4.7.
+
+## 10. For you, not the contract
 
 - **Income flag codes are my labels** (the docs define none for Feature 2): `INC-CHK-01` 1040
   wages against W-2 Box 1, `02` employer, `03` Box 5 minus Box 1 against Box 12 deferrals, `04`
@@ -921,3 +992,21 @@ were reserved; they now hold real shapes, and the response gains `checks`, `budg
 - **Gemini latency:** with a free key, `classify` took 38 to 650 s per document in testing, and 10 of
   18 calls failed with a `GatewayError` after about 37 s (the cause was not captured; free-tier rate
   limiting is the likely one). The worker now allows 1800 s a job and logs the cause chain.
+- **"Hardship resolved" has no value in your profile.** Duration is `temporary`, `long_term` or
+  `unknown`, so the repayment plan's and the deferral's "hardship resolved (confirmed)" condition is
+  `not_met` once the duration is confirmed, with a note saying so; a reviewer who knows the hardship
+  ended can override it with a reason. I did not invent a field. Tell me if you want `resolved` added
+  to the duration categories (it is a change to `hardship@1`, your folder).
+- **Months delinquent comes from the loan record** (the simulated servicing record), because no
+  document field carries it. The mortgage statement's `payments_past_due` is in the generated
+  documents but not in the schema; add it if you want it read from the document.
+- **Rule set citations:** every condition cites a passage id in `sample-investor-a-v1.<topic>.<n>`
+  form (my provisional scheme). The seeded guide has all ten; a test checks that each cited id
+  resolves.
+- **Credit report fields your schema must emit** (the names are in `backend/config/document_fields.yaml`,
+  under `credit_report`): `consumer_name`, `report_date`, `alerts` (one text), `score_NNN_{bureau,
+  value}`, `tradeline_NNN_{creditor, account_type, ownership, open_date, status, balance,
+  credit_limit, monthly_payment, past_due, late_30, late_60, late_90, most_recent_late, remarks}` and
+  `inquiry_NNN_{creditor, date}`. Feature 3 already reads the creditor, type, balance and payment.
+  Until your `credit_report` schema lands, the analysis runs on seeded fields in tests, and a live demo
+  without them says "Cannot compute" (`CR-I101`).
