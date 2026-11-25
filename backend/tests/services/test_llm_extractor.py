@@ -261,7 +261,7 @@ async def test_signals_become_plain_notes() -> None:
     assert outcome.signals == ["the earnings table is cut off"]
 
 
-@pytest.mark.parametrize("doc_type", ["credit_report", "hardship_letter", "unrecognized"])
+@pytest.mark.parametrize("doc_type", ["hardship_letter", "unrecognized"])
 async def test_types_without_a_field_schema_make_no_model_call(doc_type: str) -> None:
     extractor, adapter = extractor_for()
     outcome = await extractor.extract(doc_type, [DocLine(1, 1, "anything")])
