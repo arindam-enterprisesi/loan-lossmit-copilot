@@ -12,6 +12,8 @@ x-backend: &backend
     REDIS_URL: redis://redis:6379/0
   volumes:
     - ./backend:/app
+    # The guideline sources the assistant loads (app/rag/sources.py reads /data/sources).
+    - ./data/sources:/data/sources:ro
     # For AWS_PROFILE users, also mount your profile (path differs per OS):
     # - ${USERPROFILE}/.aws:/root/.aws:ro
   depends_on:
