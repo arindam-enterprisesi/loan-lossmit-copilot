@@ -208,6 +208,13 @@ ENDPOINTS: tuple[Endpoint, ...] = (
     ep("GET", f"{C}/audit"),
     ep("GET", "/api/v1/guidelines/sources", special="no case"),
     ep("GET", "/api/v1/guidelines/passages/{passage_id}", special="no case"),
+    ep("POST", "/api/v1/guidelines/ask", takes_body=True, special="no case; a model call"),
+    ep(
+        "POST",
+        "/api/v1/guidelines/answers/{answer_id}/feedback",
+        takes_body=True,
+        special="no case; an answer",
+    ),
     ep("GET", "/api/v1/jobs/{job_id}", special="a job, not a case"),
 )
 BY_KEY = {e.key: e for e in ENDPOINTS}
