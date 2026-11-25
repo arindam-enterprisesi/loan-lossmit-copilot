@@ -1,7 +1,8 @@
 """Field schemas per document type (Feature Design 1.3, "Document types and what is read").
 
-One model per extractable type. Credit reports and hardship letters are classified
-only here (analysed in Features 4 and 7), so they have no field schema.
+One model per extractable type. Hardship letters are classified only here (read
+by hardship@1 in Feature 7), so they have no field schema. The credit report's
+fields feed the code in Feature 4 (scores, tradelines, inquiries).
 
 Every value is copied exactly as printed (``"2,083.61"``, ``"09/14/2026"``); code
 normalises amounts and dates, cuts account numbers to the last four digits and
@@ -222,3 +223,51 @@ class ExpenseBillFields(Schema):
     billing_period_end: Annotated[ExtractedField, Describe("Last day of the billing period.")]
     statement_date: Annotated[ExtractedField, Describe("The bill or statement date.")]
     due_date: Annotated[ExtractedField, Describe("The payment due date.")]
+
+
+# --- credit report (Feature Design 4.3) -------------------------------------------------------
+
+
+class CreditScore(Schema):
+    bureau: Annotated[ExtractedField, Describe("The bureau or score name as printed.")]
+    value: Annotated[ExtractedField, Describe("The score as printed.")]
+
+
+class Tradeline(Schema):
+    creditor: Annotated[ExtractedField, Describe("The creditor or account name.")]
+    account_type: Annotated[
+        ExtractedField, Describe("Revolving, installment, mortgage or open, as printed.")
+    ]
+    ownership: Annotated[ExtractedField, Describe("Individual, joint or authorized user.")]
+    open_date: Annotated[ExtractedField, Describe("The date the account was opened.")]
+    status: Annotated[ExtractedField, Describe("The account status, e.g. open or closed.")]
+    balance: Annotated[ExtractedField, Describe("The current balance.")]
+    credit_limit: Annotated[
+        ExtractedField, Describe("The credit limit or high credit; null when printed as n/a.")
+    ]
+    monthly_payment: Annotated[ExtractedField, Describe("The scheduled monthly payment.")]
+    past_due: Annotated[ExtractedField, Describe("The past-due amount.")]
+    late_30: Annotated[ExtractedField, Describe("The count of 30-day late payments.")]
+    late_60: Annotated[ExtractedField, Describe("The count of 60-day late payments.")]
+    late_90: Annotated[ExtractedField, Describe("The count of 90-day late payments.")]
+    most_recent_late: Annotated[
+        ExtractedField, Describe("The date of the most recent late payment; null when none.")
+    ]
+    remarks: Annotated[ExtractedField, Describe("Remarks printed for the account; null if none.")]
+
+
+class Inquiry(Schema):
+    creditor: Annotated[ExtractedField, Describe("Who made the inquiry.")]
+    date: Annotated[ExtractedField, Describe("The inquiry date.")]
+
+
+class CreditReportFields(Schema):
+    consumer_name: Annotated[ExtractedField, Describe("The consumer's name.")]
+    report_date: Annotated[ExtractedField, Describe("The date of the report.")]
+    alerts: Annotated[
+        ExtractedField,
+        Describe("Fraud alerts, freezes or consumer statements as printed; null if none."),
+    ]
+    scores: Annotated[list[CreditScore], Describe("Every credit score printed, one per bureau.")]
+    tradelines: Annotated[list[Tradeline], Describe("Every trade account, in printed order.")]
+    inquiries: Annotated[list[Inquiry], Describe("Every inquiry listed.")]
