@@ -116,8 +116,8 @@ export function TransactionsTable({ transactions, caseId, pillarSlug, onReclassi
                             </span>
                           ) : null}
                           {t.needs_review ? <FlagChip tone="warning">Needs review</FlagChip> : null}
-                          {t.flags.map((f) => (
-                            <span key={f.code} title={f.message}>
+                          {t.flags.map((f, i) => (
+                            <span key={`${f.code}-${i}`} title={f.message}>
                               <FlagChip tone={severityTone(f.severity)}>{FLAG_SHORT_LABEL[f.code] ?? f.code}</FlagChip>
                             </span>
                           ))}
@@ -126,8 +126,8 @@ export function TransactionsTable({ transactions, caseId, pillarSlug, onReclassi
                         {t.sourced && t.sourced_note ? (
                           <div className="mt-1 max-w-56 whitespace-normal text-xs text-muted-foreground">Source: {t.sourced_note}</div>
                         ) : null}
-                        {t.flags.map((f) => (
-                          <div key={`${f.code}-m`} className="mt-1 max-w-60 text-xs text-muted-foreground">
+                        {t.flags.map((f, i) => (
+                          <div key={`${f.code}-m${i}`} className="mt-1 max-w-60 text-xs text-muted-foreground">
                             {f.message}
                           </div>
                         ))}

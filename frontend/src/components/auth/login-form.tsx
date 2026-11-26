@@ -75,6 +75,7 @@ export function LoginForm({ expired = false, next = null }: LoginFormProps) {
             <button
               key={u.username}
               type="button"
+              suppressHydrationWarning
               aria-label={`Use the ${u.label} username`}
               onClick={() => setUsername(u.username)}
               className="rounded-md border px-2 py-0.5 font-mono text-[11px] text-navy hover:bg-accent"

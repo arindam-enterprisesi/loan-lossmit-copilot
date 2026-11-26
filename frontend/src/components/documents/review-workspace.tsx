@@ -211,8 +211,8 @@ export function ReviewWorkspace({ caseId, documentId, backHref }: ReviewWorkspac
           {extraction.summary ? <p className="text-sm text-navy">{extraction.summary}</p> : null}
           {extraction.flags.length > 0 ? (
             <ul className="mt-2 space-y-1">
-              {extraction.flags.map((f) => (
-                <li key={f.code} className="flex items-start gap-2 text-sm">
+              {extraction.flags.map((f, i) => (
+                <li key={`${f.code}-${i}`} className="flex items-start gap-2 text-sm">
                   <FlagChip tone={severityTone(f.severity)}>{f.code}</FlagChip>
                   <span className="text-navy">{f.message}</span>
                 </li>

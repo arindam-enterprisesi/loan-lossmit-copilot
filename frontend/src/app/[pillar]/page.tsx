@@ -3,6 +3,7 @@ import { PageHeader } from "@/components/layout/page-header";
 import { DocStatusChip } from "@/components/shared/doc-status-chip";
 import { FlagChip, severityTone } from "@/components/shared/flag-chip";
 import { StatCard } from "@/components/shared/stat-card";
+import { flagGroupLabel, flagGroupTitle, groupFlags } from "@/lib/flags";
 import { humanize } from "@/lib/format";
 import { PILLARS, pillarFromSlug } from "@/lib/nav";
 import { loadCases, loadDocuments } from "@/lib/server-api";
@@ -52,9 +53,9 @@ export default async function DashboardPage({ params }: { params: Promise<{ pill
                   </div>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
-                  {d.flags.map((f) => (
-                    <FlagChip key={f.code} tone={severityTone(f.severity)}>
-                      {f.code}
+                  {groupFlags(d.flags).map((g) => (
+                    <FlagChip key={g.code} tone={severityTone(g.severity)} title={flagGroupTitle(g)}>
+                      {flagGroupLabel(g)}
                     </FlagChip>
                   ))}
                   <DocStatusChip status={d.status} />
