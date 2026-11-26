@@ -14,6 +14,7 @@ from typing import Any
 from app.agents.config import AgentsConfig
 from app.agents.dossier import Dossier
 from app.db.enums import ReviewPriority
+from app.llm.tasks import clean_text
 from app.services.report_writer import FindingDraft
 
 _ORDER = {ReviewPriority.SIGNIFICANT: 0, ReviewPriority.ATTENTION: 1, ReviewPriority.INFORMATION: 2}
@@ -74,5 +75,6 @@ def build_findings(dossier: Dossier, config: AgentsConfig) -> list[CodedFinding]
 
 def render_findings(findings: list[CodedFinding]) -> str:
     return "\n".join(
-        f"- {f.id} | {f.draft.priority.value} | {f.code} | {f.draft.title}" for f in findings
+        clean_text(f"- {f.id} | {f.draft.priority.value} | {f.code} | {f.draft.title}")
+        for f in findings
     )
