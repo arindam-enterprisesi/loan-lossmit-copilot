@@ -72,8 +72,8 @@ export function FieldRow({ field, selected, highlighted, onSelect, onHover, onRe
         </div>
         {field.flags.length > 0 ? (
           <ul className="mt-2 space-y-1">
-            {field.flags.map((f) => (
-              <li key={f.code} className="flex items-start gap-2 text-sm">
+            {field.flags.map((f, i) => (
+              <li key={`${f.code}-${i}`} className="flex items-start gap-2 text-sm">
                 <FlagChip tone={severityTone(f.severity)}>{f.code}</FlagChip>
                 <span className="text-navy">{f.message}</span>
               </li>

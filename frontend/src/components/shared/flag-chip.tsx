@@ -20,12 +20,15 @@ interface FlagChipProps {
   tone: ChipTone;
   children: React.ReactNode;
   className?: string;
+  /** Shown on hover, for what the chip stands for when its text is only a code. */
+  title?: string;
 }
 
 /** Small pill for flags and statuses: High / Medium / Low, Consistent, Excluded, Source needed. */
-export function FlagChip({ tone, children, className }: FlagChipProps) {
+export function FlagChip({ tone, children, className, title }: FlagChipProps) {
   return (
     <span
+      title={title}
       className={cn(
         "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ring-inset whitespace-nowrap",
         toneClasses[tone],

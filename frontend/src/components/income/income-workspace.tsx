@@ -170,8 +170,8 @@ export function IncomeWorkspace({ cases, pillarSlug }: IncomeWorkspaceProps) {
                 Nothing flagged.
               </p>
             ) : (
-              analysis.flags.map((f) => (
-                <IncomeFlagCard key={f.code} flag={f} caseId={analysis.case_id} pillarSlug={pillarSlug} />
+              analysis.flags.map((f, i) => (
+                <IncomeFlagCard key={`${f.code}-${i}`} flag={f} caseId={analysis.case_id} pillarSlug={pillarSlug} />
               ))
             )}
             {analysis.explanations && analysis.explanations.length > 0 ? (

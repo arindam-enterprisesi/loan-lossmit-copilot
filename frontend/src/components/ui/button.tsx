@@ -47,6 +47,8 @@ function Button({
 }: ButtonPrimitive.Props & VariantProps<typeof buttonVariants>) {
   return (
     <ButtonPrimitive
+      // Some browser extensions add attributes such as fdprocessedid before React loads. That is not a bug here.
+      suppressHydrationWarning
       data-slot="button"
       className={cn(buttonVariants({ variant, size, className }))}
       {...props}

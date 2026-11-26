@@ -77,6 +77,25 @@ describe("DocumentTable", () => {
     expect(row.querySelector("a")).toBeNull();
   });
 
+  it("shows one chip with a count when a document repeats a flag code, and warns about no duplicate keys (real W-2 shape)", () => {
+    const base = danielDocs.find((d) => d.doc_type === "pay_stub")!;
+    const missing = ["Tax year", "Employee", "Box 5, Medicare wages", "Employer", "Box 1, wages"].map((what) => ({
+      code: "DI-W604",
+      severity: "warning" as const,
+      message: `${what} wasn't found in this document.`,
+    }));
+    const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+    setup([{ ...base, flags: missing }]);
+
+    const chip = screen.getByText("DI-W604 ×5");
+    expect(screen.getAllByText(/DI-W604/)).toHaveLength(1);
+    expect(chip).toHaveAttribute("title", expect.stringContaining("Box 5, Medicare wages wasn't found in this document."));
+    expect(chip.getAttribute("title")!.split("\n")).toHaveLength(5);
+    const sameKey = errors.mock.calls.filter((c) => String(c[0]).includes("same key"));
+    errors.mockRestore();
+    expect(sameKey).toHaveLength(0);
+  });
+
   it("says what to do when there are no documents yet", () => {
     setup([]);
     expect(screen.getByText("No documents yet")).toBeInTheDocument();

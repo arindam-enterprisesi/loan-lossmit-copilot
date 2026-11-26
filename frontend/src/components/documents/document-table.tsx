@@ -15,6 +15,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { docTypeLabel } from "@/lib/documents";
+import { flagGroupLabel, flagGroupTitle, groupFlags } from "@/lib/flags";
 import { formatDate } from "@/lib/format";
 import type { DocumentSummary, DocumentType } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -82,9 +83,9 @@ export function DocumentTable({ documents, pillarSlug, section, filtered = false
                   {d.flags.length === 0 ? (
                     <span className="text-muted-foreground">—</span>
                   ) : (
-                    d.flags.map((f) => (
-                      <FlagChip key={f.code} tone={severityTone(f.severity)}>
-                        {f.code}
+                    groupFlags(d.flags).map((g) => (
+                      <FlagChip key={g.code} tone={severityTone(g.severity)} title={flagGroupTitle(g)}>
+                        {flagGroupLabel(g)}
                       </FlagChip>
                     ))
                   )}
