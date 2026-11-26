@@ -91,5 +91,8 @@ class SeededPassageStore:
 
 @lru_cache
 def get_passage_store() -> PassageStore:
-    """FastAPI dependency: the passage store (tests override it)."""
-    return SeededPassageStore()
+    """FastAPI dependency: the guideline index (``app.rag``), which also holds the seeded
+    passages under the same IDs. Tests override it."""
+    from app.rag.store import get_rag_store
+
+    return get_rag_store()
