@@ -701,12 +701,14 @@ export interface PageImage {
 }
 
 /**
- * Asks for the link to one page's image. The contract has no page-image endpoint yet (TODO D3+), so
- * in real mode this answers "none" and the viewer draws a blank page. When the endpoint lands, only
- * this function changes. Always ask again for a fresh link: an old one may have expired.
+ * Asks for the link to one page's image. The backend answers with a link that lasts about five
+ * minutes, so always ask again for a fresh one: an old one may have expired. A page the backend does
+ * not have (404) gives "none" and the viewer draws a blank page. Any other failure is thrown, and the
+ * page-image hook turns it into the same blank page. The contract on main still has this path as a
+ * TODO, but the backend serves it (getPageImage in backend/app/api/routers/documents.py).
  */
 export async function getPageImage(
-  _caseId: string,
+  caseId: string,
   documentId: string,
   page: number,
 ): Promise<PageImage | undefined> {
@@ -714,5 +716,13 @@ export async function getPageImage(
     const url = pageImageUrlMock(documentId, page);
     return url ? { url } : undefined;
   }
-  return undefined;
+  try {
+    const data = await request<{ url: string; expires_at?: string }>(
+      `/cases/${caseId}/documents/${documentId}/pages/${page}`,
+    );
+    return { url: data.url, expiresAt: data.expires_at };
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 404) return undefined;
+    throw e;
+  }
 }

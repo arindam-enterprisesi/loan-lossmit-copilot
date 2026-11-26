@@ -489,12 +489,38 @@ describe("getPageImage", () => {
     expect(await getPageImage("c1", PAYSTUB_DOC_ID, 9)).toBeUndefined();
   });
 
-  it("against the real backend, returns nothing until the endpoint exists, and never calls fetch", async () => {
-    const fetchMock = vi.fn();
+  it("against the real backend, asks for the page's link through the proxy and renames expires_at", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      reply(200, {
+        page: 1,
+        url: "https://bucket.s3.example/pages/1.png?X-Amz-Expires=300",
+        expires_at: "2026-11-26T09:00:00Z",
+        width: 1275,
+        height: 1650,
+      }),
+    );
     vi.stubGlobal("fetch", fetchMock);
     const { getPageImage } = await loadApi("false");
-    expect(await getPageImage("c1", "d1", 1)).toBeUndefined();
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(await getPageImage("c1", "d1", 1)).toEqual({
+      url: "https://bucket.s3.example/pages/1.png?X-Amz-Expires=300",
+      expiresAt: "2026-11-26T09:00:00Z",
+    });
+    expect(fetchMock.mock.calls[0][0]).toBe("/api/proxy/cases/c1/documents/d1/pages/1");
+  });
+
+  it("against the real backend, a page it does not have gives nothing, not an error", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(reply(404, { message: "Page not found" })));
+    const { getPageImage } = await loadApi("false");
+    expect(await getPageImage("c1", "d1", 9)).toBeUndefined();
+  });
+
+  it("against the real backend, any other failure is thrown so the hook can show the blank page", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(reply(503, { message: "The page image is unavailable. Please try again." })),
+    );
+    const { getPageImage } = await loadApi("false");
+    await expect(getPageImage("c1", "d1", 1)).rejects.toMatchObject({ status: 503 });
   });
 });
 
