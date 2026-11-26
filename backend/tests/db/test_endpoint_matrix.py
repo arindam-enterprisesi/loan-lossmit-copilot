@@ -160,6 +160,8 @@ ENDPOINTS: tuple[Endpoint, ...] = (
     ep("POST", f"{C}/credit-analysis"),
     ep("GET", f"{C}/credit-analysis/latest"),
     # underwriting report
+    ep("POST", f"{C}/underwriting-report", roles=ONLY_UW),
+    ep("POST", f"{C}/underwriting-report/latest/agents/{{agent}}/rerun", roles=ONLY_UW),
     ep("GET", f"{C}/underwriting-report/latest"),
     ep(
         "POST",
@@ -195,6 +197,7 @@ ENDPOINTS: tuple[Endpoint, ...] = (
     ),
     # loss mitigation recommendation
     ep("POST", f"{C}/lm-recommendation", roles=ONLY_LM),
+    ep("POST", f"{C}/lm-recommendation/latest/agents/{{agent}}/rerun", roles=ONLY_LM),
     ep("GET", f"{C}/lm-recommendation/latest"),
     ep(
         "PUT",
@@ -230,6 +233,7 @@ def url(endpoint: Endpoint, case: uuid.UUID | str = DANIEL) -> str:
         "page": "1",
         "item_id": "pay_stubs_30_days",
         "passage_id": "sample-investor-a-v1.order.1",
+        "agent": "critic",
     }
     names = re.findall(r"{(\w+)}", endpoint.path)
     return endpoint.path.format(**{n: fixed.get(n, str(uuid.uuid4())) for n in names})

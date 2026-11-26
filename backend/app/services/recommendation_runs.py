@@ -343,9 +343,16 @@ async def run_recommendation_job(
         job.attempts += 1
         await session.commit()
         try:
-            await run_recommendation_rules(
+            run = await run_recommendation_rules(
                 session, case_id, user_id=user_id, job_id=job_id, rule_set=rule_set
             )
+            job.stage, job.progress = "agents", 0.6
+            await session.commit()
+            # The agents explain the rules' result on the same run (Feature Design 8.5). They
+            # never change it, and their failure leaves the waterfall as it is.
+            from app.agents.jobs import run_lm_after_rules
+
+            await run_lm_after_rules(session, run)
             job.status, job.stage, job.progress, job.error = JobStatus.SUCCEEDED, "done", 1.0, None
             await session.commit()
         except Exception as exc:

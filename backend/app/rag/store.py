@@ -49,7 +49,8 @@ def stem(word: str) -> str:
 
 
 def terms(text: str) -> list[str]:
-    return [stem(w) for w in _WORD.findall(text.lower()) if w not in STOPWORDS]
+    """Search words: lower case, stemmed, without stop words or bare numbers."""
+    return [stem(w) for w in _WORD.findall(text.lower()) if w not in STOPWORDS and not w.isdigit()]
 
 
 @dataclass(frozen=True)

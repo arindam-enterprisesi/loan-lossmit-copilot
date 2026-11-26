@@ -1,0 +1,46 @@
+# The agents' settings (Feature Design 6.3, 6.5 and 8.5). Read by app/agents/config.py.
+# Every setting carries a label and a source (CLAUDE.md rule 4). Bump `version` when a value changes.
+version: "2026-11-25.1"
+label: illustrative
+source: "Feature Design 6.3, 6.5 and 8.5, illustrative settings chosen for the demo"
+
+# Review priority of a finding, by the code of the flag it comes from. The first pattern that
+# matches wins (fnmatch, so * is a wildcard). Priority is the order to review in, never
+# eligibility (Feature Design 6.5).
+priority_by_code:
+  - {pattern: "AL-W105", priority: significant}   # funds to close not documented
+  - {pattern: "AL-W101", priority: significant}   # unsourced large deposit
+  - {pattern: "AL-W106", priority: significant}   # DTI above the review level
+  - {pattern: "DI-CHK-*", priority: attention}    # a printed figure that does not add up
+  - {pattern: "INC-W*", priority: attention}
+  - {pattern: "CR-W*", priority: attention}
+  - {pattern: "DI-W701", priority: attention}     # a page is missing
+  - {pattern: "CHECKLIST", priority: attention}   # a checklist item not satisfied
+  - {pattern: "HB-W*", priority: attention}
+  - {pattern: "*", priority: information}
+
+# Flags left out of the findings list: notes that a calculation could not run yet, and the
+# document reader's "no fields" note on types that are only classified.
+skip_codes: ["AL-I101", "DI-W604"]
+
+# Words the reports may not contain (rule 3), on top of app/llm/checks.py's list.
+extra_blocked_words: ["guaranteed", "guarantee", "you qualify", "approval"]
+
+# What the Researcher asks the guideline index for each kind of finding (by flag code, or
+# "checklist.<item id>"). The first pattern that matches wins; a finding with none is not
+# researched. Questions are topics, not the finding's figures, so retrieval finds the section.
+research_questions:
+  - {pattern: "AL-W101", question: "Which large deposits need a documented source?"}
+  - {pattern: "AL-W105", question: "How are deposit accounts and gift funds verified for the funds to close?"}
+  - {pattern: "AL-W106", question: "Which monthly debts count in the debt-to-income ratio, and what is the review level?"}
+  - {pattern: "INC-W101", question: "How is overtime and bonus income evaluated?"}
+  - {pattern: "DI-W701", question: "What happens if a statement page is missing?"}
+  - {pattern: "checklist.bank_statements_2_months", question: "What happens if a statement page is missing?"}
+  - {pattern: "checklist.pay_stubs_30_days", question: "How recent must a pay stub be?"}
+  - {pattern: "checklist.w2_two_years", question: "Which W-2s and employment documents are needed?"}
+  - {pattern: "checklist.tax_returns_two_years", question: "Which W-2s and employment documents are needed?"}
+  - {pattern: "checklist.credit_report_120_days", question: "How is the representative credit score chosen?"}
+  - {pattern: "CR-W*", question: "Which monthly debts count in the debt-to-income ratio, and what is the review level?"}
+
+# How many guideline questions the Researcher asks at once.
+researcher_concurrency: 4
