@@ -88,7 +88,7 @@ def test_the_contract_operations_are_served_at_their_paths(spec: dict[str, Any])
     assert len(wanted) == 2 and wanted <= served, wanted - served
 
 
-def test_the_new_endpoints_do_not_collide_with_anything_the_contract_names(
+def test_the_income_and_override_endpoints_are_in_the_contract(
     spec: dict[str, Any],
 ) -> None:
     contract_ids = {
@@ -103,7 +103,7 @@ def test_the_new_endpoints_do_not_collide_with_anything_the_contract_names(
         "reviewIncomeComponent",
         "overrideCompletenessItem",
     }
-    assert not ours & contract_ids  # not in the contract yet: Arindam adds them
+    assert ours <= contract_ids  # added to the contract on 2026-11-25
     served = {
         op["operationId"]
         for item in app.openapi()["paths"].values()
