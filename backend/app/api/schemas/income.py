@@ -226,4 +226,23 @@ def analysis_from_view(view: IncomeView, cfg: AnalysisConfig) -> IncomeAnalysisO
             for c in view.ordered_calculations
             if c.id not in component_calcs and (view.candidate is None or c.id != view.candidate.id)
         ],
+        explanations=(explained := explanations_from_flags(view.flags)),
+        explanations_note="" if explained else NOT_GENERATED,
     )
+
+
+def explanations_from_flags(flags: list[Any]) -> list[str]:
+    """``"INC-CHK-03: <text> (possible — to be confirmed)"`` for each explained flag.
+
+    A figure the code could not find in the inputs is marked, never hidden.
+    """
+    out: list[str] = []
+    for flag in flags:
+        found = (flag.evidence or {}).get("explanation")
+        if not isinstance(found, dict):
+            continue
+        line = f"{flag.code}: {found.get('text', '')} ({found.get('label', '')})"
+        if found.get("checks"):
+            line += " [" + ", ".join(str(c) for c in found["checks"]) + "]"
+        out.append(line)
+    return out

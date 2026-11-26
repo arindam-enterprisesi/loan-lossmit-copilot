@@ -23,6 +23,7 @@ from pathlib import Path
 from pydantic import BaseModel
 
 from app.llm.config import load_llm_config
+from app.llm.env import load_provider_env
 from app.llm.gateway import GatewayError, run
 from app.llm.hardship import read_hardship_letter
 from app.llm.income import explain_income_flags
@@ -167,12 +168,7 @@ async def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
-    try:
-        from dotenv import load_dotenv
-
-        load_dotenv(REPO_ROOT / ".env")
-    except ImportError:
-        pass
+    load_provider_env(REPO_ROOT / ".env")
 
     selected = providers if args.provider == "all" else [args.provider]
     checks = {

@@ -100,3 +100,58 @@ async def explain_income_flags(
             item_flags.append(DECISION_WORDING)
         checked.append(CheckedExplanation(item, item_flags, unverified, unknown_refs))
     return ExplainOutcome(checked, call, list(dict.fromkeys(unknown_codes)))
+
+
+@dataclass(frozen=True)
+class StoredFlag:
+    """A flag as the income analysis stored it: its code, message and working."""
+
+    code: str
+    message: str
+    working: str | None = None
+
+
+@dataclass(frozen=True)
+class StoredCalculation:
+    name: str
+    formula: str
+    working: str
+
+
+async def explain_stored_flags(
+    flags: Sequence[StoredFlag],
+    calculations: Sequence[StoredCalculation],
+    *,
+    provider: str | None = None,
+    gateway: Gateway | None = None,
+) -> dict[str, dict[str, object]]:
+    """Explanations for a stored income run, keyed by flag code, ready to store as JSON.
+
+    Each calculation becomes an evidence item (ref = its name, value = its working), so every
+    figure the model may repeat is one code computed. An explanation that uses decision wording
+    is dropped (rule 3); one with a figure not in the inputs is kept and marked.
+    """
+    if not flags:
+        return {}
+    evidence = [IncomeEvidence(c.name, c.formula, c.working) for c in calculations]
+    asked = [
+        IncomeFlag(f.code, f.message + (f" ({f.working})" if f.working else ""), []) for f in flags
+    ]
+    outcome = await explain_income_flags(asked, evidence, provider=provider, gateway=gateway)
+    stored: dict[str, dict[str, object]] = {}
+    for item in outcome.explanations:
+        if DECISION_WORDING in item.flags:
+            continue
+        e = item.explanation
+        stored[e.flag_code] = {
+            "text": e.explanation,
+            "label": e.label,
+            "evidence_refs": [r for r in e.evidence_refs if r not in item.unknown_refs],
+            "suggested_documents": list(e.suggested_documents),
+            "checks": list(item.flags),
+            "unverified_numbers": list(item.unverified_numbers),
+            "provider": outcome.call.provider,
+            "model": outcome.call.model,
+            "prompt_id": outcome.call.prompt_id,
+        }
+    return stored

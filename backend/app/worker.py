@@ -12,6 +12,7 @@ from typing import Any, ClassVar
 
 from arq.connections import RedisSettings
 
+from app.agents.jobs import run_agents_job
 from app.db.session import get_sessionmaker
 from app.services.asset_runs import run_asset_job
 from app.services.classification import get_classifier
@@ -120,6 +121,19 @@ async def run_recommendation_rules(ctx: dict[str, Any], job_id: str, user_id: st
     )
 
 
+async def run_agents(
+    ctx: dict[str, Any], job_id: str, user_id: str, kind: str, agent: str | None
+) -> None:
+    """Run the underwriting or LM agents (or one of them again) and write the next report."""
+    await run_agents_job(
+        ctx.get("session_factory") or get_sessionmaker(),
+        uuid.UUID(job_id),
+        uuid.UUID(user_id) if user_id else None,
+        "lm" if kind == "lm" else "underwriting",
+        agent,
+    )
+
+
 class WorkerSettings:
     functions: ClassVar[list[Any]] = [
         ping,
@@ -129,6 +143,7 @@ class WorkerSettings:
         run_hardship_reading,
         run_recommendation_rules,
         run_credit_analysis,
+        run_agents,
     ]
     on_startup = startup
     redis_settings = RedisSettings.from_dsn(get_settings().redis_url)

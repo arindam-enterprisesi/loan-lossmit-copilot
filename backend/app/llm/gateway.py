@@ -201,7 +201,10 @@ _default_gateway: Gateway | None = None
 
 def default_adapters() -> dict[str, ProviderAdapter]:
     # Adapters create their clients on first use, so a missing key for one
-    # provider never blocks the others.
+    # provider never blocks the others. Host-run scripts get their keys from .env.
+    from app.llm.env import load_provider_env
+
+    load_provider_env()
     from app.llm.adapters.anthropic import AnthropicAdapter, BedrockClaudeAdapter
     from app.llm.adapters.langchain import gemini_adapter, openai_adapter
 

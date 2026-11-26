@@ -3,8 +3,8 @@
 Reading needs a logged-in user and a case that user may see (otherwise 404). Starting the rules,
 overriding a condition and signing off are for the loss mitigation specialist only: the underwriter
 cannot see a Pillar 2 case (404) and the administrator, who maintains the rule set and makes no case
-decisions, gets 403. ``POST`` applies the rule set in code and calls no model; the agents that
-write the report come with D8 and fill ``report`` on the same run.
+decisions, gets 403. ``POST`` applies the rule set in code, then the agents (``app.agents.lm``)
+write the report on the same run; re-running one agent writes its next version.
 
 The contract has no entries for these yet; ``docs/contract-proposal-d4.md`` has the YAML.
 """
@@ -17,6 +17,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.agents.jobs import NothingToRerunError, start_agents
 from app.api.deps import CaseIdPath, case_not_found, get_current_user, require_roles
 from app.api.errors import ApiError
 from app.api.schemas.jobs import JobOut
@@ -29,7 +30,7 @@ from app.api.schemas.reports import (
     recommendation_from_view,
     sign_off_from_row,
 )
-from app.db.enums import ReportKind, Role, WaterfallStatus
+from app.db.enums import AgentName, ReportKind, Role, WaterfallStatus
 from app.db.session import get_session
 from app.services import cases as case_service
 from app.services import recommendation_runs, reports, review_conditions
@@ -68,6 +69,27 @@ async def run_lm_recommendation(
     await _visible(session, user, case_id)
     try:
         job = await recommendation_runs.start_recommendation(session, queue, user, case_id)
+    except UploadFailedError as exc:
+        raise ApiError(503, exc.kind, exc.message) from None
+    return RecommendationRunAccepted(job=JobOut.model_validate(job))
+
+
+@router.post(
+    "/latest/agents/{agent}/rerun",
+    status_code=202,
+    response_model=RecommendationRunAccepted,
+    operation_id="rerunLmAgent",
+    dependencies=[Reviewer],
+)
+async def rerun_lm_agent(
+    case_id: CaseIdPath, agent: AgentName, user: User, session: Session, queue: Queue
+) -> RecommendationRunAccepted:
+    """Run one agent again on the newest waterfall, from the others' stored outputs."""
+    await _visible(session, user, case_id)
+    try:
+        job = await start_agents(session, queue, user, case_id, "lm", agent)
+    except NothingToRerunError:
+        raise ApiError(404, "not_found", "No recommendation has been made for this case") from None
     except UploadFailedError as exc:
         raise ApiError(503, exc.kind, exc.message) from None
     return RecommendationRunAccepted(job=JobOut.model_validate(job))

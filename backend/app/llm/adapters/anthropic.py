@@ -91,6 +91,12 @@ class AnthropicAdapter:
             if "authentication" not in str(exc):
                 raise
             raise ProviderCallError(self.name, "no credentials configured") from exc
+        except Exception as exc:
+            # Bedrock signs requests with botocore, whose errors (no credentials, a profile that
+            # does not exist, a bad region) are not AnthropicError. Name the class, never the text.
+            if type(exc).__module__.split(".")[0] != "botocore":
+                raise
+            raise ProviderCallError(self.name, f"AWS: {type(exc).__name__}") from exc
 
         text = "".join(block.text for block in response.content if block.type == "text")
         usage = response.usage

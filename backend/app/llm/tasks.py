@@ -39,7 +39,9 @@ CLASSIFY_PAGES = 2
 
 # Every tag a prompt wraps untrusted text in. Text cannot close one of them early.
 _CLOSING_TAG_RE = re.compile(
-    r"</\s*(document|transactions|letter|application|flags|evidence)\s*>", re.IGNORECASE
+    r"</\s*(document|transactions|letter|application|flags|evidence|question|passages|"
+    r"case_facts|case|dossier|findings|guidance|fixes|waterfall|hardship|code_checks|draft)\s*>",
+    re.IGNORECASE,
 )
 
 
