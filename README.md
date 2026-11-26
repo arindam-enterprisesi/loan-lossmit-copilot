@@ -58,6 +58,33 @@ uv run python -m app.llm.smoke --provider all   # real calls on each provider wi
 databases. The golden tests (`backend/tests/golden`) check every worked example of the Feature Design
 to the cent and must stay green.
 
+## Model providers (the LLM steps)
+
+Every model call goes through the LLM Gateway (`backend/app/llm/gateway.py`): a named prompt
+(`backend/app/prompts/<name>@<version>.md`), a Pydantic output model, one retry on a schema failure,
+and a log line with IDs and token counts only. The provider and model per task are in
+`backend/config/llm.yaml`; switch a task's provider there, no code change.
+
+| Provider | `.env` | Model in `llm.yaml` | Checked |
+| --- | --- | --- | --- |
+| `anthropic` (Claude API, the default) | `ANTHROPIC_API_KEY` | `claude-opus-5-5` | 6/6 checks, `docs/provider-evaluation.md` |
+| `bedrock` (Claude on Amazon Bedrock) | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION` (leave `AWS_PROFILE` blank or set it) | `global.anthropic.claude-sonnet-4-6` (an inference profile your IAM user may invoke) | 6/6 checks |
+| `gemini`, `openai` | `GOOGLE_API_KEY`, `OPENAI_API_KEY` | see `llm.yaml` | not evaluated: no keys on this project |
+
+Scripts run on the host (`reset_demo`, smoke, evaluation) read the repo `.env` themselves
+(`app/llm/env.py`); inside docker compose it comes from `env_file`. Blank `AWS_*` values count as unset.
+
+```bash
+cd backend
+uv run python -m app.llm.smoke --provider anthropic     # smoke + classify + extract + label + hardship + explain
+uv run python -m app.llm.evaluate --provider anthropic bedrock --out ../docs/provider-evaluation.md
+uv run pytest -m live                                     # the live provider tests; each skips without a key
+```
+
+`PIPELINE_LLM=auto` (default) uses the model for reading documents, labelling transactions, income
+explanations and the agents; `PIPELINE_LLM=fake` uses the rule-based reader and skips every model call
+(the tests run that way).
+
 ## Synthetic data
 
 `data/synthetic/scenarios/daniel_reyes.json` and `angela_whitfield.json` hold every figure for the two demo borrowers (the Feature Design worked examples), and `data/synthetic/generate.py` renders their documents from those files only, so a number is the same everywhere it appears:
@@ -160,8 +187,52 @@ their own, and signs off; the loss mitigation specialist overrides conditions an
 sign-off records that a person reviewed a version of the report: "Records a review. Not a decision."
 The recommendation's sign-off needs a report on the newest evaluation (409 `no_report` otherwise).
 `GET .../audit` lists a case's events newest first (filters `action`, `entity_type`, paging with
-`before`); `GET /api/v1/guidelines/sources` and `/guidelines/passages/{id}` read the cited passages
-(a small seeded set until the retrieval loader exists).
+`before`); `GET /api/v1/guidelines/sources` and `/guidelines/passages/{id}` read the cited passages.
+
+## Guideline assistant (Feature 5)
+
+`data/sources/*.md` holds the sources: Fannie Mae and Freddie Mac sections on income, assets,
+liabilities and credit, a sample lender overlay, and 12 CFR 1024.41. **All are illustrative
+paraphrases written for the demo**, not the publishers' text (`data/sources/README.md` says how to
+load the real text). The Sample Investor A passages that Feature 8 cites are loaded with them.
+Retrieval is BM25 in code with a coverage threshold and direct lookup of a named section
+(`backend/config/rag.yaml`); with no passage above the threshold the answer is "no supporting
+passage found" and no model is called. The answer (`answer@1`) cites a passage in every sentence, and
+code removes any sentence whose citation, quotation or figure is not supported, or that uses decision
+wording. Regulation X answers carry "Not legal advice; confirm with your compliance team."
+
+```bash
+cd backend
+uv run python -m app.rag.ask "How is overtime income evaluated?"
+uv run python -m app.rag.ask --source-set regulation_x "The application is missing a document. What must the servicer do?"
+uv run python -m app.rag.evaluate            # 16 questions: retrieval hit rate and no-support accuracy
+uv run python -m app.rag.evaluate --answers  # also answers each one (provider calls)
+```
+
+`POST /api/v1/guidelines/ask` (`question`, `source_set` = `guidelines` | `regulation_x` | `all`,
+optional `case_id` to attach the case's facts) and `POST /guidelines/answers/{id}/feedback`; both are
+in the audit log.
+
+## Agents: underwriting copilot and LM recommendation (Features 6 and 8)
+
+`backend/app/agents`: code builds the dossier (every stored figure with its working, the open flags,
+the checklist gaps), the findings list and the snapshot; then the **Researcher** asks the guideline
+assistant about each kind of finding, the **Writer** drafts the narrative only, and the **Critic**
+runs code checks (every figure must equal a stored result, no decision wording, every ref resolves)
+and a reading check, and returns the draft once. Whatever still fails is removed and recorded in the
+report's `guardrail_results`. A failed agent leaves its section "not available"; the report still
+completes. Settings (review priority per flag code, research topics, blocked words) are in
+`backend/config/agents.yaml`.
+
+| Endpoint | Does |
+| --- | --- |
+| `POST /cases/{id}/underwriting-report` | starts the three agents in the worker (202 and a job) |
+| `POST /cases/{id}/underwriting-report/latest/agents/{researcher,writer,critic}/rerun` | runs one agent again (and the steps after it); writes the next report version |
+| `POST /cases/{id}/lm-recommendation` | applies the rules in code, then the agents write the report on the same run |
+| `POST /cases/{id}/lm-recommendation/latest/agents/{agent}/rerun` | as above, for the recommendation |
+
+Each workflow takes about a minute with Claude. With `PIPELINE_LLM=fake` the agents are not run and
+the seeded sample reports stay.
 
 ## API tests
 
@@ -190,10 +261,10 @@ pointed at.
 | `contracts/openapi.yaml` | API contract (source of truth for the frontend types) | Arindam |
 | `backend/app/llm` | LLM Gateway and provider adapters | Arindam |
 | `backend/app/prompts` | Versioned prompts (`name@version.md`) and output schemas | Arindam |
-| `backend/app/rag`, `backend/app/agents` | Retrieval and LangGraph agents | Arindam |
+| `backend/app/rag`, `backend/app/agents` | Guideline retrieval and answers; the three agents (plain asyncio) | Arindam |
 | `backend/app/api`, `services`, `db` | REST endpoints, calculations, rules, storage | Abhay |
 | `backend/config` | Checklists, methods, thresholds, `llm.yaml` | Abhay (`llm.yaml`: Arindam) |
-| `data/` | Synthetic scenarios and guideline sources | Abhay |
+| `data/` | Synthetic scenarios (Abhay) and guideline sources in `data/sources` (Arindam) | Abhay, Arindam |
 | `frontend/` | Next.js app | Amogh |
 | `docs/` | Feature Design, FSD, ADRs, demo scripts | All |
 

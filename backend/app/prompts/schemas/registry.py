@@ -2,8 +2,8 @@
 
 Each type has a one-paragraph description that the classify prompt shows the
 model, and the field schema extract@1 reads (``None`` for types that are only
-classified here: credit reports and hardship letters are analysed in Features 4
-and 7). Adding a type means adding it here. The type names must match
+classified here: hardship letters are read by hardship@1 in Feature 7).
+Adding a type means adding it here. The type names must match
 ``DocumentType`` in contracts/openapi.yaml; a test checks.
 """
 
@@ -84,7 +84,7 @@ REGISTRY: dict[DocumentType, DocumentTypeSpec] = {
             "A consumer credit report: personal identification, credit scores, a list of "
             "trade accounts with creditor, balance, payment and status history, inquiries and "
             "public records.",
-            None,
+            d.CreditReportFields,
         ),
         DocumentTypeSpec(
             DocumentType.MORTGAGE_ASSISTANCE_APPLICATION,

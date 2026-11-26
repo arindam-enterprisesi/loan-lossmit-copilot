@@ -1,6 +1,6 @@
 # LLM provider and model per task. Switch a task's provider here; no code change needed.
 # Read by app/llm/config.py. Every result records the provider and model it used.
-version: "2026-11-19.1"
+version: "2026-11-25.1"
 label: illustrative
 
 default_provider: anthropic
@@ -13,7 +13,7 @@ providers:
     options:
       effort: medium
   bedrock:              # Claude on Amazon Bedrock (bedrock-runtime, InvokeModel); region from AWS_REGION
-    model: anthropic.claude-opus-5-5   # confirm the exact model or inference-profile ID with the AWS admin
+    model: global.anthropic.claude-sonnet-4-6   # inference profile the project IAM user may invoke (checked 2026-11-24)
     temperature: null
     options:
       effort: medium
@@ -45,6 +45,22 @@ tasks:
     options:
       effort: medium
   income_explain:         # Feature Design 2.7 names Gemini; switch after the D9 provider evaluation
+    max_tokens: 4096
+    options:
+      effort: low
+  guideline_answer:       # answer@1 (Feature Design 5.5 names Gemini); checked in code afterwards
+    max_tokens: 4096
+    options:
+      effort: low
+  underwriting_writer:    # the underwriting copilot's Writer agent (Feature Design 6.5)
+    max_tokens: 8000
+    options:
+      effort: medium
+  lm_writer:              # the loss mitigation recommendation's Writer agent (Feature Design 8.5)
+    max_tokens: 6000
+    options:
+      effort: medium
+  critic:                 # the Critic agent's reading check, after the code checks (6.5, 8.5)
     max_tokens: 4096
     options:
       effort: low

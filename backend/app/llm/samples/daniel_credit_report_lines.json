@@ -1,0 +1,190 @@
+{
+ "source": "data/synthetic/scenarios/daniel_reyes.json -> credit_report_2026-10-12.pdf (rendered by data/synthetic/generate.py, read by app.services.ingestion.parse_pdf)",
+ "lines": [
+  {
+   "page": 1,
+   "line": 1,
+   "text": "SAMPLE MERGED CREDIT REPORT (simulated)"
+  },
+  {
+   "page": 1,
+   "line": 2,
+   "text": "Report date: 2026-10-12"
+  },
+  {
+   "page": 1,
+   "line": 3,
+   "text": "Consumer: Daniel Reyes SSN XXX-XX-4821"
+  },
+  {
+   "page": 1,
+   "line": 4,
+   "text": "Address: 418 Alder Street, Apt 3B, Columbus, OH 43215"
+  },
+  {
+   "page": 1,
+   "line": 5,
+   "text": "Alerts: none"
+  },
+  {
+   "page": 1,
+   "line": 6,
+   "text": "SCORES"
+  },
+  {
+   "page": 1,
+   "line": 7,
+   "text": "Bureau A score 712"
+  },
+  {
+   "page": 1,
+   "line": 8,
+   "text": "Bureau B score 698"
+  },
+  {
+   "page": 1,
+   "line": 9,
+   "text": "Bureau C score 705"
+  },
+  {
+   "page": 1,
+   "line": 10,
+   "text": "TRADELINES"
+  },
+  {
+   "page": 1,
+   "line": 11,
+   "text": "Northgate Card | revolving | individual | opened 2019-06-14 | status open"
+  },
+  {
+   "page": 1,
+   "line": 12,
+   "text": "Balance 2,940.00 Limit 8,000.00 Monthly payment 88.00 Past due 0.00"
+  },
+  {
+   "page": 1,
+   "line": 13,
+   "text": "Late payments: 30-day 1, 60-day 0, 90-day 0 Most recent late: 2025-03-05"
+  },
+  {
+   "page": 1,
+   "line": 14,
+   "text": "Remarks: none"
+  },
+  {
+   "page": 1,
+   "line": 15,
+   "text": "Cardinal Rewards Visa | revolving | individual | opened 2021-02-02 | status open"
+  },
+  {
+   "page": 1,
+   "line": 16,
+   "text": "Balance 1,240.00 Limit 6,000.00 Monthly payment 40.00 Past due 0.00"
+  },
+  {
+   "page": 1,
+   "line": 17,
+   "text": "Late payments: 30-day 0, 60-day 0, 90-day 0 Most recent late: none"
+  },
+  {
+   "page": 1,
+   "line": 18,
+   "text": "Remarks: none"
+  },
+  {
+   "page": 1,
+   "line": 19,
+   "text": "Harbor Retail Card | revolving | individual | opened 2026-09-08 | status open"
+  },
+  {
+   "page": 1,
+   "line": 20,
+   "text": "Balance 300.00 Limit 2,000.00 Monthly payment 35.00 Past due 0.00"
+  },
+  {
+   "page": 1,
+   "line": 21,
+   "text": "Late payments: 30-day 0, 60-day 0, 90-day 0 Most recent late: none"
+  },
+  {
+   "page": 1,
+   "line": 22,
+   "text": "Remarks: new account"
+  },
+  {
+   "page": 1,
+   "line": 23,
+   "text": "Lakeshore Auto Finance | installment | individual | opened 2023-04-11 | status open"
+  },
+  {
+   "page": 1,
+   "line": 24,
+   "text": "Balance 14,860.00 Limit n/a Monthly payment 420.00 Past due 0.00"
+  },
+  {
+   "page": 1,
+   "line": 25,
+   "text": "Late payments: 30-day 0, 60-day 0, 90-day 0 Most recent late: none"
+  },
+  {
+   "page": 1,
+   "line": 26,
+   "text": "Remarks: auto loan"
+  },
+  {
+   "page": 1,
+   "line": 27,
+   "text": "Brightpath Student Loan Servicing | installment | individual | opened 2017-09-01 | status open"
+  },
+  {
+   "page": 1,
+   "line": 28,
+   "text": "Balance 18,430.00 Limit n/a Monthly payment 110.00 Past due 0.00"
+  },
+  {
+   "page": 1,
+   "line": 29,
+   "text": "Late payments: 30-day 0, 60-day 0, 90-day 0 Most recent late: none"
+  },
+  {
+   "page": 1,
+   "line": 30,
+   "text": "Remarks: student loan"
+  },
+  {
+   "page": 1,
+   "line": 31,
+   "text": "INQUIRIES"
+  },
+  {
+   "page": 1,
+   "line": 32,
+   "text": "Harbor Retail 2026-09-08"
+  },
+  {
+   "page": 1,
+   "line": 33,
+   "text": "Orion Mortgage 2026-07-08"
+  },
+  {
+   "page": 1,
+   "line": 34,
+   "text": "Collections: none"
+  },
+  {
+   "page": 1,
+   "line": 35,
+   "text": "Public records: none"
+  },
+  {
+   "page": 1,
+   "line": 36,
+   "text": "Page 1 of 1"
+  },
+  {
+   "page": 1,
+   "line": 37,
+   "text": "SYNTHETIC SAMPLE - invented data, not a real document"
+  }
+ ]
+}

@@ -436,13 +436,1227 @@ paths:
         "404":
           $ref: "#/components/responses/NotFound"
 
-  # TODO(F2 Income, D4):       POST /cases/{case_id}/income/analysis, GET .../latest, PATCH components
-  # TODO(F7 Hardship, D4-D6):  GET /cases/{case_id}/hardship/profile, budget
-  # TODO(F3 Assets, D6):       POST /cases/{case_id}/assets-liabilities/analysis
-  # TODO(F5 Guidelines, D6):   POST /guidelines/ask, GET /guidelines/passages/{id}, GET|POST /guidelines/sources
-  # TODO(F6 Underwriting, D7): agent runs, report, conditions, sign-off
-  # TODO(F8 Loss mitigation, D8): waterfall, lender view, agent runs, sign-off
-  # TODO(HITL/Audit, D8):      GET /cases/{case_id}/audit
+  # ---------- Generated from the served API (FastAPI) on 2026-11-25 ----------
+  # Income, assets, credit, hardship and budget, the underwriting report, the LM
+  # recommendation, guidelines, audit and jobs. Regenerate with the script in the PR.
+  /cases/{case_id}/asset-liability:
+    post:
+      tags:
+      - assets
+      summary: Run Asset Liability
+      description: Queue an analysis of the case's statements. Poll the job, then read ``/latest``.
+      operationId: runAssetLiabilityAnalysis
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: case_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Case Id
+      responses:
+        '202':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssetRunAccepted'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /cases/{case_id}/asset-liability/latest:
+    get:
+      tags:
+      - assets
+      summary: Get Latest Asset Liability
+      description: 'The newest analysis: the figures with their working, the debts, the labelled lines,
+        flags.'
+      operationId: getLatestAssetLiabilityAnalysis
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: case_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Case Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssetAnalysisOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /cases/{case_id}/asset-liability/latest/obligations/{obligation_id}:
+    patch:
+      tags:
+      - assets
+      summary: Review Obligation
+      description: Include a debt in the DTI or leave it out, with a reason. The ratios recalculate at once.
+      operationId: reviewObligation
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: obligation_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Obligation Id
+      - name: case_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Case Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ObligationReviewIn'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssetAnalysisOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /cases/{case_id}/asset-liability/latest/transactions/{transaction_id}:
+    patch:
+      tags:
+      - assets
+      summary: Review Transaction
+      description: Give a line another category, or mark a deposit as sourced, with a reason.
+      operationId: reviewTransaction
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: transaction_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Transaction Id
+      - name: case_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Case Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TransactionReviewIn'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssetAnalysisOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /cases/{case_id}/audit:
+    get:
+      tags:
+      - audit
+      summary: List Case Audit
+      description: A case's events, newest first. Filter by action or entity_type; page by before.
+      operationId: listCaseAudit
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: case_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Case Id
+      - name: action
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 100
+          - type: 'null'
+          description: Exact action name
+          title: Action
+        description: Exact action name
+      - name: entity_type
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 64
+          - type: 'null'
+          title: Entity Type
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 200
+          minimum: 1
+          default: 50
+          title: Limit
+      - name: before
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: integer
+            minimum: 1
+          - type: 'null'
+          description: Id of the last event already seen
+          title: Before
+        description: Id of the last event already seen
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditPage'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /cases/{case_id}/completeness/latest/items/{item_id}:
+    patch:
+      tags:
+      - completeness
+      summary: Override Completeness Item
+      description: Override an item with a written reason (it counts as satisfied), or clear the override.
+      operationId: overrideCompletenessItem
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: item_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Item Id
+      - name: case_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Case Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ItemOverrideIn'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CompletenessResultOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /cases/{case_id}/credit-analysis:
+    post:
+      tags:
+      - credit
+      summary: Run Credit Analysis
+      description: Queue an analysis of the case's credit report. Poll the job, then read ``/latest``.
+      operationId: runCreditAnalysis
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: case_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Case Id
+      responses:
+        '202':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreditRunAccepted'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /cases/{case_id}/credit-analysis/latest:
+    get:
+      tags:
+      - credit
+      summary: Get Latest Credit Analysis
+      description: 'Scores and the representative score with its method, tradelines with utilization and
+        late
+
+        payments, inquiries with their matches, derogatory items, alerts first, flags, the template
+
+        summary, and every figure with its working.'
+      operationId: getLatestCreditAnalysis
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: case_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Case Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreditAnalysisOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /cases/{case_id}/documents/{document_id}/pages/{page}:
+    get:
+      tags:
+      - documents
+      summary: Get Page Image
+      description: A 5-minute link to the stored image of one page, and the image's width and height.
+      operationId: getPageImage
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: document_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Document Id
+      - name: page
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Page
+      - name: case_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Case Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PageImageOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /cases/{case_id}/hardship-assessment:
+    post:
+      tags:
+      - hardship
+      summary: Run Hardship Reading
+      description: 'Queue a reading of the case''s hardship letter. Poll the job, then read ``/latest``.
+        The
+
+        earlier reading, such as the seeded sample, stays as history.'
+      operationId: runHardshipReading
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: case_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Case Id
+      responses:
+        '202':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HardshipRunAccepted'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /cases/{case_id}/hardship-assessment/latest:
+    get:
+      tags:
+      - hardship
+      summary: Get Latest Hardship Assessment
+      description: 'The newest profile with each item''s quote, lines and check, the specialist''s confirmations,
+
+        and the budget with its measures, consistency checks and flags.'
+      operationId: getLatestHardshipAssessment
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: case_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Case Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HardshipAssessmentOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /cases/{case_id}/hardship-assessment/latest/budget/{line_id}:
+    patch:
+      tags:
+      - hardship
+      summary: Adjust Budget Line
+      description: 'Count a different observed amount for a budget line (for example, part of it was one-off),
+
+        with a reason, or clear an earlier adjustment. The measures update at once, with no model.'
+      operationId: adjustBudgetLine
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: line_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Line Id
+      - name: case_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Case Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BudgetAdjustIn'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HardshipAssessmentOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /cases/{case_id}/hardship-assessment/latest/confirmations:
+    put:
+      tags:
+      - hardship
+      summary: Confirm Hardship Items
+      description: 'Confirm the reading''s reason, onset, duration or intent, or correct it with a reason.
+        The
+
+        value as read stays beside the confirmation (labelled "reviewer-confirmed").'
+      operationId: confirmHardshipItems
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: case_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Case Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConfirmationsIn'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HardshipAssessmentOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /cases/{case_id}/income-analysis:
+    post:
+      tags:
+      - income
+      summary: Run Income Analysis
+      description: Queue an analysis of the case's documents. Poll the job, then read ``/latest``.
+      operationId: runIncomeAnalysis
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: case_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Case Id
+      responses:
+        '202':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IncomeRunAccepted'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /cases/{case_id}/income-analysis/latest:
+    get:
+      tags:
+      - income
+      summary: Get Latest Income Analysis
+      description: 'The newest analysis: components with current, year-to-date and monthly figures, flags.'
+      operationId: getLatestIncomeAnalysis
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: case_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Case Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IncomeAnalysisOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /cases/{case_id}/income-analysis/latest/components/{component_id}:
+    patch:
+      tags:
+      - income
+      summary: Review Income Component
+      description: Include or exclude a component, with a reason. The candidate is recalculated at once.
+      operationId: reviewIncomeComponent
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: component_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Component Id
+      - name: case_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Case Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ComponentReviewIn'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IncomeAnalysisOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /cases/{case_id}/lm-recommendation:
+    post:
+      tags:
+      - lm-recommendation
+      summary: Run Lm Recommendation
+      description: 'Apply the investor''s rule set to the case, in code: each option''s conditions, the
+        waterfall
+
+        and the lender view. Poll the job, then read ``/latest``. A judgement nobody has confirmed
+
+        (hardship duration, intent) is reported as needing confirmation, never assumed. Earlier
+
+        overrides carry to the new result with the system''s own status beside them.'
+      operationId: runLmRecommendation
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: case_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Case Id
+      responses:
+        '202':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecommendationRunAccepted'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /cases/{case_id}/lm-recommendation/latest:
+    get:
+      tags:
+      - lm-recommendation
+      summary: Get Latest Lm Recommendation
+      description: 'The waterfall (each option with its status and conditions), the lender view with its
+
+        working, the rule set with its banner, any overrides, and the report once there is one.'
+      operationId: getLatestLmRecommendation
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: case_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Case Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LmRecommendationOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /cases/{case_id}/lm-recommendation/latest/agents/{agent}/rerun:
+    post:
+      tags:
+      - lm-recommendation
+      summary: Rerun Lm Agent
+      description: Run one agent again on the newest waterfall, from the others' stored outputs.
+      operationId: rerunLmAgent
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: agent
+        in: path
+        required: true
+        schema:
+          $ref: '#/components/schemas/AgentName'
+      - name: case_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Case Id
+      responses:
+        '202':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecommendationRunAccepted'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /cases/{case_id}/lm-recommendation/latest/conditions/{condition_id}/override:
+    put:
+      tags:
+      - lm-recommendation
+      summary: Override Condition
+      description: 'Override a condition, with a reason. The statuses recompute at once; the rules'' own
+        status
+
+        stays beside the override. Choosing the status the rules found removes it.'
+      operationId: overrideLmCondition
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: condition_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Condition Id
+      - name: case_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Case Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OverrideIn'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LmRecommendationOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /cases/{case_id}/lm-recommendation/latest/sign-off:
+    post:
+      tags:
+      - lm-recommendation
+      summary: Sign Off
+      description: Records a review. Not a decision.
+      operationId: signOffLmRecommendation
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: case_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Case Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SignOffIn'
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SignOffResult'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /cases/{case_id}/loan-scenario:
+    put:
+      tags:
+      - assets
+      summary: Put Loan Scenario
+      description: Enter the sample loan by hand, or replace it (the old values go in the audit event).
+      operationId: putLoanScenario
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: case_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Case Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoanScenarioIn'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoanScenarioOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    get:
+      tags:
+      - assets
+      summary: Get Loan Scenario
+      operationId: getLoanScenario
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: case_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Case Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoanScenarioOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /cases/{case_id}/underwriting-report:
+    post:
+      tags:
+      - underwriting
+      summary: Run Underwriting Report
+      description: 'Start the Researcher, Writer and Critic on the case''s stored results. Poll the job,
+        then
+
+        read ``/latest``. The report is a draft for the underwriter''s review.'
+      operationId: runUnderwritingReport
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: case_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Case Id
+      responses:
+        '202':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecommendationRunAccepted'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /cases/{case_id}/underwriting-report/latest:
+    get:
+      tags:
+      - underwriting
+      summary: Get Latest Underwriting Report
+      description: 'The newest report: findings, suggested conditions with the review so far, the agents''
+        run
+
+        log and the sign-off record.'
+      operationId: getLatestUnderwritingReport
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: case_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Case Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnderwritingReportOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /cases/{case_id}/underwriting-report/latest/agents/{agent}/rerun:
+    post:
+      tags:
+      - underwriting
+      summary: Rerun Underwriting Agent
+      description: Run one agent again (and the steps after it) from the others' stored outputs.
+      operationId: rerunUnderwritingAgent
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: agent
+        in: path
+        required: true
+        schema:
+          $ref: '#/components/schemas/AgentName'
+      - name: case_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Case Id
+      responses:
+        '202':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecommendationRunAccepted'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /cases/{case_id}/underwriting-report/latest/conditions:
+    post:
+      tags:
+      - underwriting
+      summary: Add Condition
+      description: Add a condition of your own to the report.
+      operationId: addUnderwritingCondition
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: case_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Case Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConditionAddIn'
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnderwritingReportOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /cases/{case_id}/underwriting-report/latest/conditions/{condition_id}:
+    patch:
+      tags:
+      - underwriting
+      summary: Review Condition
+      description: Accept, edit or reject a suggested condition. The agents' text is kept beside an edit.
+      operationId: reviewUnderwritingCondition
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: condition_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Condition Id
+      - name: case_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Case Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConditionDecisionIn'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnderwritingReportOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /cases/{case_id}/underwriting-report/latest/sign-off:
+    post:
+      tags:
+      - underwriting
+      summary: Sign Off
+      description: Records a review. Not a decision.
+      operationId: signOffUnderwritingReport
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: case_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Case Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SignOffIn'
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SignOffResult'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /guidelines/answers/{answer_id}/feedback:
+    post:
+      tags:
+      - guidelines
+      summary: Send Feedback
+      description: Helpful, not helpful or wrongly cited, with an optional note. Recorded in the audit log.
+      operationId: sendGuidelineFeedback
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: answer_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Answer Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FeedbackIn'
+      responses:
+        '204':
+          description: Successful Response
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /guidelines/ask:
+    post:
+      tags:
+      - guidelines
+      summary: Ask Guideline
+      description: A cited answer from the loaded sources, or "no supporting passage found".
+      operationId: askGuideline
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AskIn'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GuidelineAnswerOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+      security:
+      - bearerAuth: []
+  /guidelines/passages/{passage_id}:
+    get:
+      tags:
+      - guidelines
+      summary: Get Passage
+      description: One passage, by the ID a finding or condition cites.
+      operationId: getGuidelinePassage
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: passage_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Passage Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PassageOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /guidelines/sources:
+    get:
+      tags:
+      - guidelines
+      summary: List Sources
+      operationId: listGuidelineSources
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SourceList'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+      security:
+      - bearerAuth: []
 
 components:
   securitySchemes:
@@ -946,3 +2160,3115 @@ components:
         run_at:
           type: string
           format: date-time
+
+    # ---------- Generated from the served API (FastAPI) on 2026-11-25 ----------
+    AgentName:
+      type: string
+      enum:
+      - researcher
+      - writer
+      - critic
+      title: AgentName
+    AgentRunOut:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        agent:
+          $ref: '#/components/schemas/AgentName'
+        attempt:
+          type: integer
+          title: Attempt
+        status:
+          $ref: '#/components/schemas/AgentRunStatus'
+        provider:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Provider
+        model:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Model
+        prompt_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Prompt Id
+        output:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+          title: Output
+        error:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Error
+        started_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Started At
+        finished_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Finished At
+      type: object
+      required:
+      - id
+      - agent
+      - attempt
+      - status
+      - provider
+      - model
+      - prompt_id
+      - output
+      - error
+      - started_at
+      - finished_at
+      title: AgentRunOut
+    AgentRunStatus:
+      type: string
+      enum:
+      - queued
+      - running
+      - succeeded
+      - failed
+      title: AgentRunStatus
+    AnalysisStatus:
+      type: string
+      enum:
+      - queued
+      - running
+      - succeeded
+      - failed
+      title: AnalysisStatus
+    AnswerCitationOut:
+      properties:
+        marker:
+          type: integer
+          title: Marker
+        passage_id:
+          type: string
+          title: Passage Id
+      type: object
+      required:
+      - marker
+      - passage_id
+      title: AnswerCitationOut
+    AnswerPassageOut:
+      properties:
+        id:
+          type: string
+          title: Id
+        source_id:
+          type: string
+          title: Source Id
+        source_title:
+          type: string
+          title: Source Title
+        heading:
+          type: string
+          title: Heading
+        text:
+          type: string
+          title: Text
+        label:
+          type: string
+          title: Label
+        page:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Page
+        version:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Version
+        notice:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Notice
+      type: object
+      required:
+      - id
+      - source_id
+      - source_title
+      - heading
+      - text
+      - label
+      - page
+      - version
+      - notice
+      title: AnswerPassageOut
+    AnswerSentenceOut:
+      properties:
+        text:
+          type: string
+          title: Text
+        citations:
+          items:
+            type: integer
+          type: array
+          title: Citations
+      type: object
+      required:
+      - text
+      - citations
+      title: AnswerSentenceOut
+    AskIn:
+      properties:
+        question:
+          type: string
+          maxLength: 1000
+          minLength: 3
+          title: Question
+        source_set:
+          type: string
+          enum:
+          - guidelines
+          - regulation_x
+          - all
+          title: Source Set
+          default: all
+        case_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Case Id
+      additionalProperties: false
+      type: object
+      required:
+      - question
+      title: AskIn
+    AssetAnalysisOut:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        case_id:
+          type: string
+          format: uuid
+          title: Case Id
+        status:
+          $ref: '#/components/schemas/AnalysisStatus'
+        started_at:
+          type: string
+          format: date-time
+          title: Started At
+        finished_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Finished At
+        config_versions:
+          additionalProperties: true
+          type: object
+          title: Config Versions
+        note:
+          type: string
+          title: Note
+          default: Candidate figures for the underwriter to review. They are not a decision.
+        documented_assets:
+          anyOf:
+          - $ref: '#/components/schemas/app__api__schemas__assets__CalcOut'
+          - type: 'null'
+        funds_to_close:
+          anyOf:
+          - $ref: '#/components/schemas/app__api__schemas__assets__CalcOut'
+          - type: 'null'
+        funds_shortfall:
+          anyOf:
+          - $ref: '#/components/schemas/app__api__schemas__assets__CalcOut'
+          - type: 'null'
+        monthly_obligations:
+          anyOf:
+          - $ref: '#/components/schemas/app__api__schemas__assets__CalcOut'
+          - type: 'null'
+        front_end_ratio:
+          anyOf:
+          - $ref: '#/components/schemas/app__api__schemas__assets__CalcOut'
+          - type: 'null'
+        dti:
+          anyOf:
+          - $ref: '#/components/schemas/app__api__schemas__assets__CalcOut'
+          - type: 'null'
+        ltv:
+          anyOf:
+          - $ref: '#/components/schemas/app__api__schemas__assets__CalcOut'
+          - type: 'null'
+        calculations:
+          items:
+            $ref: '#/components/schemas/app__api__schemas__assets__CalcOut'
+          type: array
+          title: Calculations
+        obligations:
+          items:
+            $ref: '#/components/schemas/ObligationOut'
+          type: array
+          title: Obligations
+        transactions:
+          items:
+            $ref: '#/components/schemas/TransactionOut'
+          type: array
+          title: Transactions
+        flags:
+          items:
+            $ref: '#/components/schemas/AssetFlagOut'
+          type: array
+          title: Flags
+      type: object
+      required:
+      - id
+      - case_id
+      - status
+      - started_at
+      - finished_at
+      - config_versions
+      - documented_assets
+      - funds_to_close
+      - funds_shortfall
+      - monthly_obligations
+      - front_end_ratio
+      - dti
+      - ltv
+      - calculations
+      - obligations
+      - transactions
+      - flags
+      title: AssetAnalysisOut
+    AssetFlagOut:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        code:
+          type: string
+          title: Code
+        severity:
+          type: string
+          title: Severity
+        message:
+          type: string
+          title: Message
+        status:
+          type: string
+          title: Status
+        working:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Working
+        refs:
+          items:
+            $ref: '#/components/schemas/app__api__schemas__assets__RefOut'
+          type: array
+          title: Refs
+      type: object
+      required:
+      - id
+      - code
+      - severity
+      - message
+      - status
+      - working
+      - refs
+      title: AssetFlagOut
+    AssetRunAccepted:
+      properties:
+        job:
+          $ref: '#/components/schemas/JobOut'
+        analysis_id:
+          type: string
+          format: uuid
+          title: Analysis Id
+      type: object
+      required:
+      - job
+      - analysis_id
+      title: AssetRunAccepted
+    AuditEventOut:
+      properties:
+        id:
+          type: integer
+          title: Id
+        at:
+          type: string
+          format: date-time
+          title: At
+        actor_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Actor Id
+        actor_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Actor Name
+        role:
+          type: string
+          title: Role
+        action:
+          type: string
+          title: Action
+        entity_type:
+          type: string
+          title: Entity Type
+        entity_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Entity Id
+        before:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+          title: Before
+        after:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+          title: After
+        reason:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Reason
+      type: object
+      required:
+      - id
+      - at
+      - actor_id
+      - actor_name
+      - role
+      - action
+      - entity_type
+      - entity_id
+      - before
+      - after
+      - reason
+      title: AuditEventOut
+    AuditPage:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/AuditEventOut'
+          type: array
+          title: Items
+        next_before:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Next Before
+      type: object
+      required:
+      - items
+      - next_before
+      title: AuditPage
+      description: Newest first. Pass ``next_before`` as ``before`` to read the next page; null at the end.
+    BudgetAdjustIn:
+      properties:
+        adjusted_amount:
+          anyOf:
+          - type: number
+            minimum: 0.0
+          - type: string
+          - type: 'null'
+          title: Adjusted Amount
+        reason:
+          type: string
+          maxLength: 500
+          title: Reason
+      additionalProperties: false
+      type: object
+      required:
+      - reason
+      title: BudgetAdjustIn
+      description: 'Count a different observed amount for a line (for example, part of it was one-off), with
+        a
+
+        reason. ``adjusted_amount: null`` clears an adjustment. The reason is required either way.'
+    BudgetLineOut:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        category:
+          type: string
+          title: Category
+        stated:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Stated
+        observed:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Observed
+        observed_month:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Observed Month
+        adjusted:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Adjusted
+        adjustment_reason:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Adjustment Reason
+        effective_observed:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Effective Observed
+        difference:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Difference
+        flagged:
+          type: boolean
+          title: Flagged
+        change:
+          anyOf:
+          - $ref: '#/components/schemas/ChangeOut'
+          - type: 'null'
+        stated_calc:
+          anyOf:
+          - $ref: '#/components/schemas/app__api__schemas__assets__CalcOut'
+          - type: 'null'
+        observed_calc:
+          anyOf:
+          - $ref: '#/components/schemas/app__api__schemas__assets__CalcOut'
+          - type: 'null'
+      type: object
+      required:
+      - id
+      - category
+      - stated
+      - observed
+      - observed_month
+      - adjusted
+      - adjustment_reason
+      - effective_observed
+      - difference
+      - flagged
+      - change
+      - stated_calc
+      - observed_calc
+      title: BudgetLineOut
+    CategorySource:
+      type: string
+      enum:
+      - ai
+      - user
+      title: CategorySource
+      description: 'Who decided ``transactions.category``: the labelling model or a person.'
+    ChangeOut:
+      properties:
+        reason:
+          type: string
+          title: Reason
+        by:
+          type: string
+          format: uuid
+          title: By
+        at:
+          type: string
+          format: date-time
+          title: At
+      type: object
+      required:
+      - reason
+      - by
+      - at
+      title: ChangeOut
+      description: A person's change to what the system decided. The system's own answer stays beside it.
+    CheckOut:
+      properties:
+        name:
+          type: string
+          title: Name
+        agrees:
+          type: boolean
+          title: Agrees
+        working:
+          type: string
+          title: Working
+        values:
+          additionalProperties:
+            type: string
+          type: object
+          title: Values
+      type: object
+      required:
+      - name
+      - agrees
+      - working
+      - values
+      title: CheckOut
+      description: A consistency check shown with both values (Feature Design 7.2 step 2).
+    ComparisonOut:
+      properties:
+        topic:
+          type: string
+          title: Topic
+        markers:
+          items:
+            type: integer
+          type: array
+          title: Markers
+      type: object
+      required:
+      - topic
+      - markers
+      title: ComparisonOut
+    CompletenessItemOut:
+      properties:
+        item_id:
+          type: string
+          title: Item Id
+        label:
+          type: string
+          title: Label
+        status:
+          type: string
+          enum:
+          - satisfied
+          - partial
+          - missing
+          - overridden
+          title: Status
+        reason:
+          type: string
+          title: Reason
+        document_ids:
+          items:
+            type: string
+            format: uuid
+          type: array
+          title: Document Ids
+        override_reason:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Override Reason
+      type: object
+      required:
+      - item_id
+      - label
+      - status
+      - reason
+      - document_ids
+      title: CompletenessItemOut
+    CompletenessResultOut:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        case_id:
+          type: string
+          format: uuid
+          title: Case Id
+        checklist_id:
+          type: string
+          title: Checklist Id
+        checklist_version:
+          type: string
+          title: Checklist Version
+        checklist_label:
+          type: string
+          enum:
+          - illustrative
+          - authoritative
+          title: Checklist Label
+        overall_status:
+          type: string
+          enum:
+          - complete
+          - incomplete
+          title: Overall Status
+        items:
+          items:
+            $ref: '#/components/schemas/CompletenessItemOut'
+          type: array
+          title: Items
+        outstanding:
+          items:
+            type: string
+          type: array
+          title: Outstanding
+        run_at:
+          type: string
+          format: date-time
+          title: Run At
+      type: object
+      required:
+      - id
+      - case_id
+      - checklist_id
+      - checklist_version
+      - checklist_label
+      - overall_status
+      - items
+      - outstanding
+      - run_at
+      title: CompletenessResultOut
+    ComponentOut:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        borrower:
+          type: string
+          title: Borrower
+        employer:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Employer
+        component:
+          $ref: '#/components/schemas/IncomeComponentKind'
+        current_period:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Current Period
+        ytd:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Ytd
+        monthly:
+          type: string
+          title: Monthly
+        included:
+          type: boolean
+          title: Included
+        exclusion_reason:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Exclusion Reason
+        system_included:
+          type: boolean
+          title: System Included
+        system_exclusion_reason:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: System Exclusion Reason
+        override:
+          anyOf:
+          - $ref: '#/components/schemas/app__api__schemas__income__OverrideOut'
+          - type: 'null'
+        calculation:
+          anyOf:
+          - $ref: '#/components/schemas/app__api__schemas__income__CalcOut'
+          - type: 'null'
+      type: object
+      required:
+      - id
+      - borrower
+      - employer
+      - component
+      - current_period
+      - ytd
+      - monthly
+      - included
+      - exclusion_reason
+      - system_included
+      - system_exclusion_reason
+      - override
+      - calculation
+      title: ComponentOut
+    ComponentReviewIn:
+      properties:
+        included:
+          type: boolean
+          title: Included
+        reason:
+          type: string
+          maxLength: 500
+          title: Reason
+      additionalProperties: false
+      type: object
+      required:
+      - included
+      - reason
+      title: ComponentReviewIn
+      description: Include or exclude a component. The reason is required either way (Feature Design 2.2).
+    ConditionAddIn:
+      properties:
+        text:
+          type: string
+          maxLength: 2000
+          minLength: 1
+          title: Text
+        priority:
+          $ref: '#/components/schemas/ReviewPriority'
+          default: attention
+      additionalProperties: false
+      type: object
+      required:
+      - text
+      title: ConditionAddIn
+    ConditionDecision:
+      type: string
+      enum:
+      - pending
+      - accepted
+      - edited
+      - rejected
+      title: ConditionDecision
+      description: What the reviewer did with a suggested condition. Recording it is not a loan decision.
+    ConditionDecisionIn:
+      properties:
+        decision:
+          type: string
+          enum:
+          - accepted
+          - edited
+          - rejected
+          title: Decision
+        edited_text:
+          anyOf:
+          - type: string
+            maxLength: 2000
+          - type: 'null'
+          title: Edited Text
+        reason:
+          anyOf:
+          - type: string
+            maxLength: 500
+          - type: 'null'
+          title: Reason
+      additionalProperties: false
+      type: object
+      required:
+      - decision
+      title: ConditionDecisionIn
+      description: 'Accept, edit or reject a suggested condition. An edit needs the new text and a reason;
+        a
+
+        rejection needs a reason.'
+    ConditionOut:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        position:
+          type: integer
+          title: Position
+        text:
+          type: string
+          title: Text
+        priority:
+          $ref: '#/components/schemas/ReviewPriority'
+        source:
+          $ref: '#/components/schemas/ConditionSource'
+        decision:
+          $ref: '#/components/schemas/ConditionDecision'
+        edited_text:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Edited Text
+        current_text:
+          type: string
+          title: Current Text
+        reason:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Reason
+        decided_by:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Decided By
+        decided_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Decided At
+      type: object
+      required:
+      - id
+      - position
+      - text
+      - priority
+      - source
+      - decision
+      - edited_text
+      - current_text
+      - reason
+      - decided_by
+      - decided_at
+      title: ConditionOut
+    ConditionSource:
+      type: string
+      enum:
+      - agent
+      - user
+      title: ConditionSource
+    ConfirmationOut:
+      properties:
+        status:
+          type: string
+          enum:
+          - confirmed
+          - corrected
+          title: Status
+        value:
+          type: string
+          title: Value
+        original:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Original
+        reason:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Reason
+        by:
+          type: string
+          format: uuid
+          title: By
+        at:
+          type: string
+          format: date-time
+          title: At
+        label:
+          type: string
+          title: Label
+      type: object
+      required:
+      - status
+      - value
+      - original
+      - reason
+      - by
+      - at
+      - label
+      title: ConfirmationOut
+      description: A specialist's confirmation or correction of an item. The item itself is the reading.
+    ConfirmationsIn:
+      properties:
+        primary_reason:
+          anyOf:
+          - $ref: '#/components/schemas/ItemIn'
+          - type: 'null'
+        onset:
+          anyOf:
+          - $ref: '#/components/schemas/ItemIn'
+          - type: 'null'
+        duration:
+          anyOf:
+          - $ref: '#/components/schemas/ItemIn'
+          - type: 'null'
+        intent:
+          anyOf:
+          - $ref: '#/components/schemas/ItemIn'
+          - type: 'null'
+      additionalProperties: false
+      type: object
+      title: ConfirmationsIn
+      description: Confirm or correct the judgements the investor rules rely on. Name each item you mean.
+    CreditAnalysisOut:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        case_id:
+          type: string
+          format: uuid
+          title: Case Id
+        status:
+          $ref: '#/components/schemas/AnalysisStatus'
+        started_at:
+          type: string
+          format: date-time
+          title: Started At
+        finished_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Finished At
+        config_versions:
+          additionalProperties: true
+          type: object
+          title: Config Versions
+        tag:
+          type: string
+          title: Tag
+          default: Sample credit report (simulated). No credit bureau was contacted.
+        note:
+          type: string
+          title: Note
+          default: Says what the report shows and flags it for a person to look at. It makes no credit decision.
+        alerts:
+          items:
+            $ref: '#/components/schemas/AssetFlagOut'
+          type: array
+          title: Alerts
+        scores:
+          items:
+            $ref: '#/components/schemas/ScoreOut'
+          type: array
+          title: Scores
+        representative:
+          anyOf:
+          - $ref: '#/components/schemas/RepresentativeScoreOut'
+          - type: 'null'
+        tradelines:
+          items:
+            $ref: '#/components/schemas/TradelineOut'
+          type: array
+          title: Tradelines
+        total_revolving_utilization:
+          anyOf:
+          - $ref: '#/components/schemas/app__api__schemas__assets__CalcOut'
+          - type: 'null'
+        monthly_payments:
+          items:
+            $ref: '#/components/schemas/app__api__schemas__assets__CalcOut'
+          type: array
+          title: Monthly Payments
+        inquiries:
+          items:
+            $ref: '#/components/schemas/InquiryOut'
+          type: array
+          title: Inquiries
+        derogatory:
+          items:
+            $ref: '#/components/schemas/TradelineOut'
+          type: array
+          title: Derogatory
+        flags:
+          items:
+            $ref: '#/components/schemas/AssetFlagOut'
+          type: array
+          title: Flags
+        summary:
+          items:
+            type: string
+          type: array
+          title: Summary
+        calculations:
+          items:
+            $ref: '#/components/schemas/app__api__schemas__assets__CalcOut'
+          type: array
+          title: Calculations
+      type: object
+      required:
+      - id
+      - case_id
+      - status
+      - started_at
+      - finished_at
+      - config_versions
+      - alerts
+      - scores
+      - representative
+      - tradelines
+      - total_revolving_utilization
+      - monthly_payments
+      - inquiries
+      - derogatory
+      - flags
+      - summary
+      - calculations
+      title: CreditAnalysisOut
+    CreditRunAccepted:
+      properties:
+        job:
+          $ref: '#/components/schemas/JobOut'
+        analysis_id:
+          type: string
+          format: uuid
+          title: Analysis Id
+      type: object
+      required:
+      - job
+      - analysis_id
+      title: CreditRunAccepted
+    DurationOut:
+      properties:
+        quote:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Quote
+        lines:
+          items:
+            type: string
+          type: array
+          title: Lines
+        verified:
+          type: boolean
+          title: Verified
+        check_flags:
+          items:
+            type: string
+          type: array
+          title: Check Flags
+        category:
+          type: string
+          enum:
+          - temporary
+          - long_term
+          - unknown
+          title: Category
+        confirmation:
+          anyOf:
+          - $ref: '#/components/schemas/ConfirmationOut'
+          - type: 'null'
+      type: object
+      required:
+      - quote
+      - lines
+      - verified
+      - check_flags
+      - category
+      title: DurationOut
+    EnclosedDocumentOut:
+      properties:
+        quote:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Quote
+        lines:
+          items:
+            type: string
+          type: array
+          title: Lines
+        verified:
+          type: boolean
+          title: Verified
+        check_flags:
+          items:
+            type: string
+          type: array
+          title: Check Flags
+        document:
+          type: string
+          title: Document
+      type: object
+      required:
+      - quote
+      - lines
+      - verified
+      - check_flags
+      - document
+      title: EnclosedDocumentOut
+    EvidenceOut:
+      properties:
+        document_id:
+          type: string
+          format: uuid
+          title: Document Id
+        page:
+          type: integer
+          minimum: 1.0
+          title: Page
+        line_ids:
+          items:
+            type: string
+            pattern: ^p[0-9]+-L[0-9]+$
+          type: array
+          title: Line Ids
+        bbox:
+          anyOf:
+          - $ref: '#/components/schemas/BoundingBox'
+          - type: 'null'
+      type: object
+      required:
+      - document_id
+      - page
+      - line_ids
+      title: EvidenceOut
+      description: Where a value came from on the page.
+    FeedbackIn:
+      properties:
+        rating:
+          type: string
+          enum:
+          - helpful
+          - not_helpful
+          - wrongly_cited
+          title: Rating
+        note:
+          anyOf:
+          - type: string
+            maxLength: 1000
+          - type: 'null'
+          title: Note
+      additionalProperties: false
+      type: object
+      required:
+      - rating
+      title: FeedbackIn
+    FindingOut:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        priority:
+          $ref: '#/components/schemas/ReviewPriority'
+        title:
+          type: string
+          title: Title
+        detail:
+          type: string
+          title: Detail
+        evidence:
+          items:
+            additionalProperties: true
+            type: object
+          type: array
+          title: Evidence
+      type: object
+      required:
+      - id
+      - priority
+      - title
+      - detail
+      - evidence
+      title: FindingOut
+    FlagOut:
+      properties:
+        code:
+          type: string
+          title: Code
+        severity:
+          type: string
+          enum:
+          - error
+          - warning
+          - info
+          title: Severity
+        message:
+          type: string
+          title: Message
+        evidence:
+          anyOf:
+          - $ref: '#/components/schemas/EvidenceOut'
+          - type: 'null'
+      type: object
+      required:
+      - code
+      - severity
+      - message
+      title: FlagOut
+    GuidelineAnswerOut:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        question:
+          type: string
+          title: Question
+        source_set:
+          type: string
+          title: Source Set
+        case_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Case Id
+        asked_at:
+          type: string
+          title: Asked At
+        status:
+          type: string
+          enum:
+          - answered
+          - no_support
+          title: Status
+        sentences:
+          items:
+            $ref: '#/components/schemas/AnswerSentenceOut'
+          type: array
+          title: Sentences
+        citations:
+          items:
+            $ref: '#/components/schemas/AnswerCitationOut'
+          type: array
+          title: Citations
+        passages:
+          items:
+            $ref: '#/components/schemas/AnswerPassageOut'
+          type: array
+          title: Passages
+        comparison:
+          anyOf:
+          - $ref: '#/components/schemas/ComparisonOut'
+          - type: 'null'
+        facts_to_check:
+          items:
+            type: string
+          type: array
+          title: Facts To Check
+        notice:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Notice
+        removed_sentences:
+          type: integer
+          title: Removed Sentences
+      type: object
+      required:
+      - id
+      - question
+      - source_set
+      - case_id
+      - asked_at
+      - status
+      - sentences
+      - citations
+      - passages
+      - comparison
+      - facts_to_check
+      - notice
+      - removed_sentences
+      title: GuidelineAnswerOut
+    HTTPValidationError:
+      properties:
+        detail:
+          items:
+            $ref: '#/components/schemas/ValidationError'
+          type: array
+          title: Detail
+      type: object
+      title: HTTPValidationError
+    HardshipAssessmentOut:
+      properties:
+        run_id:
+          type: string
+          format: uuid
+          title: Run Id
+        source:
+          type: string
+          enum:
+          - model
+          - seeded_sample
+          title: Source
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+        letter_document_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Letter Document Id
+        config_version:
+          type: string
+          title: Config Version
+        config_label:
+          type: string
+          enum:
+          - illustrative
+          - authoritative
+          title: Config Label
+        profile:
+          $ref: '#/components/schemas/ProfileOut'
+        flags:
+          items:
+            $ref: '#/components/schemas/FlagOut'
+          type: array
+          title: Flags
+        confirmed_by:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Confirmed By
+        confirmed_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Confirmed At
+        budget:
+          items:
+            $ref: '#/components/schemas/BudgetLineOut'
+          type: array
+          title: Budget
+        measures:
+          items:
+            $ref: '#/components/schemas/app__api__schemas__assets__CalcOut'
+          type: array
+          title: Measures
+        checks:
+          items:
+            $ref: '#/components/schemas/CheckOut'
+          type: array
+          title: Checks
+        budget_flags:
+          items:
+            $ref: '#/components/schemas/AssetFlagOut'
+          type: array
+          title: Budget Flags
+        budget_note:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Budget Note
+      type: object
+      required:
+      - run_id
+      - source
+      - created_at
+      - letter_document_id
+      - config_version
+      - config_label
+      - profile
+      - flags
+      - budget
+      - measures
+      - checks
+      - budget_flags
+      title: HardshipAssessmentOut
+    HardshipRunAccepted:
+      properties:
+        job:
+          $ref: '#/components/schemas/JobOut'
+      type: object
+      required:
+      - job
+      title: HardshipRunAccepted
+    IncomeAnalysisOut:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        case_id:
+          type: string
+          format: uuid
+          title: Case Id
+        status:
+          $ref: '#/components/schemas/AnalysisStatus'
+        started_at:
+          type: string
+          format: date-time
+          title: Started At
+        finished_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Finished At
+        config_versions:
+          additionalProperties: true
+          type: object
+          title: Config Versions
+        candidate_monthly_income:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Candidate Monthly Income
+        candidate_label:
+          type: string
+          title: Candidate Label
+        candidate:
+          anyOf:
+          - $ref: '#/components/schemas/app__api__schemas__income__CalcOut'
+          - type: 'null'
+        components:
+          items:
+            $ref: '#/components/schemas/ComponentOut'
+          type: array
+          title: Components
+        flags:
+          items:
+            $ref: '#/components/schemas/IncomeFlagOut'
+          type: array
+          title: Flags
+        calculations:
+          items:
+            $ref: '#/components/schemas/app__api__schemas__income__CalcOut'
+          type: array
+          title: Calculations
+        explanations:
+          items:
+            type: string
+          type: array
+          title: Explanations
+        explanations_note:
+          type: string
+          title: Explanations Note
+          default: explanations not generated
+      type: object
+      required:
+      - id
+      - case_id
+      - status
+      - started_at
+      - finished_at
+      - config_versions
+      - candidate_monthly_income
+      - candidate_label
+      - candidate
+      - components
+      - flags
+      - calculations
+      title: IncomeAnalysisOut
+    IncomeComponentKind:
+      type: string
+      enum:
+      - base
+      - overtime
+      - bonus
+      - commission
+      title: IncomeComponentKind
+      description: '``income_components.component`` (Feature Design 2.3: earnings are grouped by type).'
+    IncomeFlagOut:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        code:
+          type: string
+          title: Code
+        severity:
+          type: string
+          title: Severity
+        message:
+          type: string
+          title: Message
+        status:
+          type: string
+          title: Status
+        working:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Working
+        refs:
+          items:
+            $ref: '#/components/schemas/app__api__schemas__income__RefOut'
+          type: array
+          title: Refs
+      type: object
+      required:
+      - id
+      - code
+      - severity
+      - message
+      - status
+      - working
+      - refs
+      title: IncomeFlagOut
+    IncomeRunAccepted:
+      properties:
+        job:
+          $ref: '#/components/schemas/JobOut'
+        analysis_id:
+          type: string
+          format: uuid
+          title: Analysis Id
+      type: object
+      required:
+      - job
+      - analysis_id
+      title: IncomeRunAccepted
+    InquiryOut:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        position:
+          type: integer
+          title: Position
+        creditor:
+          type: string
+          title: Creditor
+        inquired_on:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          title: Inquired On
+        in_window:
+          type: boolean
+          title: In Window
+        matched_tradeline_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Matched Tradeline Id
+        matched_account:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Matched Account
+        line_ids:
+          items:
+            type: string
+          type: array
+          title: Line Ids
+      type: object
+      required:
+      - id
+      - position
+      - creditor
+      - inquired_on
+      - in_window
+      - matched_tradeline_id
+      - matched_account
+      - line_ids
+      title: InquiryOut
+    IntentOut:
+      properties:
+        quote:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Quote
+        lines:
+          items:
+            type: string
+          type: array
+          title: Lines
+        verified:
+          type: boolean
+          title: Verified
+        check_flags:
+          items:
+            type: string
+          type: array
+          title: Check Flags
+        category:
+          type: string
+          enum:
+          - keep
+          - sell
+          - unsure
+          title: Category
+        confirmation:
+          anyOf:
+          - $ref: '#/components/schemas/ConfirmationOut'
+          - type: 'null'
+      type: object
+      required:
+      - quote
+      - lines
+      - verified
+      - check_flags
+      - category
+      title: IntentOut
+    ItemIn:
+      properties:
+        value:
+          anyOf:
+          - type: string
+            maxLength: 64
+          - type: 'null'
+          title: Value
+        reason:
+          anyOf:
+          - type: string
+            maxLength: 500
+          - type: 'null'
+          title: Reason
+      additionalProperties: false
+      type: object
+      title: ItemIn
+      description: Confirm an item as read (send ``{}``), or correct it (send the value and a reason).
+    ItemOverrideIn:
+      properties:
+        action:
+          type: string
+          enum:
+          - override
+          - clear
+          title: Action
+        reason:
+          anyOf:
+          - type: string
+            maxLength: 500
+          - type: 'null'
+          title: Reason
+      additionalProperties: false
+      type: object
+      required:
+      - action
+      title: ItemOverrideIn
+      description: Override an item with a written reason, or clear the override.
+    JobOut:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        kind:
+          type: string
+          title: Kind
+        status:
+          $ref: '#/components/schemas/JobStatus'
+        progress:
+          type: number
+          title: Progress
+        stage:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Stage
+        error:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Error
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+        updated_at:
+          type: string
+          format: date-time
+          title: Updated At
+      type: object
+      required:
+      - id
+      - kind
+      - status
+      - progress
+      - created_at
+      - updated_at
+      title: JobOut
+    JobStatus:
+      type: string
+      enum:
+      - queued
+      - running
+      - succeeded
+      - failed
+      title: JobStatus
+    LenderViewOut:
+      properties:
+        foreclosure_loss:
+          type: string
+          title: Foreclosure Loss
+        modification_cost:
+          type: string
+          title: Modification Cost
+        advantage:
+          type: string
+          title: Advantage
+        settings:
+          additionalProperties: true
+          type: object
+          title: Settings
+        figures:
+          items:
+            $ref: '#/components/schemas/app__api__schemas__assets__CalcOut'
+          type: array
+          title: Figures
+        final_terms:
+          type: string
+          title: Final Terms
+          default: 'Final terms are never computed here: to be calculated under the investor''s own method.'
+      type: object
+      required:
+      - foreclosure_loss
+      - modification_cost
+      - advantage
+      - settings
+      - figures
+      title: LenderViewOut
+    LmRecommendationOut:
+      properties:
+        run_id:
+          type: string
+          format: uuid
+          title: Run Id
+        run_status:
+          $ref: '#/components/schemas/AnalysisStatus'
+        source:
+          type: string
+          enum:
+          - rules_engine
+          - seeded_sample
+          title: Source
+        notice:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Notice
+        rule_set:
+          anyOf:
+          - $ref: '#/components/schemas/RuleSetOut'
+          - type: 'null'
+        waterfall:
+          items:
+            $ref: '#/components/schemas/WaterfallOptionOut'
+          type: array
+          title: Waterfall
+        lender_view:
+          anyOf:
+          - $ref: '#/components/schemas/LenderViewOut'
+          - type: 'null'
+        report:
+          anyOf:
+          - $ref: '#/components/schemas/UnderwritingReportOut'
+          - type: 'null'
+      type: object
+      required:
+      - run_id
+      - run_status
+      - source
+      - notice
+      - rule_set
+      - waterfall
+      - lender_view
+      - report
+      title: LmRecommendationOut
+    LoanScenarioIn:
+      properties:
+        purpose:
+          type: string
+          maxLength: 64
+          minLength: 1
+          title: Purpose
+        occupancy:
+          type: string
+          maxLength: 64
+          minLength: 1
+          title: Occupancy
+        property_value:
+          anyOf:
+          - type: number
+            exclusiveMinimum: 0.0
+          - type: string
+          title: Property Value
+        loan_amount:
+          anyOf:
+          - type: number
+            minimum: 0.0
+          - type: string
+          title: Loan Amount
+        proposed_housing_payment:
+          anyOf:
+          - type: number
+            minimum: 0.0
+          - type: string
+          title: Proposed Housing Payment
+        funds_to_close:
+          anyOf:
+          - type: number
+            minimum: 0.0
+          - type: string
+          title: Funds To Close
+      additionalProperties: false
+      type: object
+      required:
+      - purpose
+      - occupancy
+      - property_value
+      - loan_amount
+      - proposed_housing_payment
+      - funds_to_close
+      title: LoanScenarioIn
+      description: The sample loan, entered by hand. Nothing is priced (Feature Design 3.3).
+    LoanScenarioOut:
+      properties:
+        case_id:
+          type: string
+          format: uuid
+          title: Case Id
+        purpose:
+          type: string
+          title: Purpose
+        occupancy:
+          type: string
+          title: Occupancy
+        property_value:
+          type: string
+          title: Property Value
+        loan_amount:
+          type: string
+          title: Loan Amount
+        proposed_housing_payment:
+          type: string
+          title: Proposed Housing Payment
+        funds_to_close:
+          type: string
+          title: Funds To Close
+        updated_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Updated At
+      type: object
+      required:
+      - case_id
+      - purpose
+      - occupancy
+      - property_value
+      - loan_amount
+      - proposed_housing_payment
+      - funds_to_close
+      - updated_at
+      title: LoanScenarioOut
+    ObligationOut:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        creditor:
+          type: string
+          title: Creditor
+        kind:
+          type: string
+          title: Kind
+        monthly_payment:
+          type: string
+          title: Monthly Payment
+        balance:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Balance
+        source:
+          $ref: '#/components/schemas/ObligationSource'
+        counts_toward_dti:
+          type: boolean
+          title: Counts Toward Dti
+        reason:
+          type: string
+          title: Reason
+        system_counts_toward_dti:
+          type: boolean
+          title: System Counts Toward Dti
+        change:
+          anyOf:
+          - $ref: '#/components/schemas/ChangeOut'
+          - type: 'null'
+      type: object
+      required:
+      - id
+      - creditor
+      - kind
+      - monthly_payment
+      - balance
+      - source
+      - counts_toward_dti
+      - reason
+      - system_counts_toward_dti
+      - change
+      title: ObligationOut
+    ObligationReviewIn:
+      properties:
+        counts_toward_dti:
+          type: boolean
+          title: Counts Toward Dti
+        reason:
+          type: string
+          maxLength: 500
+          title: Reason
+      additionalProperties: false
+      type: object
+      required:
+      - counts_toward_dti
+      - reason
+      title: ObligationReviewIn
+      description: Include a debt in the DTI or leave it out. The reason is required either way.
+    ObligationSource:
+      type: string
+      enum:
+      - bank
+      - credit_report
+      - both
+      title: ObligationSource
+      description: Where a recurring debt was found (Feature Design 3.2).
+    OnsetOut:
+      properties:
+        quote:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Quote
+        lines:
+          items:
+            type: string
+          type: array
+          title: Lines
+        verified:
+          type: boolean
+          title: Verified
+        check_flags:
+          items:
+            type: string
+          type: array
+          title: Check Flags
+        as_stated:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: As Stated
+        month:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Month
+        confirmation:
+          anyOf:
+          - $ref: '#/components/schemas/ConfirmationOut'
+          - type: 'null'
+      type: object
+      required:
+      - quote
+      - lines
+      - verified
+      - check_flags
+      - as_stated
+      - month
+      title: OnsetOut
+    OverrideIn:
+      properties:
+        status:
+          type: string
+          enum:
+          - met
+          - not_met
+          - not_evaluable
+          - needs_confirmation
+          title: Status
+        reason:
+          type: string
+          maxLength: 500
+          title: Reason
+      additionalProperties: false
+      type: object
+      required:
+      - status
+      - reason
+      title: OverrideIn
+      description: Override one waterfall condition. The reason is required.
+    PageImageOut:
+      properties:
+        page:
+          type: integer
+          minimum: 1.0
+          title: Page
+        url:
+          type: string
+          title: Url
+        expires_at:
+          type: string
+          format: date-time
+          title: Expires At
+        width:
+          type: integer
+          exclusiveMinimum: 0.0
+          title: Width
+        height:
+          type: integer
+          exclusiveMinimum: 0.0
+          title: Height
+      type: object
+      required:
+      - page
+      - url
+      - expires_at
+      - width
+      - height
+      title: PageImageOut
+      description: 'A short-lived link to one page image, and the image''s size in pixels.
+
+
+        Boxes in ``Evidence.bbox`` are fractions of this image (origin top left), so a viewer needs
+
+        ``width`` and ``height`` to draw them. The link stops working at ``expires_at``; ask again.'
+    PassageOut:
+      properties:
+        id:
+          type: string
+          title: Id
+        source_id:
+          type: string
+          title: Source Id
+        source_title:
+          type: string
+          title: Source Title
+        heading:
+          type: string
+          title: Heading
+        text:
+          type: string
+          title: Text
+        label:
+          type: string
+          title: Label
+        notice:
+          type: string
+          title: Notice
+      type: object
+      required:
+      - id
+      - source_id
+      - source_title
+      - heading
+      - text
+      - label
+      - notice
+      title: PassageOut
+    ProfileOut:
+      properties:
+        primary_reason:
+          $ref: '#/components/schemas/ReasonOut'
+        other_reasons:
+          items:
+            $ref: '#/components/schemas/ReasonOut'
+          type: array
+          title: Other Reasons
+        onset:
+          $ref: '#/components/schemas/OnsetOut'
+        duration:
+          $ref: '#/components/schemas/DurationOut'
+        intent:
+          $ref: '#/components/schemas/IntentOut'
+        timeline:
+          items:
+            $ref: '#/components/schemas/TimelineEventOut'
+          type: array
+          title: Timeline
+        enclosed_documents:
+          items:
+            $ref: '#/components/schemas/EnclosedDocumentOut'
+          type: array
+          title: Enclosed Documents
+      type: object
+      required:
+      - primary_reason
+      - other_reasons
+      - onset
+      - duration
+      - intent
+      - timeline
+      - enclosed_documents
+      title: ProfileOut
+    ReasonOut:
+      properties:
+        quote:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Quote
+        lines:
+          items:
+            type: string
+          type: array
+          title: Lines
+        verified:
+          type: boolean
+          title: Verified
+        check_flags:
+          items:
+            type: string
+          type: array
+          title: Check Flags
+        category:
+          type: string
+          title: Category
+        category_label:
+          type: string
+          title: Category Label
+        sensitive:
+          type: boolean
+          title: Sensitive
+        financial_effect:
+          type: string
+          title: Financial Effect
+        confirmation:
+          anyOf:
+          - $ref: '#/components/schemas/ConfirmationOut'
+          - type: 'null'
+      type: object
+      required:
+      - quote
+      - lines
+      - verified
+      - check_flags
+      - category
+      - category_label
+      - sensitive
+      - financial_effect
+      title: ReasonOut
+    RecommendationRunAccepted:
+      properties:
+        job:
+          $ref: '#/components/schemas/JobOut'
+      type: object
+      required:
+      - job
+      title: RecommendationRunAccepted
+    ReportKind:
+      type: string
+      enum:
+      - underwriting
+      - lm_recommendation
+      title: ReportKind
+      description: '``reports.kind``: which pillar''s report it is.'
+    ReportOut:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        kind:
+          $ref: '#/components/schemas/ReportKind'
+        version:
+          type: integer
+          title: Version
+        status:
+          $ref: '#/components/schemas/ReportStatus'
+        source:
+          $ref: '#/components/schemas/ReportSource'
+        notice:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Notice
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+        sections:
+          additionalProperties: true
+          type: object
+          title: Sections
+        guardrail_results:
+          additionalProperties: true
+          type: object
+          title: Guardrail Results
+      type: object
+      required:
+      - id
+      - kind
+      - version
+      - status
+      - source
+      - notice
+      - created_at
+      - sections
+      - guardrail_results
+      title: ReportOut
+    ReportSource:
+      type: string
+      enum:
+      - agents
+      - seeded_sample
+      title: ReportSource
+      description: 'Who wrote a report: the agents, or the seeded sample the demo starts from.'
+    ReportStatus:
+      type: string
+      enum:
+      - draft
+      - in_review
+      - signed_off
+      title: ReportStatus
+      description: 'A report is a draft until a person has reviewed it; a sign-off records that review.
+
+
+        ``signed_off`` says a person reviewed the report. It is not a decision (rule 3).'
+    RepresentativeScoreOut:
+      properties:
+        score:
+          type: integer
+          title: Score
+        bureau:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Bureau
+        method:
+          type: string
+          title: Method
+        calculation:
+          $ref: '#/components/schemas/app__api__schemas__assets__CalcOut'
+      type: object
+      required:
+      - score
+      - bureau
+      - method
+      - calculation
+      title: RepresentativeScoreOut
+    ReviewPriority:
+      type: string
+      enum:
+      - significant
+      - attention
+      - information
+      title: ReviewPriority
+      description: 'Review order for findings and conditions. It describes what to look at first, never
+
+        eligibility (Feature Design 6.5).'
+    RuleSetOut:
+      properties:
+        name:
+          type: string
+          title: Name
+        version:
+          type: string
+          title: Version
+        label:
+          type: string
+          title: Label
+        banner:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Banner
+      type: object
+      required:
+      - name
+      - version
+      - label
+      - banner
+      title: RuleSetOut
+    ScoreOut:
+      properties:
+        bureau:
+          type: string
+          title: Bureau
+        score:
+          type: integer
+          title: Score
+        is_representative:
+          type: boolean
+          title: Is Representative
+        line_ids:
+          items:
+            type: string
+          type: array
+          title: Line Ids
+      type: object
+      required:
+      - bureau
+      - score
+      - is_representative
+      - line_ids
+      title: ScoreOut
+    SignOffIn:
+      properties:
+        note:
+          anyOf:
+          - type: string
+            maxLength: 500
+          - type: 'null'
+          title: Note
+      additionalProperties: false
+      type: object
+      title: SignOffIn
+    SignOffOut:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        report_id:
+          type: string
+          format: uuid
+          title: Report Id
+        report_version:
+          type: integer
+          title: Report Version
+        signed_by:
+          type: string
+          format: uuid
+          title: Signed By
+        role:
+          type: string
+          title: Role
+        signed_at:
+          type: string
+          format: date-time
+          title: Signed At
+        note:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Note
+        statement:
+          type: string
+          title: Statement
+          default: Records a review. Not a decision.
+      type: object
+      required:
+      - id
+      - report_id
+      - report_version
+      - signed_by
+      - role
+      - signed_at
+      - note
+      title: SignOffOut
+    SignOffResult:
+      properties:
+        sign_off:
+          $ref: '#/components/schemas/SignOffOut'
+        report_status:
+          $ref: '#/components/schemas/ReportStatus'
+        pending_conditions:
+          type: integer
+          title: Pending Conditions
+      type: object
+      required:
+      - sign_off
+      - report_status
+      - pending_conditions
+      title: SignOffResult
+    SourceList:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/SourceOut'
+          type: array
+          title: Items
+      type: object
+      required:
+      - items
+      title: SourceList
+    SourceOut:
+      properties:
+        id:
+          type: string
+          title: Id
+        title:
+          type: string
+          title: Title
+        kind:
+          type: string
+          title: Kind
+        label:
+          type: string
+          title: Label
+        passage_count:
+          type: integer
+          title: Passage Count
+      type: object
+      required:
+      - id
+      - title
+      - kind
+      - label
+      - passage_count
+      title: SourceOut
+    TimelineEventOut:
+      properties:
+        quote:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Quote
+        lines:
+          items:
+            type: string
+          type: array
+          title: Lines
+        verified:
+          type: boolean
+          title: Verified
+        check_flags:
+          items:
+            type: string
+          type: array
+          title: Check Flags
+        when:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: When
+        event:
+          type: string
+          title: Event
+      type: object
+      required:
+      - quote
+      - lines
+      - verified
+      - check_flags
+      - when
+      - event
+      title: TimelineEventOut
+    TradelineOut:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        position:
+          type: integer
+          title: Position
+        creditor:
+          type: string
+          title: Creditor
+        account_type:
+          type: string
+          title: Account Type
+        ownership:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Ownership
+        opened_on:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          title: Opened On
+        status:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Status
+        balance:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Balance
+        credit_limit:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Credit Limit
+        monthly_payment:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Monthly Payment
+        past_due:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Past Due
+        late_30:
+          type: integer
+          title: Late 30
+        late_60:
+          type: integer
+          title: Late 60
+        late_90:
+          type: integer
+          title: Late 90
+        last_late_on:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          title: Last Late On
+        remarks:
+          type: string
+          title: Remarks
+        line_ids:
+          items:
+            type: string
+          type: array
+          title: Line Ids
+        utilization:
+          anyOf:
+          - $ref: '#/components/schemas/app__api__schemas__assets__CalcOut'
+          - type: 'null'
+        utilization_over_review_level:
+          type: boolean
+          title: Utilization Over Review Level
+        months_since_last_late:
+          anyOf:
+          - $ref: '#/components/schemas/app__api__schemas__assets__CalcOut'
+          - type: 'null'
+        late_in_lookback:
+          type: boolean
+          title: Late In Lookback
+        derogatory:
+          type: boolean
+          title: Derogatory
+      type: object
+      required:
+      - id
+      - position
+      - creditor
+      - account_type
+      - ownership
+      - opened_on
+      - status
+      - balance
+      - credit_limit
+      - monthly_payment
+      - past_due
+      - late_30
+      - late_60
+      - late_90
+      - last_late_on
+      - remarks
+      - line_ids
+      - utilization
+      - utilization_over_review_level
+      - months_since_last_late
+      - late_in_lookback
+      - derogatory
+      title: TradelineOut
+    TransactionCategory:
+      type: string
+      enum:
+      - payroll deposit
+      - other income deposit
+      - transfer in
+      - transfer out
+      - housing payment
+      - loan payment
+      - credit card payment
+      - utility
+      - insurance
+      - everyday spending
+      - overdraft or returned-item fee
+      - other fee
+      - refund
+      - other
+      title: TransactionCategory
+      description: '``transactions.category``: the fixed list of Feature Design 3.5.
+
+
+        Mirrors ``app.prompts.schemas.transactions.TransactionCategory`` (a test keeps them equal), so
+
+        the database layer does not import the prompts package.'
+    TransactionDirection:
+      type: string
+      enum:
+      - credit
+      - debit
+      title: TransactionDirection
+      description: Which way money moved. ``transactions.amount`` is always the size, never negative.
+    TransactionOut:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        document_id:
+          type: string
+          format: uuid
+          title: Document Id
+        line_id:
+          type: string
+          title: Line Id
+        account_last4:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Account Last4
+        posted_on:
+          type: string
+          format: date
+          title: Posted On
+        description:
+          type: string
+          title: Description
+        amount:
+          type: string
+          title: Amount
+        direction:
+          $ref: '#/components/schemas/TransactionDirection'
+        category:
+          $ref: '#/components/schemas/TransactionCategory'
+        category_source:
+          $ref: '#/components/schemas/CategorySource'
+        system_category:
+          $ref: '#/components/schemas/TransactionCategory'
+        counterparty:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Counterparty
+        needs_review:
+          type: boolean
+          title: Needs Review
+        sourced:
+          type: boolean
+          title: Sourced
+        sourced_note:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Sourced Note
+        change:
+          anyOf:
+          - $ref: '#/components/schemas/ChangeOut'
+          - type: 'null'
+        payroll_match:
+          anyOf:
+          - $ref: '#/components/schemas/app__api__schemas__assets__CalcOut'
+          - type: 'null'
+        large_deposit:
+          anyOf:
+          - $ref: '#/components/schemas/app__api__schemas__assets__CalcOut'
+          - type: 'null'
+      type: object
+      required:
+      - id
+      - document_id
+      - line_id
+      - account_last4
+      - posted_on
+      - description
+      - amount
+      - direction
+      - category
+      - category_source
+      - system_category
+      - counterparty
+      - needs_review
+      - sourced
+      - sourced_note
+      - change
+      - payroll_match
+      - large_deposit
+      title: TransactionOut
+    TransactionReviewIn:
+      properties:
+        category:
+          anyOf:
+          - $ref: '#/components/schemas/TransactionCategory'
+          - type: 'null'
+        sourced:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Sourced
+        reason:
+          type: string
+          maxLength: 500
+          title: Reason
+      additionalProperties: false
+      type: object
+      required:
+      - reason
+      title: TransactionReviewIn
+      description: Give a line another category, or mark a deposit as sourced. The reason is required.
+    UnderwritingReportOut:
+      properties:
+        run_id:
+          type: string
+          format: uuid
+          title: Run Id
+        run_status:
+          $ref: '#/components/schemas/AnalysisStatus'
+        report:
+          $ref: '#/components/schemas/ReportOut'
+        findings:
+          items:
+            $ref: '#/components/schemas/FindingOut'
+          type: array
+          title: Findings
+        conditions:
+          items:
+            $ref: '#/components/schemas/ConditionOut'
+          type: array
+          title: Conditions
+        agent_runs:
+          items:
+            $ref: '#/components/schemas/AgentRunOut'
+          type: array
+          title: Agent Runs
+        sign_offs:
+          items:
+            $ref: '#/components/schemas/SignOffOut'
+          type: array
+          title: Sign Offs
+      type: object
+      required:
+      - run_id
+      - run_status
+      - report
+      - findings
+      - conditions
+      - agent_runs
+      - sign_offs
+      title: UnderwritingReportOut
+    ValidationError:
+      properties:
+        loc:
+          items:
+            anyOf:
+            - type: string
+            - type: integer
+          type: array
+          title: Location
+        msg:
+          type: string
+          title: Message
+        type:
+          type: string
+          title: Error Type
+        input:
+          title: Input
+        ctx:
+          type: object
+          title: Context
+      type: object
+      required:
+      - loc
+      - msg
+      - type
+      title: ValidationError
+    WaterfallConditionOut:
+      properties:
+        id:
+          type: string
+          title: Id
+        label:
+          type: string
+          title: Label
+        expression:
+          type: string
+          title: Expression
+        values:
+          additionalProperties: true
+          type: object
+          title: Values
+        passage_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Passage Id
+        derived:
+          type: boolean
+          title: Derived
+        note:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Note
+        evidence:
+          items:
+            additionalProperties: true
+            type: object
+          type: array
+          title: Evidence
+        status:
+          $ref: '#/components/schemas/WaterfallStatus'
+        effective_status:
+          $ref: '#/components/schemas/WaterfallStatus'
+        override:
+          anyOf:
+          - $ref: '#/components/schemas/app__api__schemas__reports__OverrideOut'
+          - type: 'null'
+      type: object
+      required:
+      - id
+      - label
+      - expression
+      - values
+      - passage_id
+      - derived
+      - status
+      - effective_status
+      - override
+      title: WaterfallConditionOut
+    WaterfallOption:
+      type: string
+      enum:
+      - repayment_plan
+      - forbearance
+      - payment_deferral
+      - loan_modification
+      - short_sale
+      - deed_in_lieu
+      title: WaterfallOption
+      description: The loss mitigation options in waterfall order (Feature Design 8.3).
+    WaterfallOptionOut:
+      properties:
+        option:
+          $ref: '#/components/schemas/WaterfallOption'
+        order_no:
+          type: integer
+          title: Order No
+        status:
+          $ref: '#/components/schemas/WaterfallStatus'
+        original_status:
+          $ref: '#/components/schemas/WaterfallStatus'
+        conditions:
+          items:
+            $ref: '#/components/schemas/WaterfallConditionOut'
+          type: array
+          title: Conditions
+        overridden:
+          type: boolean
+          title: Overridden
+        override_reason:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Override Reason
+        overridden_by:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Overridden By
+        overridden_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Overridden At
+      type: object
+      required:
+      - option
+      - order_no
+      - status
+      - original_status
+      - conditions
+      - overridden
+      - override_reason
+      - overridden_by
+      - overridden_at
+      title: WaterfallOptionOut
+    WaterfallStatus:
+      type: string
+      enum:
+      - met
+      - not_met
+      - not_evaluable
+      - not_reached
+      - needs_confirmation
+      title: WaterfallStatus
+      description: What the rules found for an option. ``met`` says its conditions are met, nothing more.
+    app__api__schemas__assets__CalcOut:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        name:
+          type: string
+          title: Name
+        value:
+          type: string
+          title: Value
+        unit:
+          type: string
+          title: Unit
+        formula:
+          type: string
+          title: Formula
+        inputs:
+          additionalProperties:
+            type: string
+          type: object
+          title: Inputs
+        working:
+          type: string
+          title: Working
+        config_version:
+          type: string
+          title: Config Version
+        evidence:
+          items:
+            $ref: '#/components/schemas/app__api__schemas__assets__RefOut'
+          type: array
+          title: Evidence
+      type: object
+      required:
+      - id
+      - name
+      - value
+      - unit
+      - formula
+      - inputs
+      - working
+      - config_version
+      - evidence
+      title: CalcOut
+    app__api__schemas__assets__RefOut:
+      properties:
+        document_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Document Id
+        field:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Field
+        line_ids:
+          items:
+            type: string
+          type: array
+          title: Line Ids
+        source:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Source
+        calculation:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Calculation
+      type: object
+      title: RefOut
+      description: 'A figure''s source: a line of a document, or the hand-entered loan scenario or income
+        run.'
+    app__api__schemas__income__CalcOut:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        name:
+          type: string
+          title: Name
+        value:
+          type: string
+          title: Value
+        unit:
+          type: string
+          title: Unit
+        formula:
+          type: string
+          title: Formula
+        inputs:
+          additionalProperties:
+            type: string
+          type: object
+          title: Inputs
+        working:
+          type: string
+          title: Working
+        config_version:
+          type: string
+          title: Config Version
+        evidence:
+          items:
+            $ref: '#/components/schemas/app__api__schemas__income__RefOut'
+          type: array
+          title: Evidence
+      type: object
+      required:
+      - id
+      - name
+      - value
+      - unit
+      - formula
+      - inputs
+      - working
+      - config_version
+      - evidence
+      title: CalcOut
+    app__api__schemas__income__OverrideOut:
+      properties:
+        included:
+          type: boolean
+          title: Included
+        reason:
+          type: string
+          title: Reason
+        by:
+          type: string
+          format: uuid
+          title: By
+        at:
+          type: string
+          format: date-time
+          title: At
+      type: object
+      required:
+      - included
+      - reason
+      - by
+      - at
+      title: OverrideOut
+      description: A person's include or exclude. The system's own decision stays in ``system_*``.
+    app__api__schemas__income__RefOut:
+      properties:
+        document_id:
+          type: string
+          format: uuid
+          title: Document Id
+        field:
+          type: string
+          title: Field
+        line_ids:
+          items:
+            type: string
+          type: array
+          title: Line Ids
+      type: object
+      required:
+      - document_id
+      - field
+      - line_ids
+      title: RefOut
+      description: 'A figure''s source: a stored field of one document, and the lines it was read from.'
+    app__api__schemas__reports__OverrideOut:
+      properties:
+        status:
+          $ref: '#/components/schemas/WaterfallStatus'
+        reason:
+          type: string
+          title: Reason
+        by:
+          type: string
+          format: uuid
+          title: By
+        at:
+          type: string
+          format: date-time
+          title: At
+      type: object
+      required:
+      - status
+      - reason
+      - by
+      - at
+      title: OverrideOut

@@ -1,0 +1,29 @@
+# Guideline assistant settings (Feature Design 5.3 and 5.5). Read by app/rag/config.py.
+# Every setting carries a label and a source (CLAUDE.md rule 4). Bump `version` when a value changes.
+version: "2026-11-25.1"
+label: illustrative
+source: "Feature Design 5.3 and 5.5, illustrative settings chosen for the demo"
+
+# How passages are found. "lexical" is BM25 over the passage text, run in code: the sources are
+# small and every passage is one section, and no embedding provider is configured for this demo
+# (the Claude providers have no embedding model). Changing it to embeddings means reloading.
+retrieval: lexical
+
+# How many passages the answer may see, at most.
+top_k: 6
+
+# A passage is dropped before the model sees anything when the question words it matches carry
+# less than this share of the question's total term weight (IDF). 0.45 keeps "how is overtime
+# income evaluated" and drops "jumbo loans", which no loaded source covers.
+min_coverage: "0.45"
+
+# A quotation in an answer is at most this many characters, and must be an exact piece of the
+# passage it cites.
+max_quote_chars: 200
+
+# BM25 parameters (standard values).
+bm25_k1: "1.2"
+bm25_b: "0.75"
+
+# Shown with every answer that cites a regulation (Feature Design 5.2 step 6).
+regulation_notice: "Not legal advice; confirm with your compliance team."

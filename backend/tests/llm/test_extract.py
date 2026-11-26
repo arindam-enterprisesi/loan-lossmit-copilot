@@ -137,7 +137,7 @@ def test_every_field_has_guidance_and_a_plain_schema_name(doc_type: DocumentType
 
 def test_classify_only_types_have_no_field_schema() -> None:
     no_schema = {t for t, spec in REGISTRY.items() if spec.fields_model is None}
-    assert no_schema == {DocumentType.CREDIT_REPORT, DocumentType.HARDSHIP_LETTER}
+    assert no_schema == {DocumentType.HARDSHIP_LETTER}
 
 
 def test_field_list_shows_row_columns() -> None:
@@ -243,7 +243,6 @@ async def test_a_page_cited_outside_its_batch_is_unknown() -> None:
 async def test_classify_only_and_unrecognized_types_are_refused() -> None:
     gateway = gateway_for(FakeAdapter([]))
     for doc_type in (
-        DocumentType.CREDIT_REPORT,
         DocumentType.HARDSHIP_LETTER,
         DocumentType.UNRECOGNIZED,
     ):

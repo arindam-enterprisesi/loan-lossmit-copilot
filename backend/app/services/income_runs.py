@@ -43,6 +43,7 @@ from app.services.income import KIND_LABELS, IncomeOutcome, analyze, flag_entity
 from app.services.pipeline import cause_chain
 from app.services.queue import INCOME_FUNCTION, JobQueue
 from app.services.security import CurrentUser
+from app.settings import get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -207,6 +208,8 @@ async def run_income_job(
             outcome = analyze(documents, cfg)
             job.stage, job.progress = "save", 0.8
             await persist(session, run, outcome, cfg)
+            job.stage, job.progress = "explain", 0.9
+            explained = await explain_flags(session, run)
             run.status, run.finished_at = AnalysisStatus.SUCCEEDED, _now()
             job.status, job.stage, job.progress, job.error = JobStatus.SUCCEEDED, "done", 1.0, None
             await audit.record(
@@ -221,6 +224,7 @@ async def run_income_job(
                     "candidate_monthly_income": str(outcome.candidate.value),
                     "components": len(outcome.components),
                     "flags": len(outcome.flags),
+                    "explanations": explained,
                     "config_versions": run.config_versions,
                 },
             )
@@ -233,6 +237,46 @@ async def run_income_job(
                 job.status, job.error = JobStatus.FAILED, FAILED_MESSAGE
                 run.status, run.finished_at = AnalysisStatus.FAILED, _now()
                 await session.commit()
+
+
+# --- possible explanations of the flags (income-explain@1, Feature Design 2.5) ---------------
+
+
+async def explain_flags(session: AsyncSession, run: AnalysisRun, *, gateway: Any = None) -> str:
+    """Ask for possible explanations of the run's flags and keep each one on its flag.
+
+    The model sees the stored flags and calculations only (never a document); code checks every
+    figure it writes. Nothing here can fail the analysis: without a provider (``PIPELINE_LLM=fake``)
+    or when the call fails, the flags simply have no explanation and the result says why.
+    Returns what happened: "generated", "none needed", "skipped" or "failed".
+    """
+    if gateway is None and get_settings().pipeline_llm == "fake":
+        return "skipped"
+    view = await load_view(session, run)
+    if not view.flags:
+        return "none needed"
+    try:
+        from app.llm.income import StoredCalculation, StoredFlag, explain_stored_flags
+
+        found = await explain_stored_flags(
+            [StoredFlag(f.code, f.message, _working(f)) for f in view.flags],
+            [StoredCalculation(c.name, c.formula, c.working) for c in view.ordered_calculations],
+            gateway=gateway,
+        )
+    except Exception as exc:
+        logger.warning("income explanations failed run=%s: %s", run.id, cause_chain(exc))
+        return "failed"
+    for flag in view.flags:
+        if flag.code in found:
+            # A new dict, so the JSONB column sees the change; the flag's own evidence is kept.
+            flag.evidence = {**(flag.evidence or {}), "explanation": found[flag.code]}
+    await session.flush()
+    return "generated"
+
+
+def _working(flag: Flag) -> str | None:
+    working = (flag.evidence or {}).get("working")
+    return str(working) if working else None
 
 
 # --- reading a run --------------------------------------------------------------------------
